@@ -1,0 +1,61 @@
+{{ block "index" . }}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">   
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">    
+    <script src="https://unpkg.com/htmx.org/dist/htmx.js"></script>
+    <link rel="sylesheet" href="/assets/css/style.css">
+    <title>{{ .Title }}</title>
+</head>
+<body>
+    <h1>Home</h1>
+    <p>Welcome to the home page</p>
+    <div id="create_protocol_form">
+        {{ template "create_protocol" . }}
+    </div>
+    <div id="display_protocol">
+        {{ template "display_protocol" . }}
+    </div>
+
+    <div id="reset_button">
+        <button hx-post="/reset">Reset</button>
+    </div>
+    
+</body>
+</html>
+{{ end }}
+
+{{ block "create_protocol" .}}
+
+<form hx-post="/protocols">
+    <label for="name">Name</label>
+    <input type="text" name="name" id="name" value="{{ .Name }}">    
+    <input type="hidden" name="id" id="id" value="{{ .Id }}">
+    <label for="code">Code</label>
+    <input type="text" name="code" id="code" value="{{ .Code }}">
+    <label for="tags">Tags</label>
+    <input type="tags" id="tags" value="{{ .Tags}}">
+    <label for="notes">Notes</label>
+    <textarea name="notes" id="notes" value="{{ .Notes}}"></textarea>    
+    <button type="submit">Create Protocol</button>
+</form>
+
+{{ end }}
+
+{{ block "display_protocol" .}}
+<div>
+    {{ range .protocols }}
+    <div style="display: flex; flex-direction: column">
+        ID : <span>{{ .ID }}</span>
+        Tumor Group : <span>{{ .TumorGroup }}</span>
+        Name : <span>{{ .Name }}</span>
+        Code : <span>{{ .Code }}</span>
+        Tags : <span>{{ .Tags }}</span>
+        Notes : <p>{{ .Notes }}</p>
+    </div>
+    {{ end }}
+   
+</div>
+{{ end }}
+
