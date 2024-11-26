@@ -8,6 +8,8 @@ import (
 	"time"
 	"encoding/json"
 	"io"
+	"github.com/go-playground/validator/v10"
+	"strings"
 )
 
 type Protocol struct {
@@ -18,12 +20,43 @@ type Protocol struct {
 	Code    string `json:"code"`
 	Name    string `json:"name"`
 	Tags    []string `json:"tags"`
-	Notes   string `json:"notes"`	
+	Notes   string `json:"notes"`
+}
+
+type ProtocolRequest struct {
+	TumorGroup      string `json:"tumor_group" validate:"required,tumorgroup"`
+	Code    string `json:"code" validate:"required,min=1,max=10"`
+	Name    string `json:"name" validate:"required,min=1,max=50"`
+	Tags    []string `json:"tags" validate:"omitempty,max=10,dive,min=1,max=50"`
+	Notes   string `json:"notes" validate:"omitempty,max=500"`
 }
 
 type Protocols struct {
 	Protocols []Protocol `json:"protocols"`
 }
+
+// Predefined list of valid tumor group codes
+var validTumorGroups = map[string]bool{
+	"lymphoma&myeloma": true,
+	"leukemia&bmt": true,
+	"breast": true,
+	"gastrointestinal": true,
+	"genitourinary": true,
+	"gynecology": true,
+	"head&neck": true,
+	"lung": true,
+	"melanoma": true,
+	"neuro-oncology": true,
+	"sarcoma": true,	
+	// Add more as needed
+}
+
+// Custom validation function
+func tumorGroupValidator(fl validator.FieldLevel) bool {
+	tumorGroup := strings.ToLower(fl.Field().String()) // Ensure case-insensitivity
+	return validTumorGroups[tumorGroup]
+}
+
 
 func mapProtocolStruct(src database.Protocol) Protocol {
 	return Protocol{
@@ -65,58 +98,33 @@ func handleCreateProtocol(c *ApiConfig, w http.ResponseWriter, r *http.Request) 
 	}
 	defer r.Body.Close()
 
-	var requestData map[string]interface{}
-	err = json.Unmarshal(body, &requestData)
-	if err != nil {		
+	var req ProtocolRequest
+	err = json.Unmarshal(body, &req)
+	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	fmt.Println("Request data: ", requestData)
-
-	tumor_group, ok := requestData["tumor_group"]
-	if !ok {		
-		respondWithError(w, http.StatusBadRequest, "Missing tumor_group field")
-		return
-	}
-	
-	code, ok := requestData["code"]
-	if !ok {		
-		respondWithError(w, http.StatusBadRequest, "Missing code field")
-		return
-	}
-	
-	name, ok := requestData["name"]
-	if !ok {		
-		respondWithError(w, http.StatusBadRequest, "Missing name field")
-		return
-	}
-
-	tags, ok := requestData["tags"]
-	if !ok {		
-		respondWithError(w, http.StatusBadRequest, "Missing tags field")
-		return
-	}
-
-	notes, ok := requestData["notes"]
-	if !ok {		
-		respondWithError(w, http.StatusBadRequest, "Missing notes field")
+	// Validate the request data
+	err = validate.Struct(req)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Validation failed: "+err.Error())
 		return
 	}		
 	
 	protocol, err := c.Db.CreateProtocol(r.Context(), database.CreateProtocolParams{			
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
-		TumorGroup: tumor_group.(string),
-		Code: code.(string),
-		Name: name.(string),
-		Tags: tags.([]string),
-		Notes: notes.(string),		
+		TumorGroup: req.TumorGroup,
+		Code: req.Code,
+		Name: req.Name,
+		Tags: req.Tags,
+		Notes: req.Notes,		
 	})
 	if err != nil {
 		
-		fmt.Println("Error creating chirp: ", err)
-		respondWithError(w, http.StatusInternalServerError, "Error creating chirp")
+		fmt.Println("Error creating protocol: ", err)
+		respondWithError(w, http.StatusInternalServerError, "Error creating protocol")
 		return
 	}
 	
