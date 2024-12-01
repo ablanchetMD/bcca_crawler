@@ -13,6 +13,66 @@ import (
 	"github.com/lib/pq"
 )
 
+const addProtocolToCancer = `-- name: AddProtocolToCancer :exec
+INSERT INTO cancer_protocols (cancer_id, protocol_id)
+VALUES (
+    $1,
+    $2
+)
+`
+
+type AddProtocolToCancerParams struct {
+	CancerID   uuid.UUID
+	ProtocolID uuid.UUID
+}
+
+func (q *Queries) AddProtocolToCancer(ctx context.Context, arg AddProtocolToCancerParams) error {
+	_, err := q.db.ExecContext(ctx, addProtocolToCancer, arg.CancerID, arg.ProtocolID)
+	return err
+}
+
+const createCancer = `-- name: CreateCancer :one
+INSERT INTO cancers (code,name,tumor_group,tags,notes)
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5
+)
+RETURNING id, created_at, updated_at, code, name, tags, notes, tumor_group
+`
+
+type CreateCancerParams struct {
+	Code       sql.NullString
+	Name       sql.NullString
+	TumorGroup string
+	Tags       []string
+	Notes      string
+}
+
+func (q *Queries) CreateCancer(ctx context.Context, arg CreateCancerParams) (Cancer, error) {
+	row := q.db.QueryRowContext(ctx, createCancer,
+		arg.Code,
+		arg.Name,
+		arg.TumorGroup,
+		pq.Array(arg.Tags),
+		arg.Notes,
+	)
+	var i Cancer
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Code,
+		&i.Name,
+		pq.Array(&i.Tags),
+		&i.Notes,
+		&i.TumorGroup,
+	)
+	return i, err
+}
+
 const deleteCancer = `-- name: DeleteCancer :exec
 DELETE FROM cancers
 WHERE id = $1
@@ -24,7 +84,7 @@ func (q *Queries) DeleteCancer(ctx context.Context, id uuid.UUID) error {
 }
 
 const getCancerByID = `-- name: GetCancerByID :one
-SELECT id, created_at, updated_at, code, name, tags, notes FROM cancers
+SELECT id, created_at, updated_at, code, name, tags, notes, tumor_group FROM cancers
 WHERE id = $1
 `
 
@@ -39,12 +99,13 @@ func (q *Queries) GetCancerByID(ctx context.Context, id uuid.UUID) (Cancer, erro
 		&i.Name,
 		pq.Array(&i.Tags),
 		&i.Notes,
+		&i.TumorGroup,
 	)
 	return i, err
 }
 
 const getCancers = `-- name: GetCancers :many
-SELECT id, created_at, updated_at, code, name, tags, notes FROM cancers
+SELECT id, created_at, updated_at, code, name, tags, notes, tumor_group FROM cancers
 ORDER BY name ASC
 LIMIT $1 OFFSET $2
 `
@@ -71,6 +132,7 @@ func (q *Queries) GetCancers(ctx context.Context, arg GetCancersParams) ([]Cance
 			&i.Name,
 			pq.Array(&i.Tags),
 			&i.Notes,
+			&i.TumorGroup,
 		); err != nil {
 			return nil, err
 		}
@@ -86,19 +148,20 @@ func (q *Queries) GetCancers(ctx context.Context, arg GetCancersParams) ([]Cance
 }
 
 const getCancersByTags = `-- name: GetCancersByTags :many
-SELECT id, created_at, updated_at, code, name, tags, notes FROM cancers
+SELECT id, created_at, updated_at, code, name, tags, notes, tumor_group FROM cancers
 WHERE tags @> $1
 ORDER BY name ASC
-LIMIT $1 OFFSET $2
+LIMIT $2 OFFSET $3
 `
 
 type GetCancersByTagsParams struct {
+	Tags   []string
 	Limit  int32
 	Offset int32
 }
 
 func (q *Queries) GetCancersByTags(ctx context.Context, arg GetCancersByTagsParams) ([]Cancer, error) {
-	rows, err := q.db.QueryContext(ctx, getCancersByTags, arg.Limit, arg.Offset)
+	rows, err := q.db.QueryContext(ctx, getCancersByTags, pq.Array(arg.Tags), arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -114,6 +177,7 @@ func (q *Queries) GetCancersByTags(ctx context.Context, arg GetCancersByTagsPara
 			&i.Name,
 			pq.Array(&i.Tags),
 			&i.Notes,
+			&i.TumorGroup,
 		); err != nil {
 			return nil, err
 		}
@@ -128,20 +192,28 @@ func (q *Queries) GetCancersByTags(ctx context.Context, arg GetCancersByTagsPara
 	return items, nil
 }
 
-const getCancersByTagsDesc = `-- name: GetCancersByTagsDesc :many
-SELECT id, created_at, updated_at, code, name, tags, notes FROM cancers
-WHERE tags @> $1
-ORDER BY name DESC
-LIMIT $1 OFFSET $2
+const getCancersOnlyTumorGroupAndTagsAsc = `-- name: GetCancersOnlyTumorGroupAndTagsAsc :many
+SELECT id, created_at, updated_at, code, name, tags, notes, tumor_group FROM cancers
+WHERE tumor_group = $1
+AND tags @> $2
+ORDER BY name ASC
+LIMIT $3 OFFSET $4
 `
 
-type GetCancersByTagsDescParams struct {
-	Limit  int32
-	Offset int32
+type GetCancersOnlyTumorGroupAndTagsAscParams struct {
+	TumorGroup string
+	Tags       []string
+	Limit      int32
+	Offset     int32
 }
 
-func (q *Queries) GetCancersByTagsDesc(ctx context.Context, arg GetCancersByTagsDescParams) ([]Cancer, error) {
-	rows, err := q.db.QueryContext(ctx, getCancersByTagsDesc, arg.Limit, arg.Offset)
+func (q *Queries) GetCancersOnlyTumorGroupAndTagsAsc(ctx context.Context, arg GetCancersOnlyTumorGroupAndTagsAscParams) ([]Cancer, error) {
+	rows, err := q.db.QueryContext(ctx, getCancersOnlyTumorGroupAndTagsAsc,
+		arg.TumorGroup,
+		pq.Array(arg.Tags),
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -153,6 +225,91 @@ func (q *Queries) GetCancersByTagsDesc(ctx context.Context, arg GetCancersByTags
 			&i.ID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Code,
+			&i.Name,
+			pq.Array(&i.Tags),
+			&i.Notes,
+			&i.TumorGroup,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCancersOnlyTumorGroupAsc = `-- name: GetCancersOnlyTumorGroupAsc :many
+SELECT id, created_at, updated_at, code, name, tags, notes, tumor_group FROM cancers
+WHERE tumor_group = $1
+ORDER BY name ASC
+LIMIT $2 OFFSET $3
+`
+
+type GetCancersOnlyTumorGroupAscParams struct {
+	TumorGroup string
+	Limit      int32
+	Offset     int32
+}
+
+func (q *Queries) GetCancersOnlyTumorGroupAsc(ctx context.Context, arg GetCancersOnlyTumorGroupAscParams) ([]Cancer, error) {
+	rows, err := q.db.QueryContext(ctx, getCancersOnlyTumorGroupAsc, arg.TumorGroup, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Cancer
+	for rows.Next() {
+		var i Cancer
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Code,
+			&i.Name,
+			pq.Array(&i.Tags),
+			&i.Notes,
+			&i.TumorGroup,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getProtocolsForCancer = `-- name: GetProtocolsForCancer :many
+SELECT p.id, p.created_at, p.updated_at, p.tumor_group, p.code, p.name, p.tags, p.notes 
+FROM cancer_protocols cp
+JOIN protocols p ON cp.protocol_id = p.id
+WHERE cp.cancer_id = $1
+`
+
+func (q *Queries) GetProtocolsForCancer(ctx context.Context, cancerID uuid.UUID) ([]Protocol, error) {
+	rows, err := q.db.QueryContext(ctx, getProtocolsForCancer, cancerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Protocol
+	for rows.Next() {
+		var i Protocol
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.TumorGroup,
 			&i.Code,
 			&i.Name,
 			pq.Array(&i.Tags),
@@ -169,6 +326,21 @@ func (q *Queries) GetCancersByTagsDesc(ctx context.Context, arg GetCancersByTags
 		return nil, err
 	}
 	return items, nil
+}
+
+const removeProtocolFromCancer = `-- name: RemoveProtocolFromCancer :exec
+DELETE FROM cancer_protocols
+WHERE cancer_id = $1 AND protocol_id = $2
+`
+
+type RemoveProtocolFromCancerParams struct {
+	CancerID   uuid.UUID
+	ProtocolID uuid.UUID
+}
+
+func (q *Queries) RemoveProtocolFromCancer(ctx context.Context, arg RemoveProtocolFromCancerParams) error {
+	_, err := q.db.ExecContext(ctx, removeProtocolFromCancer, arg.CancerID, arg.ProtocolID)
+	return err
 }
 
 const updateCancer = `-- name: UpdateCancer :one
@@ -177,18 +349,20 @@ SET
     updated_at = NOW(),
     code = $2,
     name = $3,
-    tags = $4,
-    notes = $5
+    tumor_group = $4,
+    tags = $5,
+    notes = $6
 WHERE id = $1
-RETURNING id, created_at, updated_at, code, name, tags, notes
+RETURNING id, created_at, updated_at, code, name, tags, notes, tumor_group
 `
 
 type UpdateCancerParams struct {
-	ID    uuid.UUID
-	Code  sql.NullString
-	Name  sql.NullString
-	Tags  []string
-	Notes string
+	ID         uuid.UUID
+	Code       sql.NullString
+	Name       sql.NullString
+	TumorGroup string
+	Tags       []string
+	Notes      string
 }
 
 func (q *Queries) UpdateCancer(ctx context.Context, arg UpdateCancerParams) (Cancer, error) {
@@ -196,6 +370,7 @@ func (q *Queries) UpdateCancer(ctx context.Context, arg UpdateCancerParams) (Can
 		arg.ID,
 		arg.Code,
 		arg.Name,
+		arg.TumorGroup,
 		pq.Array(arg.Tags),
 		arg.Notes,
 	)
@@ -208,6 +383,7 @@ func (q *Queries) UpdateCancer(ctx context.Context, arg UpdateCancerParams) (Can
 		&i.Name,
 		pq.Array(&i.Tags),
 		&i.Notes,
+		&i.TumorGroup,
 	)
 	return i, err
 }

@@ -24,7 +24,7 @@ SET
 WHERE id = $1
 RETURNING *;
 
- --name: DeleteProtocol :exec
+-- name: DeleteProtocol :exec
 DELETE FROM protocols
 WHERE id = $1;
 
@@ -32,35 +32,41 @@ WHERE id = $1;
 SELECT * FROM protocols
 WHERE id = $1;
 
--- name: GetProtocols :many
+-- name: GetProtocolsAsc :many
 SELECT * FROM protocols
-ORDER BY name ASC;
-
--- name: GetProtocolsByTumorGroupAsc :many
-SELECT * FROM protocols
-WHERE tumor_group = $1
 ORDER BY name ASC
 LIMIT $1 OFFSET $2;
 
--- name: GetProtocolsByTumorGroupDesc :many
+-- name: GetProtocolsDesc :many
 SELECT * FROM protocols
-WHERE tumor_group = $1
 ORDER BY name DESC
 LIMIT $1 OFFSET $2;
 
--- name: GetProtocolsByTumorGroupAndTagsAsc :many
+-- name: GetProtocolsOnlyTumorGroupAsc :many
+SELECT * FROM protocols
+WHERE tumor_group = $1
+ORDER BY name ASC
+LIMIT $2 OFFSET $3;
+
+-- name: GetProtocolsOnlyTumorGroupDesc :many
+SELECT * FROM protocols
+WHERE tumor_group = $1
+ORDER BY name DESC
+LIMIT $2 OFFSET $3;
+
+-- name: GetProtocolsOnlyTumorGroupAndTagsAsc :many
 SELECT * FROM protocols
 WHERE tumor_group = $1
 AND tags @> $2
 ORDER BY name ASC
-LIMIT $1 OFFSET $2;
+LIMIT $3 OFFSET $4;
 
--- name: GetProtocolsByTumorGroupAndTagsDesc :many
+-- name: GetProtocolsOnlyTumorGroupAndTagsDesc :many
 SELECT * FROM protocols
 WHERE tumor_group = $1
 AND tags @> $2
 ORDER BY name DESC
-LIMIT $1 OFFSET $2;
+LIMIT $3 OFFSET $4;
 
 
 

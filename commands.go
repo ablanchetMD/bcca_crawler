@@ -4,7 +4,10 @@ import (
 	"errors"
 	"fmt"	
 	"log"
-	"net/http"		
+	"net/http"
+	"bcca_crawler/internal/config"
+	"bcca_crawler/api"
+	"bcca_crawler/routes"
 )
 
 type command struct {
@@ -13,7 +16,7 @@ type command struct {
 }
 
 type commands struct {
-	library map[string]func(*ApiConfig, command) error
+	library map[string]func(*config.Config, command) error
 }
 
 
@@ -27,9 +30,9 @@ type commands struct {
 // 	})
 // }
 
-func (c *commands) register(name string, f func(s *ApiConfig, c command) error) error {
+func (c *commands) register(name string, f func(s *config.Config, c command) error) error {
 	if c.library == nil {
-		c.library = make(map[string]func(*ApiConfig, command) error) // Initialize the map if not already done
+		c.library = make(map[string]func(*config.Config, command) error) // Initialize the map if not already done
 	}
 	if _, exists := c.library[name]; exists {
 		return errors.New("command already registered")
@@ -38,7 +41,7 @@ func (c *commands) register(name string, f func(s *ApiConfig, c command) error) 
 	return nil
 }
 
-func (c *commands) run(s *ApiConfig, cmd command) error {
+func (c *commands) run(s *config.Config, cmd command) error {
 	f, ok := c.library[cmd.Name]
 	if !ok {
 		return errors.New("command not found")
@@ -46,22 +49,28 @@ func (c *commands) run(s *ApiConfig, cmd command) error {
 	return f(s, cmd)
 }
 
+func handlerGeoLocation(s *config.Config, cmd command) error {
+	// Get the geolocation of a given IP address
+	ip := cmd.Args[0]
 
-func handlerStartServer(s *ApiConfig, cmd command) error {
+	resp,err := api.GetIPGeoLocation(ip)
+	// geo, err := s.GeoIPDB.City(net.ParseIP(ip))
+	if err != nil {
+		fmt.Println("Error getting geolocation: ", err)
+		return err
+	}
+	fmt.Println("IP: ", resp)	
+	return nil
+}
+
+
+func handlerStartServer(s *config.Config, cmd command) error {
 	// Start the server
 	// Create a new instance of the server
 	mux := http.NewServeMux()
 
+	routes.RegisterRoutes(mux, s)
 	
-	// Define a handler
-	mux.HandleFunc("GET /api/v1/protocols", func(w http.ResponseWriter, r *http.Request) {
-		handleGetProtocols(s, w, r)		
-	})	
-
-	mux.HandleFunc("POST /api/v1/protocols", func(w http.ResponseWriter, r *http.Request) {
-		handleCreateProtocol(s, w, r)		
-	})
-
 	// Start the server//
 	//  wrappedMux := s.middlewareMetricsInc(mux)
 	// portString := "8080"

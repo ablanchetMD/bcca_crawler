@@ -5,6 +5,8 @@ import (
 	"os"
 	"fmt"
 	"bcca_crawler/internal/database"
+	"bcca_crawler/api"
+	"bcca_crawler/internal/config"
 	_ "github.com/lib/pq"
 	"database/sql"
 	"github.com/go-playground/validator/v10"
@@ -24,11 +26,11 @@ var validate *validator.Validate
 func init() {
 	godotenv.Load(".env")
 	validate = validator.New()
-	validate.RegisterValidation("tumorgroup", tumorGroupValidator)
+	validate.RegisterValidation("tumorgroup", api.TumorGroupValidator)
 }
 
 func main() {
-	cfg := &ApiConfig{}	
+	cfg := &config.Config{}	
 	cfg.Platform = os.Getenv("PLATFORM")
 	cfg.Secret = os.Getenv("SECRET")
 	cfg.DatabaseUrl = os.Getenv("DB_URL")
@@ -41,9 +43,10 @@ func main() {
 	dbQueries := database.New(db)
 	cfg.Db = dbQueries
 	cfg.ServerPort = os.Getenv("PORT")
+	cfg.Validate = validate
 	commands := commands{}
 	commands.register("serve", handlerStartServer)
-	
+	commands.register("geo", handlerGeoLocation)	
 
 	//http://www.bccancer.bc.ca/health-professionals/clinical-resources/chemotherapy-protocols/lymphoma-myeloma
 

@@ -12,18 +12,29 @@ import (
 )
 
 type Cancer struct {
-	ID        uuid.UUID
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Code      sql.NullString
-	Name      sql.NullString
-	Tags      []string
-	Notes     string
+	ID         uuid.UUID
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	Code       sql.NullString
+	Name       sql.NullString
+	Tags       []string
+	Notes      string
+	TumorGroup string
 }
 
 type CancerProtocol struct {
 	CancerID   uuid.UUID
 	ProtocolID uuid.UUID
+}
+
+type Log struct {
+	ID        uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	UserID    uuid.UUID
+	IpAddress string
+	UserAgent string
+	Action    string
 }
 
 type Protocol struct {
@@ -35,4 +46,26 @@ type Protocol struct {
 	Name       string
 	Tags       []string
 	Notes      string
+}
+
+type RefreshToken struct {
+	Token     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	ExpiresAt time.Time
+	RevokedAt sql.NullTime
+	UserID    uuid.UUID
+}
+
+type User struct {
+	ID         uuid.UUID
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	Email      string
+	Password   string
+	Role       string
+	IsVerified bool
+	DeletedAt  sql.NullTime
+	DeletedBy  uuid.NullUUID
+	LastActive sql.NullTime
 }

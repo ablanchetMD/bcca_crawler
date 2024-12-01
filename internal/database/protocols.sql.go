@@ -62,6 +62,16 @@ func (q *Queries) CreateProtocol(ctx context.Context, arg CreateProtocolParams) 
 	return i, err
 }
 
+const deleteProtocol = `-- name: DeleteProtocol :exec
+DELETE FROM protocols
+WHERE id = $1
+`
+
+func (q *Queries) DeleteProtocol(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deleteProtocol, id)
+	return err
+}
+
 const getProtocolByID = `-- name: GetProtocolByID :one
 SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM protocols
 WHERE id = $1
@@ -83,58 +93,19 @@ func (q *Queries) GetProtocolByID(ctx context.Context, id uuid.UUID) (Protocol, 
 	return i, err
 }
 
-const getProtocols = `-- name: GetProtocols :many
+const getProtocolsAsc = `-- name: GetProtocolsAsc :many
 SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM protocols
-ORDER BY name ASC
-`
-
-func (q *Queries) GetProtocols(ctx context.Context) ([]Protocol, error) {
-	rows, err := q.db.QueryContext(ctx, getProtocols)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Protocol
-	for rows.Next() {
-		var i Protocol
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.TumorGroup,
-			&i.Code,
-			&i.Name,
-			pq.Array(&i.Tags),
-			&i.Notes,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getProtocolsByTumorGroupAndTagsAsc = `-- name: GetProtocolsByTumorGroupAndTagsAsc :many
-SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM protocols
-WHERE tumor_group = $1
-AND tags @> $2
 ORDER BY name ASC
 LIMIT $1 OFFSET $2
 `
 
-type GetProtocolsByTumorGroupAndTagsAscParams struct {
+type GetProtocolsAscParams struct {
 	Limit  int32
 	Offset int32
 }
 
-func (q *Queries) GetProtocolsByTumorGroupAndTagsAsc(ctx context.Context, arg GetProtocolsByTumorGroupAndTagsAscParams) ([]Protocol, error) {
-	rows, err := q.db.QueryContext(ctx, getProtocolsByTumorGroupAndTagsAsc, arg.Limit, arg.Offset)
+func (q *Queries) GetProtocolsAsc(ctx context.Context, arg GetProtocolsAscParams) ([]Protocol, error) {
+	rows, err := q.db.QueryContext(ctx, getProtocolsAsc, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -165,21 +136,19 @@ func (q *Queries) GetProtocolsByTumorGroupAndTagsAsc(ctx context.Context, arg Ge
 	return items, nil
 }
 
-const getProtocolsByTumorGroupAndTagsDesc = `-- name: GetProtocolsByTumorGroupAndTagsDesc :many
+const getProtocolsDesc = `-- name: GetProtocolsDesc :many
 SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM protocols
-WHERE tumor_group = $1
-AND tags @> $2
 ORDER BY name DESC
 LIMIT $1 OFFSET $2
 `
 
-type GetProtocolsByTumorGroupAndTagsDescParams struct {
+type GetProtocolsDescParams struct {
 	Limit  int32
 	Offset int32
 }
 
-func (q *Queries) GetProtocolsByTumorGroupAndTagsDesc(ctx context.Context, arg GetProtocolsByTumorGroupAndTagsDescParams) ([]Protocol, error) {
-	rows, err := q.db.QueryContext(ctx, getProtocolsByTumorGroupAndTagsDesc, arg.Limit, arg.Offset)
+func (q *Queries) GetProtocolsDesc(ctx context.Context, arg GetProtocolsDescParams) ([]Protocol, error) {
+	rows, err := q.db.QueryContext(ctx, getProtocolsDesc, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -210,20 +179,125 @@ func (q *Queries) GetProtocolsByTumorGroupAndTagsDesc(ctx context.Context, arg G
 	return items, nil
 }
 
-const getProtocolsByTumorGroupAsc = `-- name: GetProtocolsByTumorGroupAsc :many
+const getProtocolsOnlyTumorGroupAndTagsAsc = `-- name: GetProtocolsOnlyTumorGroupAndTagsAsc :many
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM protocols
+WHERE tumor_group = $1
+AND tags @> $2
+ORDER BY name ASC
+LIMIT $3 OFFSET $4
+`
+
+type GetProtocolsOnlyTumorGroupAndTagsAscParams struct {
+	TumorGroup string
+	Tags       []string
+	Limit      int32
+	Offset     int32
+}
+
+func (q *Queries) GetProtocolsOnlyTumorGroupAndTagsAsc(ctx context.Context, arg GetProtocolsOnlyTumorGroupAndTagsAscParams) ([]Protocol, error) {
+	rows, err := q.db.QueryContext(ctx, getProtocolsOnlyTumorGroupAndTagsAsc,
+		arg.TumorGroup,
+		pq.Array(arg.Tags),
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Protocol
+	for rows.Next() {
+		var i Protocol
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.TumorGroup,
+			&i.Code,
+			&i.Name,
+			pq.Array(&i.Tags),
+			&i.Notes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getProtocolsOnlyTumorGroupAndTagsDesc = `-- name: GetProtocolsOnlyTumorGroupAndTagsDesc :many
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM protocols
+WHERE tumor_group = $1
+AND tags @> $2
+ORDER BY name DESC
+LIMIT $3 OFFSET $4
+`
+
+type GetProtocolsOnlyTumorGroupAndTagsDescParams struct {
+	TumorGroup string
+	Tags       []string
+	Limit      int32
+	Offset     int32
+}
+
+func (q *Queries) GetProtocolsOnlyTumorGroupAndTagsDesc(ctx context.Context, arg GetProtocolsOnlyTumorGroupAndTagsDescParams) ([]Protocol, error) {
+	rows, err := q.db.QueryContext(ctx, getProtocolsOnlyTumorGroupAndTagsDesc,
+		arg.TumorGroup,
+		pq.Array(arg.Tags),
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Protocol
+	for rows.Next() {
+		var i Protocol
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.TumorGroup,
+			&i.Code,
+			&i.Name,
+			pq.Array(&i.Tags),
+			&i.Notes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getProtocolsOnlyTumorGroupAsc = `-- name: GetProtocolsOnlyTumorGroupAsc :many
 SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM protocols
 WHERE tumor_group = $1
 ORDER BY name ASC
-LIMIT $1 OFFSET $2
+LIMIT $2 OFFSET $3
 `
 
-type GetProtocolsByTumorGroupAscParams struct {
-	Limit  int32
-	Offset int32
+type GetProtocolsOnlyTumorGroupAscParams struct {
+	TumorGroup string
+	Limit      int32
+	Offset     int32
 }
 
-func (q *Queries) GetProtocolsByTumorGroupAsc(ctx context.Context, arg GetProtocolsByTumorGroupAscParams) ([]Protocol, error) {
-	rows, err := q.db.QueryContext(ctx, getProtocolsByTumorGroupAsc, arg.Limit, arg.Offset)
+func (q *Queries) GetProtocolsOnlyTumorGroupAsc(ctx context.Context, arg GetProtocolsOnlyTumorGroupAscParams) ([]Protocol, error) {
+	rows, err := q.db.QueryContext(ctx, getProtocolsOnlyTumorGroupAsc, arg.TumorGroup, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -254,20 +328,21 @@ func (q *Queries) GetProtocolsByTumorGroupAsc(ctx context.Context, arg GetProtoc
 	return items, nil
 }
 
-const getProtocolsByTumorGroupDesc = `-- name: GetProtocolsByTumorGroupDesc :many
+const getProtocolsOnlyTumorGroupDesc = `-- name: GetProtocolsOnlyTumorGroupDesc :many
 SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM protocols
 WHERE tumor_group = $1
 ORDER BY name DESC
-LIMIT $1 OFFSET $2
+LIMIT $2 OFFSET $3
 `
 
-type GetProtocolsByTumorGroupDescParams struct {
-	Limit  int32
-	Offset int32
+type GetProtocolsOnlyTumorGroupDescParams struct {
+	TumorGroup string
+	Limit      int32
+	Offset     int32
 }
 
-func (q *Queries) GetProtocolsByTumorGroupDesc(ctx context.Context, arg GetProtocolsByTumorGroupDescParams) ([]Protocol, error) {
-	rows, err := q.db.QueryContext(ctx, getProtocolsByTumorGroupDesc, arg.Limit, arg.Offset)
+func (q *Queries) GetProtocolsOnlyTumorGroupDesc(ctx context.Context, arg GetProtocolsOnlyTumorGroupDescParams) ([]Protocol, error) {
+	rows, err := q.db.QueryContext(ctx, getProtocolsOnlyTumorGroupDesc, arg.TumorGroup, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}

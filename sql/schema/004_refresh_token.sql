@@ -1,0 +1,28 @@
+-- +goose Up
+
+ALTER TABLE users
+ADD COLUMN role TEXT NOT NULL DEFAULT 'user',
+ADD COLUMN is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+ADD COLUMN deleted_at TIMESTAMP,
+ADD COLUMN deleted_by UUID REFERENCES users(id),
+ADD COLUMN last_active TIMESTAMP;
+
+CREATE Table logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  ip_address TEXT NOT NULL,
+  user_agent TEXT NOT NULL,
+  action TEXT NOT NULL
+);
+
+-- +goose Down
+ALTER TABLE users
+DROP COLUMN is_verified,
+DROP COLUMN role,
+DROP COLUMN deleted_at,
+DROP COLUMN deleted_by,
+DROP COLUMN last_active;
+
+DROP TABLE logs;
