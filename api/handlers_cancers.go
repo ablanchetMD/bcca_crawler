@@ -56,14 +56,14 @@ func HandleGetCancers(c *config.Config, q QueryParams, w http.ResponseWriter, r 
 
 	//optional queries : sort, sort_by, page, limit, offset, filter, fields, include, exclude,
 	switch {
-	case q.FilterBy == "tumor_group" && len(q.Include) > 0:
+	case len(q.FilterBy) > 0 && len(q.Include) > 0:
 		payload, err = c.Db.GetCancersOnlyTumorGroupAndTagsAsc(r.Context(), database.GetCancersOnlyTumorGroupAndTagsAscParams{
 			TumorGroup: q.FilterBy,
 			Tags:       q.Include,
 			Limit:      params.Limit,
 			Offset:     params.Offset,
 		})
-	case q.FilterBy == "tumor_group" && len(q.Include) == 0:
+	case len(q.FilterBy) > 0 && len(q.Include) == 0:
 		payload, err = c.Db.GetCancersOnlyTumorGroupAsc(r.Context(), database.GetCancersOnlyTumorGroupAscParams{
 			TumorGroup: q.FilterBy,
 			Limit:      params.Limit,

@@ -13,20 +13,14 @@ import (
 	
 )
 
-type ApiConfig struct {
-	Db             *database.Queries
-	Platform       string
-	ServerPort		   string
-	DatabaseUrl    string
-	Secret         string	
-	
-}
+
 var validate *validator.Validate
 
 func init() {
 	godotenv.Load(".env")
 	validate = validator.New()
 	validate.RegisterValidation("tumorgroup", api.TumorGroupValidator)
+	validate.RegisterValidation("passwordstrength", api.PasswordStrengthValidator)
 }
 
 func main() {
@@ -42,6 +36,7 @@ func main() {
 	defer db.Close()
 	dbQueries := database.New(db)
 	cfg.Db = dbQueries
+	cfg.Database = db
 	cfg.ServerPort = os.Getenv("PORT")
 	cfg.Validate = validate
 	commands := commands{}

@@ -1,32 +1,53 @@
 package api
 
 import (
-	
+	"bcca_crawler/internal/auth"
 	"bcca_crawler/internal/config"
 	"bcca_crawler/internal/database"
-	"bcca_crawler/internal/auth"
-	"github.com/google/uuid"
-	"fmt"	
-	"net/http"
 	"context"
+	"database/sql"
+	"fmt"
+	"net/http"
+	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type User struct {
-	ID         uuid.UUID `json:"id"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
-	Email string    `json:"tumor_group"`	
+	ID         uuid.UUID     `json:"id"`
+	CreatedAt  time.Time     `json:"created_at"`
+	UpdatedAt  time.Time     `json:"updated_at"`
+	Email      string        `json:"email"`
+	Role       string        `json:"role"`
+	IsVerified bool          `json:"is_verified"`
+	DeletedAt  sql.NullTime  `json:"deleted_at"`
+	DeletedBy  uuid.NullUUID `json:"deleted_by"`
+	LastActive sql.NullTime  `json:"last_active"`
 }
 
 type CreateUserRequest struct {
-	Email       string   `json:"email" validate:"required,email"`
-	Password    string   `json:"password" validate:"required,passwordstrength"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,passwordstrength"`
 }
 
 type LoginRequest struct {
 	Email    string `json:"email"`
-	Password string `json:"password"`	
+	Password string `json:"password"`
+}
+
+type UpdateUserRequest struct {
+	Email      string        `json:"email" validate:"omitempty,email"`
+	Password   string        `json:"password" validate:"omitempty,passwordstrength"`
+	Role       string        `json:"role" validate:"omitempty,oneof=user admin"`
+	IsVerified *bool         `json:"is_verified" validate:"omitempty,boolean"`
+	DeletedAt  sql.NullTime  `json:"deleted_at"`
+	DeletedBy  uuid.NullUUID `json:"deleted_by"`
+	LastActive sql.NullTime  `json:"last_active"`
+}
+
+type RevokeRequest struct {
+	UserID uuid.UUID `json:"user_id"`
 }
 
 type Users struct {
@@ -38,7 +59,12 @@ func mapUserStruct(src database.User) User {
 		ID:         src.ID,
 		CreatedAt:  src.CreatedAt,
 		UpdatedAt:  src.UpdatedAt,
-		Email: 		src.Email,		
+		Email:      src.Email,
+		Role:       src.Role,
+		IsVerified: src.IsVerified,
+		DeletedAt:  src.DeletedAt,
+		DeletedBy:  src.DeletedBy,
+		LastActive: src.LastActive,
 	}
 }
 
@@ -49,7 +75,7 @@ func HandleCLICreateUser(c *config.Config, email string, password string) (User,
 	}
 	err := c.Validate.Struct(requestData)
 	if err != nil {
-		return User{}, fmt.Errorf("Validation failed: "+err.Error())
+		return User{}, fmt.Errorf("Validation failed: " + err.Error())
 	}
 
 	hashedPassword, err := auth.HashPassword(password)
@@ -61,7 +87,7 @@ func HandleCLICreateUser(c *config.Config, email string, password string) (User,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 		Password:  hashedPassword,
-		Role: "admin",
+		Role:      "admin",
 	})
 	if err != nil {
 		return User{}, fmt.Errorf("error creating user")
@@ -70,9 +96,9 @@ func HandleCLICreateUser(c *config.Config, email string, password string) (User,
 }
 
 func HandleCreateUser(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	
+
 	var requestData CreateUserRequest
-	err :=UnmarshalAndValidatePayload(c, r, &requestData)	
+	err := UnmarshalAndValidatePayload(c, r, &requestData)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
@@ -83,13 +109,13 @@ func HandleCreateUser(c *config.Config, w http.ResponseWriter, r *http.Request) 
 		respondWithError(w, http.StatusInternalServerError, "Error hashing password")
 		return
 	}
-	
+
 	user, err := c.Db.CreateUser(r.Context(), database.CreateUserParams{
 		Email:     requestData.Email,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 		Password:  hashedPassword,
-		Role: "user",		
+		Role:      "user",
 	})
 	if err != nil {
 		fmt.Println("Error creating user: ", err)
@@ -97,6 +123,56 @@ func HandleCreateUser(c *config.Config, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	respondWithJSON(w, http.StatusCreated, mapUserStruct(user))
+}
+
+func HandleUpdateUser(c *config.Config, w http.ResponseWriter, r *http.Request) {
+	parsed_id, err := ParseAndValidateID(r)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	var req UpdateUserRequest
+	err = UnmarshalAndValidatePayload(c, r, &req)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	updates := make(map[string]interface{})
+	updates["updated_at"] = time.Now()
+	// Helper function to add updates to the map
+	addUpdate := func(key string, value interface{}) {
+		if value != nil && value != "" && !(value == (sql.NullTime{}) || value == (uuid.NullUUID{})) {
+			updates[key] = value
+		}
+	}
+
+	// Apply conditions for each field
+	addUpdate("email", req.Email)
+	if req.Password != "" {
+		hashedPassword, err := auth.HashPassword(req.Password)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Error hashing password")
+			return
+		}
+		addUpdate("password", hashedPassword)
+	}
+	addUpdate("role", req.Role)
+	if req.IsVerified != nil {
+		addUpdate("is_verified", req.IsVerified)
+	}
+	addUpdate("deleted_at", req.DeletedAt)
+	addUpdate("deleted_by", req.DeletedBy)
+	addUpdate("last_active", req.LastActive)
+
+	user, err := UpdateUserDynamic(c, parsed_id, updates, r)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error updating user: %s with error:%s", parsed_id.String(), err.Error()))
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, user)
 }
 
 func HandleReset(c *config.Config, w http.ResponseWriter, r *http.Request) {
@@ -113,15 +189,22 @@ func HandleReset(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, "Users deleted")
 }
 
-func HandleRefresh(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	token, err := auth.GetBearerToken(r.Header)
+//Refresh function uses cookies instead of headers, can we make it use both?
 
+func HandleRefresh(c *config.Config, w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "No token provided")
+		// If the cookie is not found or any error occurs
+		if err == http.ErrNoCookie {
+			http.Error(w, "Refresh token cookie not found", http.StatusUnauthorized)
+			return
+		}
+		// Handle other errors
+		http.Error(w, fmt.Sprintf("Error retrieving cookie: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	refreshToken, err := c.Db.GetRefreshToken(r.Context(), token)
+	refreshToken, err := c.Db.GetRefreshToken(r.Context(), cookie.Value)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, "Invalid token")
 		return
@@ -154,7 +237,7 @@ func HandleRefresh(c *config.Config, w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusInternalServerError, "Error creating refresh token")
 		return
 	}
-		_, err = c.Db.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
+	_, err = c.Db.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
 		Token:     refresh_token,
 		UserID:    refreshToken.UserID,
 		ExpiresAt: time.Now().Add(time.Hour * 24 * 60),
@@ -184,20 +267,25 @@ func HandleRefresh(c *config.Config, w http.ResponseWriter, r *http.Request) {
 		MaxAge:   3600, // 1 hour
 	})
 
-	t := struct {Token string `json:"auth_token"`;RefreshToken string `json:"refresh_token"`}{Token: jwt, RefreshToken: refresh_token}
+	t := struct {
+		Token        string `json:"auth_token"`
+		RefreshToken string `json:"refresh_token"`
+	}{Token: jwt, RefreshToken: refresh_token}
 
 	respondWithJSON(w, http.StatusOK, t)
 }
 
-func HandleRevoke(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	token, err := auth.GetBearerToken(r.Header)
+//Finish the Revoke Function
 
+func HandleRevoke(c *config.Config, w http.ResponseWriter, r *http.Request) {
+	var requestData RevokeRequest
+	err := UnmarshalAndValidatePayload(c, r, &requestData)
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "No token provided")
+		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	_, err = c.Db.RevokeRefreshToken(r.Context(), token)
+	_, err = c.Db.RevokeRefreshTokenByUserId(r.Context(), requestData.UserID)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Error revoking token")
 		return
@@ -205,8 +293,25 @@ func HandleRevoke(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusNoContent, "")
 }
 
-func HandleGetUsers(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	users, err := c.Db.GetUsers(r.Context())
+func HandleGetUsers(c *config.Config, q QueryParams, w http.ResponseWriter, r *http.Request) {
+	var users = []database.User{}
+	params := database.GetUsersParams{
+		Limit:  int32(q.Limit),
+		Offset: int32(q.Offset),
+	}
+	var err error
+	//optional queries : sort, sort_by, page, limit, offset, filter, fields, include, exclude,
+	switch {
+	case q.FilterBy == "role" && len(q.Include) > 0:
+		users, err = c.Db.GetUsersByRole(r.Context(), database.GetUsersByRoleParams{
+			Role:   q.FilterBy,
+			Limit:  params.Limit,
+			Offset: params.Offset,
+		})
+	default:
+		users, err = c.Db.GetUsers(r.Context(), params)
+	}
+
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Error getting users")
 		return
@@ -220,7 +325,7 @@ func HandleGetUsers(c *config.Config, w http.ResponseWriter, r *http.Request) {
 
 func HandleLogin(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	var requestData LoginRequest
-	err :=UnmarshalAndValidatePayload(c, r, &requestData)	
+	err := UnmarshalAndValidatePayload(c, r, &requestData)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
@@ -281,9 +386,86 @@ func HandleLogin(c *config.Config, w http.ResponseWriter, r *http.Request) {
 		MaxAge:   3600, // 1 hour
 	})
 
-	t := struct {Token string `json:"auth_token"`;RefreshToken string `json:"refresh_token"`}{Token: token, RefreshToken: refresh_token}
-	
+	t := struct {
+		Token        string `json:"auth_token"`
+		RefreshToken string `json:"refresh_token"`
+	}{Token: token, RefreshToken: refresh_token}
 
 	respondWithJSON(w, http.StatusOK, t)
+
+}
+
+func HandleDeleteUserById(c *config.Config, w http.ResponseWriter, r *http.Request) {
+	parsed_id, err := ParseAndValidateID(r)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	err = c.Db.DeleteUserByID(r.Context(), parsed_id)
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error deleting user")
+		return
+	}
+	respondWithJSON(w, http.StatusOK, map[string]string{"message": fmt.Sprintf("User %s deleted", parsed_id.String())})
+}
+
+func HandleGetUserById(c *config.Config, w http.ResponseWriter, r *http.Request) {
+
+	parsed_id, err := ParseAndValidateID(r)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	user, err := c.Db.GetUserByID(r.Context(), parsed_id)
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting user: %s", parsed_id.String()))
+		return
+	}
+	respondWithJSON(w, http.StatusOK, mapUserStruct(user))
+}
+
+func UpdateUserDynamic(c *config.Config, userID uuid.UUID, updates map[string]interface{}, r *http.Request) (User, error) {
+	ctx := r.Context()
+	DB := c.Database
+	query := "UPDATE users SET "
+	args := []interface{}{}
+	i := 1
+
+	for column, value := range updates {
+		query += fmt.Sprintf("%s = $%d, ", column, i)
+		args = append(args, value)
+		i++
+	}
+
+	query = strings.TrimSuffix(query, ", ") // Remove trailing comma
+	query += fmt.Sprintf(" WHERE id = $%d ", i)
+	args = append(args, userID)
+	query += "RETURNING *;"
+	fmt.Println(query)
+	fmt.Println("args: \n", args)
+
+	// user, err := db.Exec(query, args...)
+
+	row := DB.QueryRowContext(ctx, query, args...)
+	var password string
+	var u User
+	err := row.Scan(
+		&u.ID,
+		&u.CreatedAt,
+		&u.UpdatedAt,
+		&u.Email,
+		&password, // password
+		&u.Role,
+		&u.IsVerified,
+		&u.DeletedAt,
+		&u.DeletedBy,
+		&u.LastActive,
+	)
+
+	return u, err
 
 }

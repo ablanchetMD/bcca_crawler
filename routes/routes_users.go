@@ -10,10 +10,9 @@ func RegisterUserRoutes(prefix string, mux *http.ServeMux, s *config.Config) {
 	mux.HandleFunc(prefix +"/users", func(w http.ResponseWriter, r *http.Request) {
 
 		switch r.Method {
-		case http.MethodGet:
-			//optional queries : sort, sort_by, page, limit, offset, filter, fields, include, exclude,
+		case http.MethodGet:			
 			v := QueryValidation{
-				ValidSortBy:  []string{"name"},
+				ValidSortBy:  []string{"email"},
 				MaxLimit: 100,
 				MinLimit: 1,								
 			}
@@ -24,7 +23,7 @@ func RegisterUserRoutes(prefix string, mux *http.ServeMux, s *config.Config) {
 				return
 			}
 			
-			api.HandleGetProtocols(s, *params, w, r)
+			api.HandleGetUsers(s, *params, w, r)
 		case http.MethodPost:
 			api.HandleCreateUser(s, w, r)				
 		default:
@@ -50,17 +49,34 @@ func RegisterUserRoutes(prefix string, mux *http.ServeMux, s *config.Config) {
 		}
 	})
 
+	mux.HandleFunc(prefix +"/users/revoke", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.HandleRevoke(s, w, r)
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
 
-	// mux.HandleFunc(prefix +"/users/{id}", func(w http.ResponseWriter, r *http.Request) {
-	// 	switch r.Method {
-	// 	case http.MethodGet:
-	// 		api(s, w, r)
-	// 	case http.MethodPut:
-	// 		api.HandleUpdateProtocol(s, w, r)
-	// 	case http.MethodDelete:
-	// 		api.HandleDeleteProtocol(s, w, r)
-	// 	default:
-	// 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-	// 	}
-	// })
+	mux.HandleFunc(prefix +"/users/reset", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			api.HandleReset(s, w, r)
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	mux.HandleFunc(prefix +"/users/{id}", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			api.HandleGetUserById(s, w, r)
+		case http.MethodPut:
+			api.HandleUpdateUser(s, w, r)
+		case http.MethodDelete:
+			api.HandleDeleteUserById(s, w, r)
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
 }

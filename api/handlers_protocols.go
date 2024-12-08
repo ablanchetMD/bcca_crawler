@@ -58,14 +58,14 @@ func HandleGetProtocols(c *config.Config,q QueryParams, w http.ResponseWriter, r
 
 	//optional queries : sort, sort_by, page, limit, offset, filter, fields, include, exclude,
 	switch {
-	case q.FilterBy == "tumor_group" && len(q.Include) > 0:
+	case len(q.FilterBy) > 0 && len(q.Include) > 0:
 		protocols, err = c.Db.GetProtocolsOnlyTumorGroupAndTagsAsc(r.Context(), database.GetProtocolsOnlyTumorGroupAndTagsAscParams{
 			TumorGroup: q.FilterBy,
 			Tags:       q.Include,
 			Limit:      params.Limit,
 			Offset:     params.Offset,
 		})
-	case q.FilterBy == "tumor_group" && len(q.Include) == 0:
+	case len(q.FilterBy) > 0 && len(q.Include) == 0:
 		protocols, err = c.Db.GetProtocolsOnlyTumorGroupAsc(r.Context(), database.GetProtocolsOnlyTumorGroupAscParams{
 			TumorGroup: q.FilterBy,
 			Limit:      params.Limit,
@@ -160,7 +160,6 @@ func HandleCreateProtocol(c *config.Config, w http.ResponseWriter, r *http.Reque
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-
 	
 	protocol, err := c.Db.CreateProtocol(r.Context(), database.CreateProtocolParams{			
 		CreatedAt: time.Now(),

@@ -98,6 +98,15 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
+const deleteUserByID = `-- name: DeleteUserByID :exec
+DELETE FROM users WHERE id = $1
+`
+
+func (q *Queries) DeleteUserByID(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deleteUserByID, id)
+	return err
+}
+
 const deleteUsers = `-- name: DeleteUsers :exec
 DELETE FROM users
 `
@@ -147,6 +156,120 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 	return i, err
 }
 
+const getUserByID = `-- name: GetUserByID :one
+SELECT id, created_at, updated_at, email, password, role, is_verified, deleted_at, deleted_by, last_active FROM users WHERE id = $1
+`
+
+func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByID, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Email,
+		&i.Password,
+		&i.Role,
+		&i.IsVerified,
+		&i.DeletedAt,
+		&i.DeletedBy,
+		&i.LastActive,
+	)
+	return i, err
+}
+
+const getUsers = `-- name: GetUsers :many
+SELECT id, created_at, updated_at, email, password, role, is_verified, deleted_at, deleted_by, last_active FROM users
+ORDER BY email ASC
+LIMIT $1 OFFSET $2
+`
+
+type GetUsersParams struct {
+	Limit  int32
+	Offset int32
+}
+
+func (q *Queries) GetUsers(ctx context.Context, arg GetUsersParams) ([]User, error) {
+	rows, err := q.db.QueryContext(ctx, getUsers, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Email,
+			&i.Password,
+			&i.Role,
+			&i.IsVerified,
+			&i.DeletedAt,
+			&i.DeletedBy,
+			&i.LastActive,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUsersByRole = `-- name: GetUsersByRole :many
+SELECT id, created_at, updated_at, email, password, role, is_verified, deleted_at, deleted_by, last_active FROM users
+WHERE role = $1
+ORDER BY email ASC
+LIMIT $2 OFFSET $3
+`
+
+type GetUsersByRoleParams struct {
+	Role   string
+	Limit  int32
+	Offset int32
+}
+
+func (q *Queries) GetUsersByRole(ctx context.Context, arg GetUsersByRoleParams) ([]User, error) {
+	rows, err := q.db.QueryContext(ctx, getUsersByRole, arg.Role, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Email,
+			&i.Password,
+			&i.Role,
+			&i.IsVerified,
+			&i.DeletedAt,
+			&i.DeletedBy,
+			&i.LastActive,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const revokeRefreshToken = `-- name: RevokeRefreshToken :one
 UPDATE refresh_tokens
 SET revoked_at = NOW(), updated_at = NOW()
@@ -168,23 +291,69 @@ func (q *Queries) RevokeRefreshToken(ctx context.Context, token string) (Refresh
 	return i, err
 }
 
+const revokeRefreshTokenByUserId = `-- name: RevokeRefreshTokenByUserId :many
+UPDATE refresh_tokens
+SET revoked_at = NOW(), updated_at = NOW()
+WHERE user_id = $1
+RETURNING token, created_at, updated_at, expires_at, revoked_at, user_id
+`
+
+func (q *Queries) RevokeRefreshTokenByUserId(ctx context.Context, userID uuid.UUID) ([]RefreshToken, error) {
+	rows, err := q.db.QueryContext(ctx, revokeRefreshTokenByUserId, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RefreshToken
+	for rows.Next() {
+		var i RefreshToken
+		if err := rows.Scan(
+			&i.Token,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ExpiresAt,
+			&i.RevokedAt,
+			&i.UserID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateUser = `-- name: UpdateUser :one
 UPDATE users
 SET
-    updated_at = $1,
-    email = $2,
-    password = $3,
-    role = $4,
-    is_verified = $5,
-    deleted_at = $6,
-    deleted_by = $7,
-    last_active = $8
-WHERE id = $9
+    updated_at = NOW(),
+    email = COALESCE($2, email),
+    password = COALESCE($3, password),
+    role = COALESCE($4, role),
+    is_verified = COALESCE($5, is_verified),
+    deleted_at = COALESCE($6, deleted_at),
+    deleted_by = COALESCE($7, deleted_by),
+    last_active = COALESCE($8, last_active)
+WHERE id = $1
+    AND (
+        $2 IS DISTINCT FROM email
+        OR $3 IS DISTINCT FROM password
+        OR $4 IS DISTINCT FROM role
+        OR $5 IS DISTINCT FROM is_verified
+        OR $6 IS DISTINCT FROM deleted_at
+        OR $7 IS DISTINCT FROM deleted_by
+        OR $8 IS DISTINCT FROM last_active        
+    )
 RETURNING id, created_at, updated_at, email, password, role, is_verified, deleted_at, deleted_by, last_active
 `
 
 type UpdateUserParams struct {
-	UpdatedAt  time.Time
+	ID         uuid.UUID
 	Email      string
 	Password   string
 	Role       string
@@ -192,12 +361,11 @@ type UpdateUserParams struct {
 	DeletedAt  sql.NullTime
 	DeletedBy  uuid.NullUUID
 	LastActive sql.NullTime
-	ID         uuid.UUID
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
 	row := q.db.QueryRowContext(ctx, updateUser,
-		arg.UpdatedAt,
+		arg.ID,
 		arg.Email,
 		arg.Password,
 		arg.Role,
@@ -205,7 +373,6 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		arg.DeletedAt,
 		arg.DeletedBy,
 		arg.LastActive,
-		arg.ID,
 	)
 	var i User
 	err := row.Scan(
