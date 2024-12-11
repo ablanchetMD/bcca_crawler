@@ -3,7 +3,7 @@ package routes
 import (
 	"bcca_crawler/internal/config"
 	"net/http"
-	"bcca_crawler/api"
+	"bcca_crawler/api"	
 )
 
 func RegisterCancerRoutes(prefix string, mux *http.ServeMux, s *config.Config) {
@@ -22,7 +22,7 @@ func RegisterCancerRoutes(prefix string, mux *http.ServeMux, s *config.Config) {
 			if err != nil {
 				http.Error(w, "Bad Request", http.StatusBadRequest)
 				return
-			}
+			}			
 			
 			api.HandleGetCancers(s, *params, w, r)
 		case http.MethodPost:

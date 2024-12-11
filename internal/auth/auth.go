@@ -7,10 +7,24 @@ import (
 	"strings"
 	"crypto/rand"
 	"github.com/golang-jwt/jwt/v5"
+	"bcca_crawler/internal/config"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	"bcca_crawler/internal/database"
+	"bcca_crawler/internal/caching"
+	"bcca_crawler/internal/auth/roles"
 	"encoding/hex"
+	"context"
 )
+
+type UserToken struct {
+	UserID         	uuid.UUID  `json:"id"`
+	RefreshToken  	string     `json:"user_token"`
+	AuthToken  		string     `json:"auth_token"`
+	Role			roles.Role	   `json:"role"`
+}
+
+
 
 func HashPassword(password string) (string, error) {
 	hashed_password, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -108,4 +122,92 @@ func MakeRefreshToken() (string, error) {
 		return "", fmt.Errorf("MakeRefreshToken Function: %w",err)
 	}
 	return hex.EncodeToString(randomBytes), nil
+}
+
+func AddCookie(w http.ResponseWriter, name, value string, timeInSeconds int) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     name,
+		Value:    value,
+		HttpOnly: true,
+		Secure:   true, // Set to false if not using HTTPS
+		Path:     "/",
+		MaxAge:   timeInSeconds,
+	})
+}
+
+func SetAuthCookies(w http.ResponseWriter, user UserToken) {
+	AddCookie(w, "refresh_token", user.RefreshToken, 5184000)
+	AddCookie(w, "auth_token", user.AuthToken, 3600)
+}
+
+
+func GetJWTFromRefreshToken(token database.RefreshToken, c *config.Config) (UserToken, error) {	
+	user := UserToken{}	
+
+	jwt, err := MakeJWT(token.UserID, c.Secret, time.Second*3600)
+	if err != nil {
+		return user, fmt.Errorf("GetJWTFromRefreshToken Function : %w",err)
+	}	
+
+	user.RefreshToken = token.Token
+	user.AuthToken = jwt
+	user.UserID = token.UserID
+
+	return user, nil
+}
+
+
+func ValidateRefreshToken(token string, c *config.Config) (UserToken, error) {
+	ctx := context.Background()
+	user := UserToken{}
+
+	refreshToken, err := c.Db.GetRefreshToken(ctx, token)
+	if err != nil {		
+		return user, fmt.Errorf("ValidateRefreshToken Function : %w",err)
+	}
+
+	if refreshToken.ExpiresAt.Before(time.Now()) {
+		return user, fmt.Errorf("ValidateRefreshToken Function : %s","token expired")
+	}
+
+	if refreshToken.RevokedAt.Valid {
+		return user, fmt.Errorf("ValidateRefreshToken Function : %s","token revoked")
+	}	
+
+	jwt, err := MakeJWT(refreshToken.UserID, c.Secret, time.Second*3600)
+	if err != nil {
+		return user, fmt.Errorf("ValidateRefreshToken Function : %w",err)
+	}
+	//revoke old refresh token and issue new one, for rotation.
+	_, err = c.Db.RevokeRefreshToken(ctx, refreshToken.Token)
+	if err != nil {
+		return user, fmt.Errorf("ValidateRefreshToken Function : %w",err)
+	}
+
+	refresh_token, err := MakeRefreshToken()
+	if err != nil {
+		return user, fmt.Errorf("ValidateRefreshToken Function : %w",err)
+	}
+	_, err = c.Db.CreateRefreshToken(ctx, database.CreateRefreshTokenParams{
+		Token:     refresh_token,
+		UserID:    refreshToken.UserID,
+		ExpiresAt: time.Now().Add(time.Hour * 24 * 60),
+	})
+
+	if err != nil {
+		return user, fmt.Errorf("ValidateRefreshToken Function : %w",err)
+	}
+
+	userRole,err := roles.RoleFromString(refreshToken.Role)
+	if err != nil {
+		return user, fmt.Errorf("ValidateRefreshToken Function: %w",err)
+	}
+
+	user.RefreshToken = refresh_token
+	user.AuthToken = jwt
+	user.UserID = refreshToken.UserID
+	user.Role = userRole
+	caching.SetRoleCache(refreshToken.UserID, userRole, time.Now().Add(time.Minute * 60))
+
+	return user, nil
 }

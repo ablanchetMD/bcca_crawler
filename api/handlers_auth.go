@@ -2,8 +2,11 @@ package api
 
 import (
 	"bcca_crawler/internal/auth"
+	"bcca_crawler/internal/caching"
 	"bcca_crawler/internal/config"
 	"bcca_crawler/internal/database"
+	"bcca_crawler/internal/json_utils"
+	"bcca_crawler/internal/auth/roles"
 	"context"
 	"database/sql"
 	"fmt"
@@ -100,13 +103,13 @@ func HandleCreateUser(c *config.Config, w http.ResponseWriter, r *http.Request) 
 	var requestData CreateUserRequest
 	err := UnmarshalAndValidatePayload(c, r, &requestData)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	hashedPassword, err := auth.HashPassword(requestData.Password)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error hashing password")
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error hashing password")
 		return
 	}
 
@@ -119,23 +122,23 @@ func HandleCreateUser(c *config.Config, w http.ResponseWriter, r *http.Request) 
 	})
 	if err != nil {
 		fmt.Println("Error creating user: ", err)
-		respondWithError(w, http.StatusInternalServerError, "Error creating user")
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error creating user")
 		return
 	}
-	respondWithJSON(w, http.StatusCreated, mapUserStruct(user))
+	json_utils.RespondWithJSON(w, http.StatusCreated, mapUserStruct(user))
 }
 
 func HandleUpdateUser(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	parsed_id, err := ParseAndValidateID(r)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	var req UpdateUserRequest
 	err = UnmarshalAndValidatePayload(c, r, &req)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -153,7 +156,7 @@ func HandleUpdateUser(c *config.Config, w http.ResponseWriter, r *http.Request) 
 	if req.Password != "" {
 		hashedPassword, err := auth.HashPassword(req.Password)
 		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "Error hashing password")
+			json_utils.RespondWithError(w, http.StatusInternalServerError, "Error hashing password")
 			return
 		}
 		addUpdate("password", hashedPassword)
@@ -168,111 +171,48 @@ func HandleUpdateUser(c *config.Config, w http.ResponseWriter, r *http.Request) 
 
 	user, err := UpdateUserDynamic(c, parsed_id, updates, r)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error updating user: %s with error:%s", parsed_id.String(), err.Error()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error updating user: %s with error:%s", parsed_id.String(), err.Error()))
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, user)
+	json_utils.RespondWithJSON(w, http.StatusOK, user)
 }
 
 func HandleReset(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	if c.Platform != "dev" {
-		respondWithError(w, http.StatusForbidden, "You are not authorized to use this function.")
+		json_utils.RespondWithError(w, http.StatusForbidden, "You are not authorized to use this function.")
 		return
 	}
 
 	err := c.Db.DeleteUsers(r.Context())
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error deleting users")
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error deleting users")
 		return
 	}
-	respondWithJSON(w, http.StatusOK, "Users deleted")
+	json_utils.RespondWithJSON(w, http.StatusOK, "Users deleted")
 }
 
 //Refresh function uses cookies instead of headers, can we make it use both?
 
-func HandleRefresh(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	cookie, err := r.Cookie("refresh_token")
+func HandleRefresh(c *config.Config, w http.ResponseWriter, r *http.Request) {	
+
+	refresh_value, err := auth.GetCookieToken(r,"refresh_token")
+	if err != nil {			
+		json_utils.RespondWithError(w, http.StatusUnauthorized, "Invalid token")
+		return
+	}
+	
+
+	usertoken, err := auth.ValidateRefreshToken(refresh_value, c)
+	
 	if err != nil {
-		// If the cookie is not found or any error occurs
-		if err == http.ErrNoCookie {
-			http.Error(w, "Refresh token cookie not found", http.StatusUnauthorized)
-			return
-		}
-		// Handle other errors
-		http.Error(w, fmt.Sprintf("Error retrieving cookie: %v", err), http.StatusInternalServerError)
+		json_utils.RespondWithError(w, http.StatusUnauthorized, "Invalid Refresh Token")
 		return
 	}
 
-	refreshToken, err := c.Db.GetRefreshToken(r.Context(), cookie.Value)
-	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "Invalid token")
-		return
-	}
+	auth.SetAuthCookies(w, usertoken)
 
-	if refreshToken.ExpiresAt.Before(time.Now()) {
-		respondWithError(w, http.StatusUnauthorized, "Token has expired")
-		return
-	}
-
-	if refreshToken.RevokedAt.Valid {
-		respondWithError(w, http.StatusUnauthorized, "Token has been revoked")
-		return
-	}
-
-	jwt, err := auth.MakeJWT(refreshToken.UserID, c.Secret, time.Second*3600)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error creating token")
-		return
-	}
-	//revoke old refresh token and issue new one, for rotation.
-	_, err = c.Db.RevokeRefreshToken(r.Context(), refreshToken.Token)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error revoking token")
-		return
-	}
-
-	refresh_token, err := auth.MakeRefreshToken()
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error creating refresh token")
-		return
-	}
-	_, err = c.Db.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
-		Token:     refresh_token,
-		UserID:    refreshToken.UserID,
-		ExpiresAt: time.Now().Add(time.Hour * 24 * 60),
-	})
-
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error creating refresh token")
-		return
-	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    refresh_token,
-		HttpOnly: true,
-		Secure:   true, // Set to false if not using HTTPS
-		Path:     "/",
-		// 60 days
-		MaxAge: 5184000,
-	})
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "auth_token",
-		Value:    jwt,
-		HttpOnly: true,
-		Secure:   true, // Set to false if not using HTTPS
-		Path:     "/",
-		MaxAge:   3600, // 1 hour
-	})
-
-	t := struct {
-		Token        string `json:"auth_token"`
-		RefreshToken string `json:"refresh_token"`
-	}{Token: jwt, RefreshToken: refresh_token}
-
-	respondWithJSON(w, http.StatusOK, t)
+	json_utils.RespondWithJSON(w, http.StatusOK, usertoken)
 }
 
 //Finish the Revoke Function
@@ -281,16 +221,17 @@ func HandleRevoke(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	var requestData RevokeRequest
 	err := UnmarshalAndValidatePayload(c, r, &requestData)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	_, err = c.Db.RevokeRefreshTokenByUserId(r.Context(), requestData.UserID)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error revoking token")
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error revoking token")
 		return
 	}
-	respondWithJSON(w, http.StatusNoContent, "")
+	caching.DeleteRoleCache(requestData.UserID)
+	json_utils.RespondWithJSON(w, http.StatusNoContent, "")
 }
 
 func HandleGetUsers(c *config.Config, q QueryParams, w http.ResponseWriter, r *http.Request) {
@@ -313,119 +254,101 @@ func HandleGetUsers(c *config.Config, q QueryParams, w http.ResponseWriter, r *h
 	}
 
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error getting users")
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting users")
 		return
 	}
 	var userStructs []User
 	for _, user := range users {
 		userStructs = append(userStructs, mapUserStruct(user))
 	}
-	respondWithJSON(w, http.StatusOK, Users{Users: userStructs})
+	json_utils.RespondWithJSON(w, http.StatusOK, Users{Users: userStructs})
 }
 
 func HandleLogin(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	var requestData LoginRequest
 	err := UnmarshalAndValidatePayload(c, r, &requestData)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	expiresIn := time.Second * 3600
-
+	
 	user, err := c.Db.GetUserByEmail(r.Context(), requestData.Email)
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "Password or email is invalid.")
+		json_utils.RespondWithError(w, http.StatusUnauthorized, "Password or email is invalid.")
 		return
 	}
 	err = auth.CheckPasswordHash(requestData.Password, user.Password)
 
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "Password or email is invalid.")
+		json_utils.RespondWithError(w, http.StatusUnauthorized, "Password or email is invalid.")
 		return
 	}
 
 	refresh_token, err := auth.MakeRefreshToken()
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error creating refresh token")
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error creating refresh token")
 		return
 	}
 
-	_, err = c.Db.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
+	refresh_obj, err := c.Db.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
 		Token:     refresh_token,
 		UserID:    user.ID,
 		ExpiresAt: time.Now().Add(time.Hour * 24 * 60),
 	})
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error creating refresh token")
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error creating refresh token")
 		return
 	}
 
-	token, err := auth.MakeJWT(user.ID, c.Secret, expiresIn)
-	// user.Password = nil
+	user_tokens,err := auth.GetJWTFromRefreshToken(refresh_obj, c)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error creating token")
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error creating auth token")
+		return
+	}
+	user_role,err := roles.RoleFromString(user.Role)
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Invalid Role")
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    refresh_token,
-		HttpOnly: true,
-		Secure:   true, // Set to false if not using HTTPS
-		Path:     "/",
-		// 60 days
-		MaxAge: 5184000,
-	})
+	user_tokens.Role = user_role
+	caching.SetRoleCache(user_tokens.UserID, user_role, time.Now().Add(time.Minute*60))
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "auth_token",
-		Value:    token,
-		HttpOnly: true,
-		Secure:   true, // Set to false if not using HTTPS
-		Path:     "/",
-		MaxAge:   3600, // 1 hour
-	})
-
-	t := struct {
-		Token        string `json:"auth_token"`
-		RefreshToken string `json:"refresh_token"`
-	}{Token: token, RefreshToken: refresh_token}
-
-	respondWithJSON(w, http.StatusOK, t)
-
+	auth.SetAuthCookies(w, user_tokens)
+	json_utils.RespondWithJSON(w, http.StatusOK, user_tokens)
 }
 
 func HandleDeleteUserById(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	parsed_id, err := ParseAndValidateID(r)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	err = c.Db.DeleteUserByID(r.Context(), parsed_id)
 
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error deleting user")
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error deleting user")
 		return
 	}
-	respondWithJSON(w, http.StatusOK, map[string]string{"message": fmt.Sprintf("User %s deleted", parsed_id.String())})
+	json_utils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": fmt.Sprintf("User %s deleted", parsed_id.String())})
 }
 
 func HandleGetUserById(c *config.Config, w http.ResponseWriter, r *http.Request) {
 
 	parsed_id, err := ParseAndValidateID(r)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	user, err := c.Db.GetUserByID(r.Context(), parsed_id)
 
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting user: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting user: %s", parsed_id.String()))
 		return
 	}
-	respondWithJSON(w, http.StatusOK, mapUserStruct(user))
+	json_utils.RespondWithJSON(w, http.StatusOK, mapUserStruct(user))
 }
 
 func UpdateUserDynamic(c *config.Config, userID uuid.UUID, updates map[string]interface{}, r *http.Request) (User, error) {

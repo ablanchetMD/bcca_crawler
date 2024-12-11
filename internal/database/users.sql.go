@@ -117,12 +117,25 @@ func (q *Queries) DeleteUsers(ctx context.Context) error {
 }
 
 const getRefreshToken = `-- name: GetRefreshToken :one
-SELECT token, created_at, updated_at, expires_at, revoked_at, user_id FROM refresh_tokens WHERE token = $1
+SELECT rt.token, rt.created_at, rt.updated_at, rt.expires_at, rt.revoked_at, rt.user_id, u.role
+FROM refresh_tokens rt
+INNER JOIN users u ON rt.user_id = u.id
+WHERE rt.token = $1
 `
 
-func (q *Queries) GetRefreshToken(ctx context.Context, token string) (RefreshToken, error) {
+type GetRefreshTokenRow struct {
+	Token     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	ExpiresAt time.Time
+	RevokedAt sql.NullTime
+	UserID    uuid.UUID
+	Role      string
+}
+
+func (q *Queries) GetRefreshToken(ctx context.Context, token string) (GetRefreshTokenRow, error) {
 	row := q.db.QueryRowContext(ctx, getRefreshToken, token)
-	var i RefreshToken
+	var i GetRefreshTokenRow
 	err := row.Scan(
 		&i.Token,
 		&i.CreatedAt,
@@ -130,6 +143,7 @@ func (q *Queries) GetRefreshToken(ctx context.Context, token string) (RefreshTok
 		&i.ExpiresAt,
 		&i.RevokedAt,
 		&i.UserID,
+		&i.Role,
 	)
 	return i, err
 }
@@ -176,6 +190,17 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.LastActive,
 	)
 	return i, err
+}
+
+const getUserRoleByID = `-- name: GetUserRoleByID :one
+SELECT role FROM users WHERE id = $1
+`
+
+func (q *Queries) GetUserRoleByID(ctx context.Context, id uuid.UUID) (string, error) {
+	row := q.db.QueryRowContext(ctx, getUserRoleByID, id)
+	var role string
+	err := row.Scan(&role)
+	return role, err
 }
 
 const getUsers = `-- name: GetUsers :many

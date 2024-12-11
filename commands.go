@@ -1,13 +1,14 @@
 package main
 
-import (	
+import (
+	"bcca_crawler/api"
+	"bcca_crawler/internal/config"
+	"bcca_crawler/internal/middleware"
+	"bcca_crawler/routes"
 	"errors"
-	"fmt"	
+	"fmt"
 	"log"
 	"net/http"
-	"bcca_crawler/internal/config"
-	"bcca_crawler/api"
-	"bcca_crawler/routes"
 )
 
 type command struct {
@@ -72,11 +73,11 @@ func handlerStartServer(s *config.Config, cmd command) error {
 	routes.RegisterRoutes(mux, s)
 	
 	// Start the server//
-	//  wrappedMux := s.middlewareMetricsInc(mux)
+	wrappedMux := middleware.MiddlewareAuth(s,mux)
 	// portString := "8080"
 	srv := &http.Server{
 		Addr:    ":" + s.ServerPort,
-		Handler: mux,
+		Handler: wrappedMux,
 	}
 	log.Printf("Server listening on port %s", s.ServerPort)
 	err := srv.ListenAndServe()

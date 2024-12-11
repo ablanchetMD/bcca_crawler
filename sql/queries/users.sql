@@ -10,7 +10,10 @@ VALUES (
 RETURNING *;
 
 -- name: GetRefreshToken :one
-SELECT * FROM refresh_tokens WHERE token = $1;
+SELECT rt.*, u.role
+FROM refresh_tokens rt
+INNER JOIN users u ON rt.user_id = u.id
+WHERE rt.token = $1;
 
 -- name: RevokeRefreshToken :one
 UPDATE refresh_tokens
@@ -52,6 +55,9 @@ SELECT * FROM users WHERE email = $1;
 
 -- name: GetUserByID :one
 SELECT * FROM users WHERE id = $1;
+
+-- name: GetUserRoleByID :one
+SELECT role FROM users WHERE id = $1;
 
 -- name: DeleteUserByID :exec
 DELETE FROM users WHERE id = $1;

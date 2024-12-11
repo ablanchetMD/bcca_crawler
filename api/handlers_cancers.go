@@ -3,6 +3,7 @@ package api
 import (
 	"bcca_crawler/internal/config"
 	"bcca_crawler/internal/database"
+	"bcca_crawler/internal/json_utils"
 	"fmt"
 	"net/http"
 	"time"
@@ -74,7 +75,7 @@ func HandleGetCancers(c *config.Config, q QueryParams, w http.ResponseWriter, r 
 	}
 
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error fetching protocols")
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error fetching protocols")
 		return
 	}
 
@@ -83,38 +84,38 @@ func HandleGetCancers(c *config.Config, q QueryParams, w http.ResponseWriter, r 
 		response = append(response, mapCancerStruct(cancer))
 	}
 
-	respondWithJSON(w, http.StatusOK, response)
+	json_utils.RespondWithJSON(w, http.StatusOK, response)
 }
 
 func HandleGetCancerById(c *config.Config, w http.ResponseWriter, r *http.Request) {
 
 	parsed_id, err := ParseAndValidateID(r)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	cancer, err := c.Db.GetCancerByID(r.Context(), parsed_id)
 
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting cancer: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting cancer: %s", parsed_id.String()))
 		return
 	}
-	respondWithJSON(w, http.StatusOK, mapCancerStruct(cancer))
+	json_utils.RespondWithJSON(w, http.StatusOK, mapCancerStruct(cancer))
 }
 
 func HandleUpdateCancer(c *config.Config, w http.ResponseWriter, r *http.Request) {
 
 	parsed_id, err := ParseAndValidateID(r)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	var req CancerRequest
 	err = UnmarshalAndValidatePayload(c, r, &req)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -128,10 +129,10 @@ func HandleUpdateCancer(c *config.Config, w http.ResponseWriter, r *http.Request
 	})
 
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error updating protocol: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error updating protocol: %s", parsed_id.String()))
 		return
 	}
-	respondWithJSON(w, http.StatusOK, mapCancerStruct(cancer))
+	json_utils.RespondWithJSON(w, http.StatusOK, mapCancerStruct(cancer))
 }
 
 func HandleCreateCancer(c *config.Config, w http.ResponseWriter, r *http.Request) {
@@ -139,7 +140,7 @@ func HandleCreateCancer(c *config.Config, w http.ResponseWriter, r *http.Request
 	var req CancerRequest
 	err := UnmarshalAndValidatePayload(c, r, &req)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -153,40 +154,40 @@ func HandleCreateCancer(c *config.Config, w http.ResponseWriter, r *http.Request
 	if err != nil {
 
 		fmt.Println("Error creating cancer: ", err)
-		respondWithError(w, http.StatusInternalServerError, "Error creating cancer")
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error creating cancer")
 		return
 	}
 
-	respondWithJSON(w, http.StatusCreated, mapCancerStruct(cancer))
+	json_utils.RespondWithJSON(w, http.StatusCreated, mapCancerStruct(cancer))
 }
 
 func HandleDeleteCancer(c *config.Config, w http.ResponseWriter, r *http.Request) {
 
 	parsed_id, err := ParseAndValidateID(r)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	err = c.Db.DeleteCancer(r.Context(), parsed_id)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting cancer: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting cancer: %s", parsed_id.String()))
 		return
 	}
-	respondWithJSON(w, http.StatusOK, nil)
+	json_utils.RespondWithJSON(w, http.StatusOK, nil)
 }
 
 func HandleGetProtocolsByCancerId(c *config.Config, w http.ResponseWriter, r *http.Request) {
 
 	parsed_id, err := ParseAndValidateID(r)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	protocols, err := c.Db.GetProtocolsForCancer(r.Context(), parsed_id)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting protocols for cancer: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting protocols for cancer: %s", parsed_id.String()))
 		return
 	}
 
@@ -194,5 +195,5 @@ func HandleGetProtocolsByCancerId(c *config.Config, w http.ResponseWriter, r *ht
 	for _, protocol := range protocols {
 		response = append(response, mapProtocolStruct(protocol))
 	}
-	respondWithJSON(w, http.StatusOK, response)
+	json_utils.RespondWithJSON(w, http.StatusOK, response)
 }

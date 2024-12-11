@@ -2,7 +2,8 @@ package api
 
 import (
 	"bcca_crawler/internal/config"
-	"bcca_crawler/internal/database"	
+	"bcca_crawler/internal/database"
+	"bcca_crawler/internal/json_utils"	
 	"fmt"	
 	"net/http"	
 	"time"	
@@ -76,7 +77,7 @@ func HandleGetProtocols(c *config.Config,q QueryParams, w http.ResponseWriter, r
 	}
 				
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error fetching protocols")
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error fetching protocols")
 		return
 	}
 	
@@ -85,54 +86,54 @@ func HandleGetProtocols(c *config.Config,q QueryParams, w http.ResponseWriter, r
 		response = append(response, mapProtocolStruct(protocol))
 	}
 	
-	respondWithJSON(w, http.StatusOK, response)
+	json_utils.RespondWithJSON(w, http.StatusOK, response)
 }
 
 func HandleDeleteProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	parsed_id, err := ParseAndValidateID(r)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	err = c.Db.DeleteProtocol(r.Context(),parsed_id)
 		
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error deleting protocols")
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error deleting protocols")
 		return
 	}
-	respondWithJSON(w, http.StatusOK, map[string]string{"message": fmt.Sprintf("Protocol %s deleted", parsed_id.String())})
+	json_utils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": fmt.Sprintf("Protocol %s deleted", parsed_id.String())})
 }
 
 func HandleGetProtocolById(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	
 	parsed_id, err := ParseAndValidateID(r)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	protocol,err := c.Db.GetProtocolByID(r.Context(),parsed_id)
 		
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting protocol: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting protocol: %s", parsed_id.String()))
 		return
 	}
-	respondWithJSON(w, http.StatusOK, mapProtocolStruct(protocol))
+	json_utils.RespondWithJSON(w, http.StatusOK, mapProtocolStruct(protocol))
 }
 
 func HandleUpdateProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
 
 	parsed_id, err := ParseAndValidateID(r)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	var req ProtocolRequest
 	err = UnmarshalAndValidatePayload(c,r, &req)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -146,10 +147,10 @@ func HandleUpdateProtocol(c *config.Config, w http.ResponseWriter, r *http.Reque
 	})
 
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error updating protocol: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error updating protocol: %s", parsed_id.String()))
 		return
 	}
-	respondWithJSON(w, http.StatusOK, mapProtocolStruct(protocol))
+	json_utils.RespondWithJSON(w, http.StatusOK, mapProtocolStruct(protocol))
 }
 
 func HandleCreateProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {	
@@ -157,7 +158,7 @@ func HandleCreateProtocol(c *config.Config, w http.ResponseWriter, r *http.Reque
 	var req ProtocolRequest
 	err := UnmarshalAndValidatePayload(c,r, &req)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	
@@ -173,11 +174,11 @@ func HandleCreateProtocol(c *config.Config, w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		
 		fmt.Println("Error creating protocol: ", err)
-		respondWithError(w, http.StatusInternalServerError, "Error creating protocol")
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error creating protocol")
 		return
 	}	
 	
-	respondWithJSON(w, http.StatusCreated, mapProtocolStruct(protocol))
+	json_utils.RespondWithJSON(w, http.StatusCreated, mapProtocolStruct(protocol))
 }
 
 
