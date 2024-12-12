@@ -41,7 +41,8 @@ func main() {
 	cfg.Validate = validate
 	commands := commands{}
 	commands.register("serve", handlerStartServer)
-	commands.register("geo", handlerGeoLocation)	
+	commands.register("geo", handlerGeoLocation)
+	commands.register("new_user", handlerCreateUser)	
 
 	//http://www.bccancer.bc.ca/health-professionals/clinical-resources/chemotherapy-protocols/lymphoma-myeloma
 

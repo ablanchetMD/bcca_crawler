@@ -64,6 +64,20 @@ func handlerGeoLocation(s *config.Config, cmd command) error {
 	return nil
 }
 
+func handlerCreateUser(s *config.Config, cmd command) error {
+	// Create a new user
+	email := cmd.Args[0]
+	password := cmd.Args[1]
+
+	user,err := api.HandleCLICreateUser(s, email, password)
+	if err != nil {
+		fmt.Println("Error creating user: ", err)
+		return err
+	}
+	fmt.Println("User created successfully: ", user)
+	return nil
+}
+
 
 func handlerStartServer(s *config.Config, cmd command) error {
 	// Start the server

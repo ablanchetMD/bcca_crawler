@@ -57,6 +57,7 @@ type Users struct {
 	Users []User `json:"users"`
 }
 
+
 func mapUserStruct(src database.User) User {
 	return User{
 		ID:         src.ID,
@@ -234,13 +235,23 @@ func HandleRevoke(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	json_utils.RespondWithJSON(w, http.StatusNoContent, "")
 }
 
-func HandleGetUsers(c *config.Config, q QueryParams, w http.ResponseWriter, r *http.Request) {
+func HandleGetUsers(c *config.Config, q QueryParams, w http.ResponseWriter, r *http.Request) {	
+	user,err := auth.GetUserFromContext(r)
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusForbidden, "Invalid token")
+		return
+	}
+	if user.Role != roles.Admin {
+		json_utils.RespondWithError(w, http.StatusForbidden, "You are not authorized to use this function.")
+		return
+	}
+
 	var users = []database.User{}
 	params := database.GetUsersParams{
 		Limit:  int32(q.Limit),
 		Offset: int32(q.Offset),
 	}
-	var err error
+	
 	//optional queries : sort, sort_by, page, limit, offset, filter, fields, include, exclude,
 	switch {
 	case q.FilterBy == "role" && len(q.Include) > 0:

@@ -39,6 +39,22 @@ func CheckPasswordHash(password, hash string) error {
 	return err
 }
 
+func GetUserFromContext(r *http.Request) (UserToken, error) {
+	userID, ok := r.Context().Value("user_id").(uuid.UUID)
+	if !ok {
+		return UserToken{}, fmt.Errorf("GetUserFromContext Function: %s","user_id not found in context")
+	}
+	userRole, ok := r.Context().Value("user_role").(roles.Role)
+	if !ok {
+		return UserToken{}, fmt.Errorf("GetUserFromContext Function: %s","user_role not found in context")
+	}
+	user := UserToken{
+		UserID: userID,
+		Role: userRole,
+	}
+	return user, nil
+}
+
 func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error){
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
 		Issuer: "leukosys-auth",
