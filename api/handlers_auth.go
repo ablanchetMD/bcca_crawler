@@ -79,7 +79,7 @@ func HandleCLICreateUser(c *config.Config, email string, password string) (User,
 	}
 	err := c.Validate.Struct(requestData)
 	if err != nil {
-		return User{}, fmt.Errorf("Validation failed: " + err.Error())
+		return User{}, fmt.Errorf("validation failed: %s", err.Error())
 	}
 
 	hashedPassword, err := auth.HashPassword(password)
@@ -238,6 +238,7 @@ func HandleRevoke(c *config.Config, w http.ResponseWriter, r *http.Request) {
 func HandleGetUsers(c *config.Config, q QueryParams, w http.ResponseWriter, r *http.Request) {	
 	user,err := auth.GetUserFromContext(r)
 	if err != nil {
+		fmt.Println("Error getting user from context: ", err)
 		json_utils.RespondWithError(w, http.StatusForbidden, "Invalid token")
 		return
 	}

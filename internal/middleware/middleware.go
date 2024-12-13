@@ -11,10 +11,7 @@ import (
 	"time"	
 )
 
-type contextKey string // Define your own type
 
-const userIDKey contextKey = "userID"     // Use a constant of your custom type
-const userRoleKey contextKey = "userRole" // Use a constant of your custom type
 // func middlewareLog(next http.Handler) http.Handler {
 // 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 // 		log.Printf("%s %s", r.Method, r.URL.Path)
@@ -38,26 +35,29 @@ func MiddlewareAuth(c *config.Config, next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return			
 		}
-
+		
 		user_id, err := auth.ValidateJWT(auth_cookie, c.Secret)
 		if err != nil {
 			fmt.Println(err)
-			if err.Error() == "ValidateJWT Function: token is expired" {
+			if err.Error() == "ValidateJWT Function: token has invalid claims: token is expired" {
 				user_token, err := auth.ValidateRefreshToken(refresh_cookie, c)
 				if err != nil {
+					fmt.Println(err)
 					next.ServeHTTP(w, r)
 					return
 				}
 				auth.SetAuthCookies(w, user_token)
-				ctx := context.WithValue(r.Context(), userIDKey, user_token.UserID)
+				ctx := context.WithValue(r.Context(), auth.UserIDKey, user_token.UserID)
+				fmt.Println("Middleware : Should have set User: ", ctx)
 				role, err := caching.GetRoleCache(user_token.UserID)
 				if err != nil {
 					fmt.Println(err)
 					fmt.Println("Error getting role from cache.. This should not happen")
 				}
-				ctx = context.WithValue(ctx, userRoleKey, role)	
+				newCtx := context.WithValue(ctx, auth.UserRoleKey, role)
+				fmt.Println("Middleware : Should have set Role and User: ", newCtx)
 
-				next.ServeHTTP(w, r.WithContext(ctx))
+				next.ServeHTTP(w, r.WithContext(newCtx))
 				return
 
 			} else {
@@ -65,7 +65,7 @@ func MiddlewareAuth(c *config.Config, next http.Handler) http.Handler {
 				return
 			}
 		}
-		ctx := context.WithValue(r.Context(), userIDKey, user_id)
+		ctx := context.WithValue(r.Context(), auth.UserIDKey, user_id)
 		role, err := caching.GetRoleCache(user_id)
 		if err != nil {
 			role_string,err := c.Db.GetUserRoleByID(ctx, user_id)
@@ -83,8 +83,9 @@ func MiddlewareAuth(c *config.Config, next http.Handler) http.Handler {
 
 		}
 		caching.SetRoleCache(user_id, role, time.Now().Add(time.Minute * 60))
-		ctx = context.WithValue(ctx, userRoleKey, role)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		fmt.Println("Middleware : Should have set Role and User: ", ctx)
+		Newctx := context.WithValue(ctx, auth.UserRoleKey, role)
+		next.ServeHTTP(w, r.WithContext(Newctx))
 	})
 }
 

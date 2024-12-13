@@ -65,7 +65,7 @@ func UnmarshalAndValidatePayload(c *config.Config,r *http.Request, v interface{}
 	// Validate the request data
 	err = c.Validate.Struct(v)
 	if err != nil {		
-		return fmt.Errorf("Validation failed: "+err.Error())
+		return fmt.Errorf("validation failed: %s", err.Error())
 	}
 	return nil
 }

@@ -12,10 +12,15 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"bcca_crawler/internal/database"
 	"bcca_crawler/internal/caching"
-	"bcca_crawler/internal/auth/roles"
+	"bcca_crawler/internal/auth/roles"	
 	"encoding/hex"
 	"context"
 )
+
+type contextKey string // Define your own type
+
+const UserIDKey contextKey = "userID"     // Use a constant of your custom type
+const UserRoleKey contextKey = "userRole" // Use a constant of your custom type
 
 type UserToken struct {
 	UserID         	uuid.UUID  `json:"id"`
@@ -40,11 +45,13 @@ func CheckPasswordHash(password, hash string) error {
 }
 
 func GetUserFromContext(r *http.Request) (UserToken, error) {
-	userID, ok := r.Context().Value("user_id").(uuid.UUID)
+	ctx := r.Context()
+	fmt.Println("Context: ",ctx)
+	userID, ok := r.Context().Value(UserIDKey).(uuid.UUID)
 	if !ok {
 		return UserToken{}, fmt.Errorf("GetUserFromContext Function: %s","user_id not found in context")
 	}
-	userRole, ok := r.Context().Value("user_role").(roles.Role)
+	userRole, ok := r.Context().Value(UserRoleKey).(roles.Role)
 	if !ok {
 		return UserToken{}, fmt.Errorf("GetUserFromContext Function: %s","user_role not found in context")
 	}
@@ -153,14 +160,14 @@ func AddCookie(w http.ResponseWriter, name, value string, timeInSeconds int) {
 
 func SetAuthCookies(w http.ResponseWriter, user UserToken) {
 	AddCookie(w, "refresh_token", user.RefreshToken, 5184000)
-	AddCookie(w, "auth_token", user.AuthToken, 3600)
+	AddCookie(w, "auth_token", user.AuthToken, 120)
 }
 
 
 func GetJWTFromRefreshToken(token database.RefreshToken, c *config.Config) (UserToken, error) {	
 	user := UserToken{}	
 
-	jwt, err := MakeJWT(token.UserID, c.Secret, time.Second*3600)
+	jwt, err := MakeJWT(token.UserID, c.Secret, time.Second*120)
 	if err != nil {
 		return user, fmt.Errorf("GetJWTFromRefreshToken Function : %w",err)
 	}	
@@ -190,7 +197,7 @@ func ValidateRefreshToken(token string, c *config.Config) (UserToken, error) {
 		return user, fmt.Errorf("ValidateRefreshToken Function : %s","token revoked")
 	}	
 
-	jwt, err := MakeJWT(refreshToken.UserID, c.Secret, time.Second*3600)
+	jwt, err := MakeJWT(refreshToken.UserID, c.Secret, time.Second*120)
 	if err != nil {
 		return user, fmt.Errorf("ValidateRefreshToken Function : %w",err)
 	}
