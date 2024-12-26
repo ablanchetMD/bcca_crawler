@@ -45,7 +45,6 @@ type Toxicity struct {
 	ToxicityManagement []ToxicityManagement `json:"toxicity_management"`
 }
 
-
 type DoseModifications struct {
 	Toxicity           []Toxicity  `json:"dose_modifications"`
 	HepaticImpairment struct {
@@ -65,21 +64,11 @@ type Treatment struct {
 	Duration       string `json:"duration"`
 }
 
-type ContactInfo struct {
-	Physicians   []string `json:"physicians"`
-	PhoneNumbers []string `json:"phone_numbers"`
-}
-
 type Reference struct {
 	Title       string `json:"title"`
 	Authors     string `json:"authors"`
 	Journal     string `json:"journal,omitempty"`
-	Year        int    `json:"year,omitempty"`
-	Volume      string `json:"volume,omitempty"`
-	Pages       string `json:"pages,omitempty"`
-	Organization string `json:"organization,omitempty"`
-	Location    string `json:"location,omitempty"`
-	Date        string `json:"date,omitempty"`
+	Year        int    `json:"year,omitempty"`	
 }
 
 type ProtocolData struct {
@@ -89,12 +78,11 @@ type ProtocolData struct {
 	Tests              Tests               `json:"tests"`
 	Treatment          Treatment           `json:"treatment"`
 	DoseModifications  DoseModifications   `json:"dose_modifications"`
-	Precautions        []string            `json:"precautions"`
-	ContactInfo        ContactInfo         `json:"contact_info"`
+	Precautions        []string            `json:"precautions"`	
 	References         []Reference         `json:"references"`
 }
 
-const ai_prompt = `Extract information from the given PDF document and return the data as a stringified JSON object. The JSON should match the following structure:
+const ai_prompt = `You are an AI tasked with extracting structured data from PDFs. Extract the relevant information from the PDF and return it as JSON matching the structure below: 
 
 {
   "protocol_summary": {
@@ -108,7 +96,6 @@ const ai_prompt = `Extract information from the given PDF document and return th
     "notes": ["string"],
     "exclusion_criteria": ["string"]
   },
-  "cautions": ["string"],
   "tests": {
     "baseline": {
       "required_before_treatment": ["string"],
@@ -145,27 +132,28 @@ const ai_prompt = `Extract information from the given PDF document and return th
       "severe": "string"
     }
   },
+  "cautions": ["string"],
   "precautions": ["string"],
-  "contact_info": {
-    "physicians": ["string"],
-    "phone_numbers": ["string"]
-  },
   "references": [
     {
       "title": "string",
       "authors": "string",
       "journal": "string",
-      "year": "integer",
-      "volume": "string",
-      "pages": "string",
-      "organization": "string",
-      "location": "string",
-      "date": "string"
+      "year": "int"
     }
   ]
 }
 
-Ensure the output is clean, concise, and free of duplication, strictly adhering to this structure.`
+Instructions: 
+1. Analyze the PDF to identify sections matching the fields in the data structure. 
+2. Extract and format the data into JSON, ensuring all fields are populated according to the structure, even if some fields are empty. 
+3. For lists (e.g., contact_physicians, inclusion_criteria), ensure each item in the list is an individual string. 
+4. For subfields like hepatic_impairment, map the information directly from the relevant PDF sections.
+
+If there is ambiguity or missing data, indicate this with "unknown" or an empty string for strings and [] for lists.
+
+Expected Output Example: 
+Provide the extracted data as JSON adhering strictly to the structure above.`
 
   
 

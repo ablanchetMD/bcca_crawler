@@ -25,7 +25,7 @@ VALUES (
     $6,
     $7
 )
-RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes
+RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url
 `
 
 type CreateProtocolParams struct {
@@ -58,6 +58,8 @@ func (q *Queries) CreateProtocol(ctx context.Context, arg CreateProtocolParams) 
 		&i.Name,
 		pq.Array(&i.Tags),
 		&i.Notes,
+		&i.ProtocolUrl,
+		&i.PatientHandoutUrl,
 	)
 	return i, err
 }
@@ -73,7 +75,7 @@ func (q *Queries) DeleteProtocol(ctx context.Context, id uuid.UUID) error {
 }
 
 const getProtocolByID = `-- name: GetProtocolByID :one
-SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM protocols
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url FROM protocols
 WHERE id = $1
 `
 
@@ -89,12 +91,14 @@ func (q *Queries) GetProtocolByID(ctx context.Context, id uuid.UUID) (Protocol, 
 		&i.Name,
 		pq.Array(&i.Tags),
 		&i.Notes,
+		&i.ProtocolUrl,
+		&i.PatientHandoutUrl,
 	)
 	return i, err
 }
 
 const getProtocolsAsc = `-- name: GetProtocolsAsc :many
-SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM protocols
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url FROM protocols
 ORDER BY name ASC
 LIMIT $1 OFFSET $2
 `
@@ -122,6 +126,8 @@ func (q *Queries) GetProtocolsAsc(ctx context.Context, arg GetProtocolsAscParams
 			&i.Name,
 			pq.Array(&i.Tags),
 			&i.Notes,
+			&i.ProtocolUrl,
+			&i.PatientHandoutUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -137,7 +143,7 @@ func (q *Queries) GetProtocolsAsc(ctx context.Context, arg GetProtocolsAscParams
 }
 
 const getProtocolsDesc = `-- name: GetProtocolsDesc :many
-SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM protocols
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url FROM protocols
 ORDER BY name DESC
 LIMIT $1 OFFSET $2
 `
@@ -165,6 +171,8 @@ func (q *Queries) GetProtocolsDesc(ctx context.Context, arg GetProtocolsDescPara
 			&i.Name,
 			pq.Array(&i.Tags),
 			&i.Notes,
+			&i.ProtocolUrl,
+			&i.PatientHandoutUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -180,7 +188,7 @@ func (q *Queries) GetProtocolsDesc(ctx context.Context, arg GetProtocolsDescPara
 }
 
 const getProtocolsOnlyTumorGroupAndTagsAsc = `-- name: GetProtocolsOnlyTumorGroupAndTagsAsc :many
-SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM protocols
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url FROM protocols
 WHERE tumor_group = $1
 AND tags @> $2
 ORDER BY name ASC
@@ -217,6 +225,8 @@ func (q *Queries) GetProtocolsOnlyTumorGroupAndTagsAsc(ctx context.Context, arg 
 			&i.Name,
 			pq.Array(&i.Tags),
 			&i.Notes,
+			&i.ProtocolUrl,
+			&i.PatientHandoutUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -232,7 +242,7 @@ func (q *Queries) GetProtocolsOnlyTumorGroupAndTagsAsc(ctx context.Context, arg 
 }
 
 const getProtocolsOnlyTumorGroupAndTagsDesc = `-- name: GetProtocolsOnlyTumorGroupAndTagsDesc :many
-SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM protocols
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url FROM protocols
 WHERE tumor_group = $1
 AND tags @> $2
 ORDER BY name DESC
@@ -269,6 +279,8 @@ func (q *Queries) GetProtocolsOnlyTumorGroupAndTagsDesc(ctx context.Context, arg
 			&i.Name,
 			pq.Array(&i.Tags),
 			&i.Notes,
+			&i.ProtocolUrl,
+			&i.PatientHandoutUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -284,7 +296,7 @@ func (q *Queries) GetProtocolsOnlyTumorGroupAndTagsDesc(ctx context.Context, arg
 }
 
 const getProtocolsOnlyTumorGroupAsc = `-- name: GetProtocolsOnlyTumorGroupAsc :many
-SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM protocols
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url FROM protocols
 WHERE tumor_group = $1
 ORDER BY name ASC
 LIMIT $2 OFFSET $3
@@ -314,6 +326,8 @@ func (q *Queries) GetProtocolsOnlyTumorGroupAsc(ctx context.Context, arg GetProt
 			&i.Name,
 			pq.Array(&i.Tags),
 			&i.Notes,
+			&i.ProtocolUrl,
+			&i.PatientHandoutUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -329,7 +343,7 @@ func (q *Queries) GetProtocolsOnlyTumorGroupAsc(ctx context.Context, arg GetProt
 }
 
 const getProtocolsOnlyTumorGroupDesc = `-- name: GetProtocolsOnlyTumorGroupDesc :many
-SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM protocols
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url FROM protocols
 WHERE tumor_group = $1
 ORDER BY name DESC
 LIMIT $2 OFFSET $3
@@ -359,6 +373,8 @@ func (q *Queries) GetProtocolsOnlyTumorGroupDesc(ctx context.Context, arg GetPro
 			&i.Name,
 			pq.Array(&i.Tags),
 			&i.Notes,
+			&i.ProtocolUrl,
+			&i.PatientHandoutUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -383,7 +399,7 @@ SET
     tags = $5,
     notes = $6
 WHERE id = $1
-RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes
+RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url
 `
 
 type UpdateProtocolParams struct {
@@ -414,6 +430,8 @@ func (q *Queries) UpdateProtocol(ctx context.Context, arg UpdateProtocolParams) 
 		&i.Name,
 		pq.Array(&i.Tags),
 		&i.Notes,
+		&i.ProtocolUrl,
+		&i.PatientHandoutUrl,
 	)
 	return i, err
 }

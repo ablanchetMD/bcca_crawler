@@ -11,6 +11,18 @@ import (
 	"github.com/google/uuid"
 )
 
+type ArticleReference struct {
+	ID        uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	Title     string
+	Authors   string
+	Journal   string
+	Year      string
+	Pmid      string
+	Joi       string
+}
+
 type Cancer struct {
 	ID         uuid.UUID
 	CreatedAt  time.Time
@@ -37,15 +49,173 @@ type Log struct {
 	Action    string
 }
 
+type Medication struct {
+	ID          uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Name        string
+	Description sql.NullString
+	Category    string
+}
+
+type Physician struct {
+	ID        uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	FirstName string
+	LastName  string
+	Email     string
+	Site      string
+}
+
 type Protocol struct {
+	ID                uuid.UUID
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	TumorGroup        string
+	Code              string
+	Name              string
+	Tags              []string
+	Notes             string
+	ProtocolUrl       string
+	PatientHandoutUrl string
+}
+
+type ProtocolBaselineTest struct {
+	ProtocolID uuid.UUID
+	TestID     uuid.UUID
+}
+
+type ProtocolBaselineTestsIfNecessary struct {
+	ProtocolID uuid.UUID
+	TestID     uuid.UUID
+}
+
+type ProtocolBaselineTestsNonUrgent struct {
+	ProtocolID uuid.UUID
+	TestID     uuid.UUID
+}
+
+type ProtocolCaution struct {
+	ID          uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Description string
+}
+
+type ProtocolCautionsValue struct {
+	ProtocolID uuid.UUID
+	CautionID  uuid.UUID
+}
+
+type ProtocolContactPhysician struct {
+	ProtocolID  uuid.UUID
+	PhysicianID uuid.UUID
+}
+
+type ProtocolCycle struct {
+	ID            uuid.UUID
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	Cycle         string
+	CycleDuration string
+	ProtocolID    uuid.UUID
+}
+
+type ProtocolEligibilityCriteriaValue struct {
+	ProtocolID uuid.UUID
+	CriteriaID uuid.UUID
+}
+
+type ProtocolEligibilityCriterium struct {
+	ID          uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Type        string
+	Description string
+}
+
+type ProtocolFollowupTest struct {
+	ProtocolID uuid.UUID
+	TestID     uuid.UUID
+}
+
+type ProtocolFollowupTestsIfNecessary struct {
+	ProtocolID uuid.UUID
+	TestID     uuid.UUID
+}
+
+type ProtocolPpo struct {
 	ID         uuid.UUID
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
-	TumorGroup string
-	Code       string
-	Name       string
-	Tags       []string
+	Title      string
+	Url        string
+	ProtocolID uuid.UUID
+}
+
+type ProtocolPreMedicationsValue struct {
+	ProtocolID      uuid.UUID
+	PreMedicationID uuid.UUID
+}
+
+type ProtocolPrecaution struct {
+	ID          uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Title       string
+	Description string
+}
+
+type ProtocolPrecautionsValue struct {
+	ProtocolID   uuid.UUID
+	PrecautionID uuid.UUID
+}
+
+type ProtocolPremedication struct {
+	ID         uuid.UUID
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	Medication uuid.UUID
+	Dose       string
+	Route      string
+	Frequency  string
+	Duration   string
 	Notes      string
+}
+
+type ProtocolReferencesValue struct {
+	ProtocolID  uuid.UUID
+	ReferenceID uuid.UUID
+}
+
+type ProtocolSupportiveMedication struct {
+	ID         uuid.UUID
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	Medication uuid.UUID
+	Dose       string
+	Route      string
+	Frequency  string
+	Duration   string
+	Notes      string
+}
+
+type ProtocolSupportiveMedicationValue struct {
+	ProtocolID             uuid.UUID
+	SupportiveMedicationID uuid.UUID
+}
+
+type ProtocolTreatment struct {
+	ID                  uuid.UUID
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	Medication          uuid.UUID
+	Dose                string
+	Route               string
+	Frequency           string
+	Duration            string
+	AdministrationGuide string
 }
 
 type RefreshToken struct {
@@ -55,6 +225,39 @@ type RefreshToken struct {
 	ExpiresAt time.Time
 	RevokedAt sql.NullTime
 	UserID    uuid.UUID
+}
+
+type Test struct {
+	ID          uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Name        string
+	Description sql.NullString
+}
+
+type ToxicityModification struct {
+	ID          uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Title       string
+	Grade       string
+	Adjustement string
+	ProtocolID  uuid.UUID
+}
+
+type TreatmentCyclesJunction struct {
+	ProtocolTreatmentID uuid.UUID
+	ProtocolCyclesID    uuid.UUID
+}
+
+type TreatmentModification struct {
+	ID          uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Category    string
+	Description string
+	Adjustement string
+	TreatmentID uuid.UUID
 }
 
 type User struct {

@@ -36,16 +36,10 @@ CREATE TABLE protocol_contact_physicians (
   PRIMARY KEY (protocol_id, physician_id)
 );
 
-CREATE TABLE protocol_supportive_medications (
+CREATE TABLE protocol_supportive_medication_values (
   protocol_id UUID NOT NULL REFERENCES protocols(id) ON DELETE CASCADE,
   supportive_medication_id UUID NOT NULL REFERENCES protocol_supportive_medication(id) ON DELETE CASCADE,
   PRIMARY KEY (protocol_id, supportive_medication_id)
-);
-
-CREATE TABLE protocol_cycles_values (
-  protocol_id UUID NOT NULL REFERENCES protocols(id) ON DELETE CASCADE,
-  cycle_id UUID NOT NULL REFERENCES protocol_cycles(id) ON DELETE CASCADE,
-  PRIMARY KEY (protocol_id, cycle_id)
 );
 
 -- +goose Down
@@ -57,5 +51,4 @@ DROP TABLE protocol_followup_tests;
 DROP TABLE protocol_followup_tests_if_necessary;
 DROP TABLE protocol_contact_physicians;
 DROP TABLE protocol_supportive_medications;
-DROP TABLE protocol_cycles_values;
 

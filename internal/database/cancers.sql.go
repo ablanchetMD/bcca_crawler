@@ -290,7 +290,7 @@ func (q *Queries) GetCancersOnlyTumorGroupAsc(ctx context.Context, arg GetCancer
 }
 
 const getProtocolsForCancer = `-- name: GetProtocolsForCancer :many
-SELECT p.id, p.created_at, p.updated_at, p.tumor_group, p.code, p.name, p.tags, p.notes 
+SELECT p.id, p.created_at, p.updated_at, p.tumor_group, p.code, p.name, p.tags, p.notes, p.protocol_url, p.patient_handout_url 
 FROM cancer_protocols cp
 JOIN protocols p ON cp.protocol_id = p.id
 WHERE cp.cancer_id = $1
@@ -314,6 +314,8 @@ func (q *Queries) GetProtocolsForCancer(ctx context.Context, cancerID uuid.UUID)
 			&i.Name,
 			pq.Array(&i.Tags),
 			&i.Notes,
+			&i.ProtocolUrl,
+			&i.PatientHandoutUrl,
 		); err != nil {
 			return nil, err
 		}
