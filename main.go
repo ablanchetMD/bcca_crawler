@@ -28,6 +28,8 @@ func main() {
 	cfg.Platform = os.Getenv("PLATFORM")
 	cfg.Secret = os.Getenv("SECRET")
 	cfg.DatabaseUrl = os.Getenv("DB_URL")
+	cfg.GeminiApiKey = os.Getenv("GEMINI_API_KEY")
+	cfg.MailGunApiKey = os.Getenv("MAILGUN_API_KEY")
 	db, err := sql.Open("postgres", os.Getenv("DB_URL"))
 	if err != nil {
 		fmt.Println("Error fetching database: ", err)
@@ -42,7 +44,9 @@ func main() {
 	commands := commands{}
 	commands.register("serve", handlerStartServer)
 	commands.register("geo", handlerGeoLocation)
-	commands.register("new_user", handlerCreateUser)	
+	commands.register("new_user", handlerCreateUser)
+	commands.register("crawl", handlerCrawl)
+	commands.register("test_ai", handlerAnalyzePDF)	
 
 	//http://www.bccancer.bc.ca/health-professionals/clinical-resources/chemotherapy-protocols/lymphoma-myeloma
 

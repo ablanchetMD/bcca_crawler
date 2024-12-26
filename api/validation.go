@@ -9,8 +9,10 @@ import(
 
 // Predefined list of valid tumor group codes
 var validTumorGroups = map[string]bool{
-	"lymphoma&myeloma": true,
-	"leukemia&bmt": true,
+	"lymphoma": true,
+	"myeloma": true,
+	"bmt": true,
+	"leukemia": true,
 	"breast": true,
 	"gastrointestinal": true,
 	"genitourinary": true,

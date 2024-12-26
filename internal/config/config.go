@@ -13,6 +13,8 @@ type Config struct {
 	ServerPort	   string
 	DatabaseUrl    string
 	Secret         string
+	GeminiApiKey   string
+	MailGunApiKey  string
 	Validate	   *validator.Validate
 	
 }

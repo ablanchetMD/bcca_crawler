@@ -237,8 +237,7 @@ func HandleRevoke(c *config.Config, w http.ResponseWriter, r *http.Request) {
 
 func HandleGetUsers(c *config.Config, q QueryParams, w http.ResponseWriter, r *http.Request) {	
 	user,err := auth.GetUserFromContext(r)
-	if err != nil {
-		fmt.Println("Error getting user from context: ", err)
+	if err != nil {		
 		json_utils.RespondWithError(w, http.StatusForbidden, "Invalid token")
 		return
 	}

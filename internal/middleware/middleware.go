@@ -5,21 +5,13 @@ import (
 	"bcca_crawler/internal/config"	
 	"bcca_crawler/internal/caching"
 	"bcca_crawler/internal/auth/roles"
+	"bcca_crawler/internal/json_utils"
 	"context"
 	"fmt"
 	"net/http"
 	"time"	
 )
 
-
-// func middlewareLog(next http.Handler) http.Handler {
-// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// 		log.Printf("%s %s", r.Method, r.URL.Path)
-// 		next.ServeHTTP(w, r)
-// 	})
-// }
-
-//Fix middlewareAuth, middlewarePermission : it shouldn't deny access, merely provide context if user is authenticated or not and their role
 
 func MiddlewareAuth(c *config.Config, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -48,15 +40,14 @@ func MiddlewareAuth(c *config.Config, next http.Handler) http.Handler {
 				}
 				auth.SetAuthCookies(w, user_token)
 				ctx := context.WithValue(r.Context(), auth.UserIDKey, user_token.UserID)
-				fmt.Println("Middleware : Should have set User: ", ctx)
+				
 				role, err := caching.GetRoleCache(user_token.UserID)
 				if err != nil {
 					fmt.Println(err)
 					fmt.Println("Error getting role from cache.. This should not happen")
 				}
 				newCtx := context.WithValue(ctx, auth.UserRoleKey, role)
-				fmt.Println("Middleware : Should have set Role and User: ", newCtx)
-
+				
 				next.ServeHTTP(w, r.WithContext(newCtx))
 				return
 
@@ -82,10 +73,26 @@ func MiddlewareAuth(c *config.Config, next http.Handler) http.Handler {
 			}
 
 		}
-		caching.SetRoleCache(user_id, role, time.Now().Add(time.Minute * 60))
-		fmt.Println("Middleware : Should have set Role and User: ", ctx)
+		caching.SetRoleCache(user_id, role, time.Now().Add(time.Minute * 60))		
 		Newctx := context.WithValue(ctx, auth.UserRoleKey, role)
 		next.ServeHTTP(w, r.WithContext(Newctx))
 	})
+}
+
+
+func WithAuthAndRole(role roles.Role, handler http.HandlerFunc) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        user, err := auth.GetUserFromContext(r)
+        if err != nil {
+            json_utils.RespondWithError(w, http.StatusForbidden, "Invalid token")
+            return
+        }		
+
+        if user.Role >= role {
+            json_utils.RespondWithError(w, http.StatusForbidden, "You are not authorized to use this function.")
+            return
+        }
+        handler(w, r) // Call the actual handler
+    }
 }
 

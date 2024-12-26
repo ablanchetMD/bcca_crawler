@@ -2,6 +2,8 @@ package main
 
 import (
 	"bcca_crawler/api"
+	"bcca_crawler/ai_helper"
+	"bcca_crawler/crawler"
 	"bcca_crawler/internal/config"
 	"bcca_crawler/internal/middleware"
 	"bcca_crawler/routes"
@@ -9,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
 )
 
 type command struct {
@@ -64,6 +67,17 @@ func handlerGeoLocation(s *config.Config, cmd command) error {
 	return nil
 }
 
+func handlerAnalyzePDF(s *config.Config, cmd command) error {
+	// Analyze a PDF
+	err := ai_helper.TestAi(s)
+	if err != nil {
+		fmt.Println("Error analyzing PDF: ", err)
+		return err 
+	}
+	
+	return nil
+}
+
 func handlerCreateUser(s *config.Config, cmd command) error {
 	// Create a new user
 	email := cmd.Args[0]
@@ -75,6 +89,26 @@ func handlerCreateUser(s *config.Config, cmd command) error {
 		return err
 	}
 	fmt.Println("User created successfully: ", user)
+	return nil
+}
+
+func handlerCrawl(s *config.Config, cmd command) error {
+	if len(cmd.Args) < 1 {
+		return errors.New("missing URL argument")
+	}
+	// Crawl a website
+	url := cmd.Args[0]
+	
+	html,err := crawler.GetHTML(url)
+	if err != nil {
+		fmt.Println("Error getting HTML: ", err)
+	}
+	_,err = crawler.GetURLsFromHTML(html)
+	if err != nil {
+		fmt.Println("Error getting URLs: ", err)
+	}
+	// fmt.Println("Links found: ", links)
+	
 	return nil
 }
 

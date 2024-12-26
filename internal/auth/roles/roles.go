@@ -9,9 +9,10 @@ import (
 type Role int
 
 const (
-	Admin Role = iota
-	Editor
+	Guest Role = iota
 	User
+	Editor
+	Admin 	
 )
 
 // Map to string values
@@ -23,6 +24,8 @@ func (r Role) String() string {
 		return "Editor"
 	case User:
 		return "User"
+	case Guest:
+		return "Guest"
 	default:
 		return "Unknown"
 	}
@@ -38,6 +41,8 @@ func RoleFromString(roleStr string) (Role, error) {
 		return Editor, nil
 	case "user":
 		return User, nil
+	case "guest":
+		return Guest, nil
 	default:
 		return -1, fmt.Errorf("invalid role: %s", roleStr)
 	}

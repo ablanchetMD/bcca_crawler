@@ -8,6 +8,7 @@ import (
 	"net/http"	
 	"time"	
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 
@@ -171,9 +172,12 @@ func HandleCreateProtocol(c *config.Config, w http.ResponseWriter, r *http.Reque
 		Tags: req.Tags,
 		Notes: req.Notes,		
 	})
-	if err != nil {
-		
-		fmt.Println("Error creating protocol: ", err)
+	if err != nil {		
+		if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
+			// Duplicate key value violation
+			json_utils.RespondWithError(w, http.StatusInternalServerError, "Record already exists")
+			return			
+		}
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error creating protocol")
 		return
 	}	
