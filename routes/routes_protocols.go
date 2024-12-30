@@ -44,4 +44,23 @@ func RegisterProtocolRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		}
 	})
+
+	mux.HandleFunc(prefix +"/protocols/summary/{id}", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			api.HandleGetProtocolSummary(s, w, r)
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	mux.HandleFunc(prefix +"/protocols/summarycode/{code}", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			api.HandleGetProtocolSummaryCode(s, w, r)
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 }

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"github.com/google/uuid"
 	"database/sql"
+	"reflect"
 	
 )
 
@@ -70,6 +71,40 @@ func UnmarshalAndValidatePayload(c *config.Config,r *http.Request, v interface{}
 	return nil
 }
 
+func AnalyzeTreeWithCustomTypes(
+	data interface{},
+	typeMap map[string][]interface{},
+	customTypes map[string]reflect.Type,
+) {
+	switch node := data.(type) {
+	case []interface{}: // Handle arrays
+		for _, item := range node {
+			AnalyzeTreeWithCustomTypes(item, typeMap, customTypes)
+		}
+	case map[string]interface{}: // Handle objects (nodes)
+		for _, v := range node {
+			AnalyzeTreeWithCustomTypes(v, typeMap, customTypes)
+		}
+
+		// Try to match this object to a custom type
+		for typeName, typeDef := range customTypes {
+			matchedObj := reflect.New(typeDef).Interface()
+			bytes, err := json.Marshal(node)
+			if err != nil {
+				continue
+			}
+			err = json.Unmarshal(bytes, matchedObj)
+			if err == nil {
+				// Match found
+				typeMap[typeName] = append(typeMap[typeName], matchedObj)
+			}
+		}
+	default:
+		// Handle primitive types
+		typeName := fmt.Sprintf("%T", node)
+		typeMap[typeName] = append(typeMap[typeName], node)
+	}
+}
 func GetIPGeoLocation(ip string) (IPApiResponse, error) {	
 	var ipApiResponse IPApiResponse
 	// Make a request to ip-api.com

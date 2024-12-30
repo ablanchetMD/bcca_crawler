@@ -27,7 +27,7 @@ type Protocol struct {
 type ProtocolRequest struct {
 	TumorGroup      string `json:"tumor_group" validate:"required,tumorgroup"`
 	Code    string `json:"code" validate:"required,min=1,max=10"`
-	Name    string `json:"name" validate:"required,min=1,max=50"`
+	Name    string `json:"name" validate:"required,min=1,max=250"`
 	Tags    []string `json:"tags" validate:"omitempty,max=10,dive,min=1,max=50"`
 	Notes   string `json:"notes" validate:"omitempty,max=500"`
 }
@@ -154,6 +154,39 @@ func HandleUpdateProtocol(c *config.Config, w http.ResponseWriter, r *http.Reque
 	json_utils.RespondWithJSON(w, http.StatusOK, mapProtocolStruct(protocol))
 }
 
+func HandleGetProtocolSummary(c *config.Config, w http.ResponseWriter, r *http.Request) {
+	
+	parsed_id, err := ParseAndValidateID(r)
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	response,err := CMD_GetProtocolBy(c,"id",parsed_id.String())
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting protocol: %s", parsed_id.String()))
+		return
+	}
+	
+	json_utils.RespondWithJSON(w, http.StatusOK, response)
+}
+
+func HandleGetProtocolSummaryCode(c *config.Config, w http.ResponseWriter, r *http.Request) {
+	code := r.PathValue("code")
+    if len(code) == 0 {
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "No protocol code provided")
+		return
+    }	
+
+	response,err := CMD_GetProtocolBy(c,"code",code)
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting protocol: %s", code))
+		return
+	}
+	
+	json_utils.RespondWithJSON(w, http.StatusOK, response)
+}
+
 func HandleCreateProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {	
 	
 	var req ProtocolRequest
@@ -163,9 +196,8 @@ func HandleCreateProtocol(c *config.Config, w http.ResponseWriter, r *http.Reque
 		return
 	}
 	
-	protocol, err := c.Db.CreateProtocol(r.Context(), database.CreateProtocolParams{			
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+	protocol, err := c.Db.CreateProtocol(r.Context(), database.CreateProtocolParams{	
+		
 		TumorGroup: req.TumorGroup,
 		Code: req.Code,
 		Name: req.Name,

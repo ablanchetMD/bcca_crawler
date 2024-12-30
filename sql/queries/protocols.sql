@@ -1,15 +1,6 @@
 -- name: CreateProtocol :one
-INSERT INTO protocols (id, created_at, updated_at, tumor_group, code, name, tags, notes)
-VALUES (
-    gen_random_uuid(),
-    $1,
-    $2,
-    $3,
-    $4,
-    $5,
-    $6,
-    $7
-)
+INSERT INTO protocols (tumor_group, code, name, tags, notes)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: UpdateProtocol :one
@@ -31,6 +22,10 @@ WHERE id = $1;
 -- name: GetProtocolByID :one
 SELECT * FROM protocols
 WHERE id = $1;
+
+-- name: GetProtocolByCode :one
+SELECT * FROM protocols
+WHERE code = $1;
 
 -- name: GetProtocolsAsc :many
 SELECT * FROM protocols
@@ -68,7 +63,6 @@ AND tags @> $2
 ORDER BY name DESC
 LIMIT $3 OFFSET $4;
 
- 
 
 
 

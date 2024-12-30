@@ -157,6 +157,81 @@ func (q *Queries) AddTreatmentToCycle(ctx context.Context, arg AddTreatmentToCyc
 	return err
 }
 
+const getCyclesByProtocol = `-- name: GetCyclesByProtocol :many
+SELECT protocol_cycles.id, protocol_cycles.created_at, protocol_cycles.updated_at, protocol_cycles.cycle, protocol_cycles.cycle_duration, protocol_cycles.protocol_id
+FROM protocol_cycles
+WHERE protocol_cycles.protocol_id = $1
+ORDER BY protocol_cycles.cycle ASC
+`
+
+func (q *Queries) GetCyclesByProtocol(ctx context.Context, protocolID uuid.UUID) ([]ProtocolCycle, error) {
+	rows, err := q.db.QueryContext(ctx, getCyclesByProtocol, protocolID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ProtocolCycle
+	for rows.Next() {
+		var i ProtocolCycle
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Cycle,
+			&i.CycleDuration,
+			&i.ProtocolID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getProtocolTreatmentByData = `-- name: GetProtocolTreatmentByData :one
+SELECT id, created_at, updated_at, medication, dose, route, frequency, duration, administration_guide FROM protocol_treatment
+WHERE medication = $1 AND dose = $2 AND route = $3 AND frequency = $4 AND duration = $5 AND administration_guide = $6
+`
+
+type GetProtocolTreatmentByDataParams struct {
+	Medication          uuid.UUID
+	Dose                string
+	Route               string
+	Frequency           string
+	Duration            string
+	AdministrationGuide string
+}
+
+func (q *Queries) GetProtocolTreatmentByData(ctx context.Context, arg GetProtocolTreatmentByDataParams) (ProtocolTreatment, error) {
+	row := q.db.QueryRowContext(ctx, getProtocolTreatmentByData,
+		arg.Medication,
+		arg.Dose,
+		arg.Route,
+		arg.Frequency,
+		arg.Duration,
+		arg.AdministrationGuide,
+	)
+	var i ProtocolTreatment
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Medication,
+		&i.Dose,
+		&i.Route,
+		&i.Frequency,
+		&i.Duration,
+		&i.AdministrationGuide,
+	)
+	return i, err
+}
+
 const getProtocolTreatmentByID = `-- name: GetProtocolTreatmentByID :one
 SELECT id, created_at, updated_at, medication, dose, route, frequency, duration, administration_guide FROM protocol_treatment
 WHERE id = $1
@@ -177,6 +252,119 @@ func (q *Queries) GetProtocolTreatmentByID(ctx context.Context, id uuid.UUID) (P
 		&i.AdministrationGuide,
 	)
 	return i, err
+}
+
+const getToxicityModificationsByProtocol = `-- name: GetToxicityModificationsByProtocol :many
+SELECT id, created_at, updated_at, title, grade, adjustement, protocol_id FROM toxicity_modifications
+WHERE protocol_id = $1
+`
+
+func (q *Queries) GetToxicityModificationsByProtocol(ctx context.Context, protocolID uuid.UUID) ([]ToxicityModification, error) {
+	rows, err := q.db.QueryContext(ctx, getToxicityModificationsByProtocol, protocolID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ToxicityModification
+	for rows.Next() {
+		var i ToxicityModification
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Title,
+			&i.Grade,
+			&i.Adjustement,
+			&i.ProtocolID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTreatmentModificationsByTreatment = `-- name: GetTreatmentModificationsByTreatment :many
+SELECT id, created_at, updated_at, category, description, adjustement, treatment_id FROM treatment_modifications
+WHERE treatment_id = $1
+`
+
+func (q *Queries) GetTreatmentModificationsByTreatment(ctx context.Context, treatmentID uuid.UUID) ([]TreatmentModification, error) {
+	rows, err := q.db.QueryContext(ctx, getTreatmentModificationsByTreatment, treatmentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TreatmentModification
+	for rows.Next() {
+		var i TreatmentModification
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Category,
+			&i.Description,
+			&i.Adjustement,
+			&i.TreatmentID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTreatmentsByCycle = `-- name: GetTreatmentsByCycle :many
+SELECT protocol_treatment.id, protocol_treatment.created_at, protocol_treatment.updated_at, protocol_treatment.medication, protocol_treatment.dose, protocol_treatment.route, protocol_treatment.frequency, protocol_treatment.duration, protocol_treatment.administration_guide
+FROM protocol_treatment
+JOIN treatment_cycles_junction ON protocol_treatment.id = treatment_cycles_junction.protocol_treatment_id
+WHERE treatment_cycles_junction.protocol_cycles_id = $1
+ORDER BY protocol_treatment.medication ASC
+`
+
+func (q *Queries) GetTreatmentsByCycle(ctx context.Context, protocolCyclesID uuid.UUID) ([]ProtocolTreatment, error) {
+	rows, err := q.db.QueryContext(ctx, getTreatmentsByCycle, protocolCyclesID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ProtocolTreatment
+	for rows.Next() {
+		var i ProtocolTreatment
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Medication,
+			&i.Dose,
+			&i.Route,
+			&i.Frequency,
+			&i.Duration,
+			&i.AdministrationGuide,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const removeProtocolTreatment = `-- name: RemoveProtocolTreatment :exec

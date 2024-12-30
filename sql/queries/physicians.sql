@@ -5,8 +5,8 @@ VALUES (
     $2,
     $3,
     $4
-)
-returning *;
+)    
+RETURNING *;
 
 -- name: UpdatePhysician :one
 UPDATE physicians
@@ -23,6 +23,10 @@ returning *;
 DELETE FROM physicians
 WHERE id = $1;
 
+-- name: GetPhysicianByName :one
+SELECT * FROM physicians
+WHERE first_name = $1 AND last_name = $2;
+
 -- name: GetPhysicianByID :one
 SELECT * FROM physicians
 WHERE id = $1;
@@ -37,15 +41,20 @@ WHERE site = $1
 ORDER BY last_name ASC;
 
 -- name: GetPhysicianByProtocol :many
-SELECT physicians.id, physicians.first_name, physicians.last_name, physicians.email, physicians.site
-FROM physicians
-JOIN protocol_contact_physicians ON physicians.id = protocol_contact_physicians.physician_id
+SELECT p.*
+FROM physicians p
+JOIN protocol_contact_physicians ON p.id = protocol_contact_physicians.physician_id
 WHERE protocol_contact_physicians.protocol_id = $1
-ORDER BY last_name ASC;
+ORDER BY p.last_name ASC;
 
 -- name: AddPhysicianToProtocol :exec
 INSERT INTO protocol_contact_physicians (protocol_id, physician_id)
-VALUES ($1::UUID[], $2::UUID[]);
+VALUES ($1, $2);
+
+-- name: AddManyPhysicianToProtocol :exec
+INSERT INTO protocol_contact_physicians (protocol_id, physician_id)
+VALUES ($1::UUID[], $2::UUID[])
+ON CONFLICT DO NOTHING;
 
 -- name: RemovePhysicianFromProtocol :exec
 DELETE FROM protocol_contact_physicians

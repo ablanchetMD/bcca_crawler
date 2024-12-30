@@ -15,73 +15,68 @@ import (
 
 const addBaselineTest = `-- name: AddBaselineTest :exec
 INSERT INTO protocol_baseline_tests (protocol_id, test_id)
-VALUES ($1::UUID[], $2::UUID[])
-ON CONFLICT DO NOTHING
+VALUES ($1, $2)
 `
 
 type AddBaselineTestParams struct {
-	Column1 []uuid.UUID
-	Column2 []uuid.UUID
+	ProtocolID uuid.UUID
+	TestID     uuid.UUID
 }
 
 func (q *Queries) AddBaselineTest(ctx context.Context, arg AddBaselineTestParams) error {
-	_, err := q.db.ExecContext(ctx, addBaselineTest, pq.Array(arg.Column1), pq.Array(arg.Column2))
+	_, err := q.db.ExecContext(ctx, addBaselineTest, arg.ProtocolID, arg.TestID)
 	return err
 }
 
 const addFollowupIfNecessaryTest = `-- name: AddFollowupIfNecessaryTest :exec
 INSERT INTO protocol_followup_tests_if_necessary (protocol_id, test_id)
-VALUES ($1::UUID[], $2::UUID[])
-ON CONFLICT DO NOTHING
+VALUES ($1, $2)
 `
 
 type AddFollowupIfNecessaryTestParams struct {
-	Column1 []uuid.UUID
-	Column2 []uuid.UUID
+	ProtocolID uuid.UUID
+	TestID     uuid.UUID
 }
 
 func (q *Queries) AddFollowupIfNecessaryTest(ctx context.Context, arg AddFollowupIfNecessaryTestParams) error {
-	_, err := q.db.ExecContext(ctx, addFollowupIfNecessaryTest, pq.Array(arg.Column1), pq.Array(arg.Column2))
+	_, err := q.db.ExecContext(ctx, addFollowupIfNecessaryTest, arg.ProtocolID, arg.TestID)
 	return err
 }
 
 const addFollowupTest = `-- name: AddFollowupTest :exec
 INSERT INTO protocol_followup_tests (protocol_id, test_id)
-VALUES ($1::UUID[], $2::UUID[])
-ON CONFLICT DO NOTHING
+VALUES ($1, $2)
 `
 
 type AddFollowupTestParams struct {
-	Column1 []uuid.UUID
-	Column2 []uuid.UUID
+	ProtocolID uuid.UUID
+	TestID     uuid.UUID
 }
 
 func (q *Queries) AddFollowupTest(ctx context.Context, arg AddFollowupTestParams) error {
-	_, err := q.db.ExecContext(ctx, addFollowupTest, pq.Array(arg.Column1), pq.Array(arg.Column2))
+	_, err := q.db.ExecContext(ctx, addFollowupTest, arg.ProtocolID, arg.TestID)
 	return err
 }
 
 const addIfNecessaryTest = `-- name: AddIfNecessaryTest :exec
 INSERT INTO protocol_baseline_tests_if_necessary (protocol_id, test_id)
-VALUES ($1::UUID[], $2::UUID[])
-ON CONFLICT DO NOTHING
+VALUES ($1, $2)
 `
 
 type AddIfNecessaryTestParams struct {
-	Column1 []uuid.UUID
-	Column2 []uuid.UUID
+	ProtocolID uuid.UUID
+	TestID     uuid.UUID
 }
 
 func (q *Queries) AddIfNecessaryTest(ctx context.Context, arg AddIfNecessaryTestParams) error {
-	_, err := q.db.ExecContext(ctx, addIfNecessaryTest, pq.Array(arg.Column1), pq.Array(arg.Column2))
+	_, err := q.db.ExecContext(ctx, addIfNecessaryTest, arg.ProtocolID, arg.TestID)
 	return err
 }
 
-const addManyTests = `-- name: AddManyTests :many
+const addManyTests = `-- name: AddManyTests :exec
 INSERT INTO tests (name, description)
 VALUES ($1::TEXT[], $2::TEXT[])
 ON CONFLICT (name) DO NOTHING
-RETURNING id, created_at, updated_at, name, description
 `
 
 type AddManyTestsParams struct {
@@ -89,48 +84,23 @@ type AddManyTestsParams struct {
 	Column2 []string
 }
 
-func (q *Queries) AddManyTests(ctx context.Context, arg AddManyTestsParams) ([]Test, error) {
-	rows, err := q.db.QueryContext(ctx, addManyTests, pq.Array(arg.Column1), pq.Array(arg.Column2))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Test
-	for rows.Next() {
-		var i Test
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Name,
-			&i.Description,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) AddManyTests(ctx context.Context, arg AddManyTestsParams) error {
+	_, err := q.db.ExecContext(ctx, addManyTests, pq.Array(arg.Column1), pq.Array(arg.Column2))
+	return err
 }
 
 const addNonUrgentTest = `-- name: AddNonUrgentTest :exec
 INSERT INTO protocol_baseline_tests_non_urgent (protocol_id, test_id)
-VALUES ($1::UUID[], $2::UUID[])
-ON CONFLICT DO NOTHING
+VALUES ($1, $2)
 `
 
 type AddNonUrgentTestParams struct {
-	Column1 []uuid.UUID
-	Column2 []uuid.UUID
+	ProtocolID uuid.UUID
+	TestID     uuid.UUID
 }
 
 func (q *Queries) AddNonUrgentTest(ctx context.Context, arg AddNonUrgentTestParams) error {
-	_, err := q.db.ExecContext(ctx, addNonUrgentTest, pq.Array(arg.Column1), pq.Array(arg.Column2))
+	_, err := q.db.ExecContext(ctx, addNonUrgentTest, arg.ProtocolID, arg.TestID)
 	return err
 }
 
@@ -158,29 +128,29 @@ func (q *Queries) AddTest(ctx context.Context, arg AddTestParams) (Test, error) 
 	return i, err
 }
 
-const getTestsByProtocol = `-- name: GetTestsByProtocol :many
-SELECT t.id, t.name, t.description
+const getBaselineTestsByProtocol = `-- name: GetBaselineTestsByProtocol :many
+SELECT t.id, t.created_at, t.updated_at, t.name, t.description
 FROM tests t
 JOIN protocol_baseline_tests pb ON t.id = pb.test_id
 WHERE pb.protocol_id = $1
 `
 
-type GetTestsByProtocolRow struct {
-	ID          uuid.UUID
-	Name        string
-	Description sql.NullString
-}
-
-func (q *Queries) GetTestsByProtocol(ctx context.Context, protocolID uuid.UUID) ([]GetTestsByProtocolRow, error) {
-	rows, err := q.db.QueryContext(ctx, getTestsByProtocol, protocolID)
+func (q *Queries) GetBaselineTestsByProtocol(ctx context.Context, protocolID uuid.UUID) ([]Test, error) {
+	rows, err := q.db.QueryContext(ctx, getBaselineTestsByProtocol, protocolID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetTestsByProtocolRow
+	var items []Test
 	for rows.Next() {
-		var i GetTestsByProtocolRow
-		if err := rows.Scan(&i.ID, &i.Name, &i.Description); err != nil {
+		var i Test
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Name,
+			&i.Description,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -192,6 +162,167 @@ func (q *Queries) GetTestsByProtocol(ctx context.Context, protocolID uuid.UUID) 
 		return nil, err
 	}
 	return items, nil
+}
+
+const getFollowupIfNecessaryTestsByProtocol = `-- name: GetFollowupIfNecessaryTestsByProtocol :many
+SELECT t.id, t.created_at, t.updated_at, t.name, t.description
+FROM tests t
+JOIN protocol_followup_tests_if_necessary pb ON t.id = pb.test_id
+WHERE pb.protocol_id = $1
+`
+
+func (q *Queries) GetFollowupIfNecessaryTestsByProtocol(ctx context.Context, protocolID uuid.UUID) ([]Test, error) {
+	rows, err := q.db.QueryContext(ctx, getFollowupIfNecessaryTestsByProtocol, protocolID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Test
+	for rows.Next() {
+		var i Test
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Name,
+			&i.Description,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getFollowupTestsByProtocol = `-- name: GetFollowupTestsByProtocol :many
+SELECT t.id, t.created_at, t.updated_at, t.name, t.description
+FROM tests t
+JOIN protocol_followup_tests pb ON t.id = pb.test_id
+WHERE pb.protocol_id = $1
+`
+
+func (q *Queries) GetFollowupTestsByProtocol(ctx context.Context, protocolID uuid.UUID) ([]Test, error) {
+	rows, err := q.db.QueryContext(ctx, getFollowupTestsByProtocol, protocolID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Test
+	for rows.Next() {
+		var i Test
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Name,
+			&i.Description,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getIfNecessaryTestsByProtocol = `-- name: GetIfNecessaryTestsByProtocol :many
+SELECT t.id, t.created_at, t.updated_at, t.name, t.description
+FROM tests t
+JOIN protocol_baseline_tests_if_necessary pb ON t.id = pb.test_id
+WHERE pb.protocol_id = $1
+`
+
+func (q *Queries) GetIfNecessaryTestsByProtocol(ctx context.Context, protocolID uuid.UUID) ([]Test, error) {
+	rows, err := q.db.QueryContext(ctx, getIfNecessaryTestsByProtocol, protocolID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Test
+	for rows.Next() {
+		var i Test
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Name,
+			&i.Description,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getNonUrgentTestsByProtocol = `-- name: GetNonUrgentTestsByProtocol :many
+SELECT t.id, t.created_at, t.updated_at, t.name, t.description
+FROM tests t
+JOIN protocol_baseline_tests_non_urgent pb ON t.id = pb.test_id
+WHERE pb.protocol_id = $1
+`
+
+func (q *Queries) GetNonUrgentTestsByProtocol(ctx context.Context, protocolID uuid.UUID) ([]Test, error) {
+	rows, err := q.db.QueryContext(ctx, getNonUrgentTestsByProtocol, protocolID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Test
+	for rows.Next() {
+		var i Test
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Name,
+			&i.Description,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTestByName = `-- name: GetTestByName :one
+SELECT id, created_at, updated_at, name, description FROM tests WHERE name = $1
+`
+
+func (q *Queries) GetTestByName(ctx context.Context, name string) (Test, error) {
+	row := q.db.QueryRowContext(ctx, getTestByName, name)
+	var i Test
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+		&i.Description,
+	)
+	return i, err
 }
 
 const removeBaselineTest = `-- name: RemoveBaselineTest :exec

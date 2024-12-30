@@ -22,49 +22,33 @@ func (q *Queries) DeleteEligibilityCriteria(ctx context.Context, id uuid.UUID) e
 	return err
 }
 
+const getElibilityCriteriaByDescription = `-- name: GetElibilityCriteriaByDescription :one
+SELECT id, created_at, updated_at, type, description FROM protocol_eligibility_criteria
+WHERE description = $1
+`
+
+func (q *Queries) GetElibilityCriteriaByDescription(ctx context.Context, description string) (ProtocolEligibilityCriterium, error) {
+	row := q.db.QueryRowContext(ctx, getElibilityCriteriaByDescription, description)
+	var i ProtocolEligibilityCriterium
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Type,
+		&i.Description,
+	)
+	return i, err
+}
+
 const getEligibilityByProtocol = `-- name: GetEligibilityByProtocol :many
-SELECT c.id, c.type, c.description
+SELECT c.id, c.created_at, c.updated_at, c.type, c.description
 FROM protocol_eligibility_criteria c
 JOIN protocol_eligibility_criteria_values v ON c.id = v.criteria_id
 WHERE v.protocol_id = $1
 `
 
-type GetEligibilityByProtocolRow struct {
-	ID          uuid.UUID
-	Type        string
-	Description string
-}
-
-func (q *Queries) GetEligibilityByProtocol(ctx context.Context, protocolID uuid.UUID) ([]GetEligibilityByProtocolRow, error) {
+func (q *Queries) GetEligibilityByProtocol(ctx context.Context, protocolID uuid.UUID) ([]ProtocolEligibilityCriterium, error) {
 	rows, err := q.db.QueryContext(ctx, getEligibilityByProtocol, protocolID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetEligibilityByProtocolRow
-	for rows.Next() {
-		var i GetEligibilityByProtocolRow
-		if err := rows.Scan(&i.ID, &i.Type, &i.Description); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getEligibilityCriteriaBy = `-- name: GetEligibilityCriteriaBy :many
-SELECT id, created_at, updated_at, type, description FROM protocol_eligibility_criteria
-WHERE type = $1
-`
-
-func (q *Queries) GetEligibilityCriteriaBy(ctx context.Context, type_ string) ([]ProtocolEligibilityCriterium, error) {
-	rows, err := q.db.QueryContext(ctx, getEligibilityCriteriaBy, type_)
 	if err != nil {
 		return nil, err
 	}
@@ -110,44 +94,13 @@ func (q *Queries) GetEligibilityCriteriaByID(ctx context.Context, id uuid.UUID) 
 	return i, err
 }
 
-const insertEligibilityCriteria = `-- name: InsertEligibilityCriteria :one
-INSERT INTO protocol_eligibility_criteria (type, description)
-VALUES ($1, $2)
-RETURNING id, created_at, updated_at, type, description
+const getEligibilityCriteriaByType = `-- name: GetEligibilityCriteriaByType :many
+SELECT id, created_at, updated_at, type, description FROM protocol_eligibility_criteria
+WHERE type = $1
 `
 
-type InsertEligibilityCriteriaParams struct {
-	Type        string
-	Description string
-}
-
-func (q *Queries) InsertEligibilityCriteria(ctx context.Context, arg InsertEligibilityCriteriaParams) (ProtocolEligibilityCriterium, error) {
-	row := q.db.QueryRowContext(ctx, insertEligibilityCriteria, arg.Type, arg.Description)
-	var i ProtocolEligibilityCriterium
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.Type,
-		&i.Description,
-	)
-	return i, err
-}
-
-const insertManyEligibilityCriteria = `-- name: InsertManyEligibilityCriteria :many
-INSERT INTO protocol_eligibility_criteria (type, description)
-VALUES ($1::TEXT[], $2::TEXT[])
-ON CONFLICT DO NOTHING
-RETURNING id, created_at, updated_at, type, description
-`
-
-type InsertManyEligibilityCriteriaParams struct {
-	Column1 []string
-	Column2 []string
-}
-
-func (q *Queries) InsertManyEligibilityCriteria(ctx context.Context, arg InsertManyEligibilityCriteriaParams) ([]ProtocolEligibilityCriterium, error) {
-	rows, err := q.db.QueryContext(ctx, insertManyEligibilityCriteria, pq.Array(arg.Column1), pq.Array(arg.Column2))
+func (q *Queries) GetEligibilityCriteriaByType(ctx context.Context, type_ string) ([]ProtocolEligibilityCriterium, error) {
+	rows, err := q.db.QueryContext(ctx, getEligibilityCriteriaByType, type_)
 	if err != nil {
 		return nil, err
 	}
@@ -175,19 +128,74 @@ func (q *Queries) InsertManyEligibilityCriteria(ctx context.Context, arg InsertM
 	return items, nil
 }
 
+const insertEligibilityCriteria = `-- name: InsertEligibilityCriteria :one
+INSERT INTO protocol_eligibility_criteria (type, description)
+VALUES ($1, $2)
+RETURNING id, created_at, updated_at, type, description
+`
+
+type InsertEligibilityCriteriaParams struct {
+	Type        string
+	Description string
+}
+
+func (q *Queries) InsertEligibilityCriteria(ctx context.Context, arg InsertEligibilityCriteriaParams) (ProtocolEligibilityCriterium, error) {
+	row := q.db.QueryRowContext(ctx, insertEligibilityCriteria, arg.Type, arg.Description)
+	var i ProtocolEligibilityCriterium
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Type,
+		&i.Description,
+	)
+	return i, err
+}
+
+const insertManyEligibilityCriteria = `-- name: InsertManyEligibilityCriteria :exec
+INSERT INTO protocol_eligibility_criteria (type, description)
+VALUES ($1::UUID[], $2::UUID[])
+ON CONFLICT DO NOTHING
+`
+
+type InsertManyEligibilityCriteriaParams struct {
+	Column1 []uuid.UUID
+	Column2 []uuid.UUID
+}
+
+func (q *Queries) InsertManyEligibilityCriteria(ctx context.Context, arg InsertManyEligibilityCriteriaParams) error {
+	_, err := q.db.ExecContext(ctx, insertManyEligibilityCriteria, pq.Array(arg.Column1), pq.Array(arg.Column2))
+	return err
+}
+
 const linkEligibilityToProtocol = `-- name: LinkEligibilityToProtocol :exec
+INSERT INTO protocol_eligibility_criteria_values (protocol_id, criteria_id)
+VALUES ($1, $2)
+`
+
+type LinkEligibilityToProtocolParams struct {
+	ProtocolID uuid.UUID
+	CriteriaID uuid.UUID
+}
+
+func (q *Queries) LinkEligibilityToProtocol(ctx context.Context, arg LinkEligibilityToProtocolParams) error {
+	_, err := q.db.ExecContext(ctx, linkEligibilityToProtocol, arg.ProtocolID, arg.CriteriaID)
+	return err
+}
+
+const linkManyEligibilityToProtocol = `-- name: LinkManyEligibilityToProtocol :exec
 INSERT INTO protocol_eligibility_criteria_values (protocol_id, criteria_id)
 VALUES ($1::UUID[], $2::UUID[])
 ON CONFLICT DO NOTHING
 `
 
-type LinkEligibilityToProtocolParams struct {
+type LinkManyEligibilityToProtocolParams struct {
 	Column1 []uuid.UUID
 	Column2 []uuid.UUID
 }
 
-func (q *Queries) LinkEligibilityToProtocol(ctx context.Context, arg LinkEligibilityToProtocolParams) error {
-	_, err := q.db.ExecContext(ctx, linkEligibilityToProtocol, pq.Array(arg.Column1), pq.Array(arg.Column2))
+func (q *Queries) LinkManyEligibilityToProtocol(ctx context.Context, arg LinkManyEligibilityToProtocolParams) error {
+	_, err := q.db.ExecContext(ctx, linkManyEligibilityToProtocol, pq.Array(arg.Column1), pq.Array(arg.Column2))
 	return err
 }
 

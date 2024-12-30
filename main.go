@@ -46,7 +46,8 @@ func main() {
 	commands.register("geo", handlerGeoLocation)
 	commands.register("new_user", handlerCreateUser)
 	commands.register("crawl", handlerCrawl)
-	commands.register("test_ai", handlerAnalyzePDF)	
+	commands.register("get", handlerAnalyzePDF)
+	commands.register("check", handlerCheckDatabase)
 
 	//http://www.bccancer.bc.ca/health-professionals/clinical-resources/chemotherapy-protocols/lymphoma-myeloma
 

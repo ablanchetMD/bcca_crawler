@@ -16,10 +16,16 @@ SET
 WHERE id = $1
 RETURNING *;
 
+-- name: GetProtocolTreatmentByData :one
+SELECT * FROM protocol_treatment
+WHERE medication = $1 AND dose = $2 AND route = $3 AND frequency = $4 AND duration = $5 AND administration_guide = $6;
+
+
 -- name: AddTreatmentModification :one
 INSERT INTO treatment_modifications (category, description, adjustement, treatment_id)
 VALUES ($1, $2, $3, $4)
 RETURNING *;
+
 
 -- name: UpdateTreatmentModification :one
 UPDATE treatment_modifications
@@ -76,4 +82,27 @@ WHERE id = $1;
 -- name: GetProtocolTreatmentByID :one
 SELECT * FROM protocol_treatment
 WHERE id = $1;
+
+-- name: GetCyclesByProtocol :many
+SELECT protocol_cycles.*
+FROM protocol_cycles
+WHERE protocol_cycles.protocol_id = $1
+ORDER BY protocol_cycles.cycle ASC;
+
+-- name: GetTreatmentsByCycle :many
+SELECT protocol_treatment.*
+FROM protocol_treatment
+JOIN treatment_cycles_junction ON protocol_treatment.id = treatment_cycles_junction.protocol_treatment_id
+WHERE treatment_cycles_junction.protocol_cycles_id = $1
+ORDER BY protocol_treatment.medication ASC;
+
+-- name: GetTreatmentModificationsByTreatment :many
+SELECT * FROM treatment_modifications
+WHERE treatment_id = $1;
+
+-- name: GetToxicityModificationsByProtocol :many
+SELECT * FROM toxicity_modifications
+WHERE protocol_id = $1;
+
+
 

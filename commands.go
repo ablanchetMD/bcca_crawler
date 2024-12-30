@@ -69,7 +69,7 @@ func handlerGeoLocation(s *config.Config, cmd command) error {
 
 func handlerAnalyzePDF(s *config.Config, cmd command) error {
 	// Analyze a PDF
-	err := ai_helper.TestAi(s)
+	err := ai_helper.GetAiData(s,cmd.Args[0])
 	if err != nil {
 		fmt.Println("Error analyzing PDF: ", err)
 		return err 
@@ -77,6 +77,27 @@ func handlerAnalyzePDF(s *config.Config, cmd command) error {
 	
 	return nil
 }
+
+func handlerCheckDatabase(s *config.Config, cmd command) error {
+	// Check the database
+	payload,err := api.CMD_GetProtocolBy(s,"code",cmd.Args[0])
+	if err != nil {
+		fmt.Println("Error checking database: ", err)
+		return err
+	}
+	fmt.Println("Payload: ", payload)
+	return nil
+}
+
+func handlerDeleteProtocol(s *config.Config, cmd command) error {
+	// Check the database
+	err := api.CMD_DeleteProtocol(s,cmd.Args[0])
+	if err != nil {		
+		return err
+	}	
+	return nil
+}
+
 
 func handlerCreateUser(s *config.Config, cmd command) error {
 	// Create a new user

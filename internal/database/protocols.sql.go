@@ -7,30 +7,18 @@ package database
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 )
 
 const createProtocol = `-- name: CreateProtocol :one
-INSERT INTO protocols (id, created_at, updated_at, tumor_group, code, name, tags, notes)
-VALUES (
-    gen_random_uuid(),
-    $1,
-    $2,
-    $3,
-    $4,
-    $5,
-    $6,
-    $7
-)
+INSERT INTO protocols (tumor_group, code, name, tags, notes)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url
 `
 
 type CreateProtocolParams struct {
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
 	TumorGroup string
 	Code       string
 	Name       string
@@ -40,8 +28,6 @@ type CreateProtocolParams struct {
 
 func (q *Queries) CreateProtocol(ctx context.Context, arg CreateProtocolParams) (Protocol, error) {
 	row := q.db.QueryRowContext(ctx, createProtocol,
-		arg.CreatedAt,
-		arg.UpdatedAt,
 		arg.TumorGroup,
 		arg.Code,
 		arg.Name,
@@ -72,6 +58,29 @@ WHERE id = $1
 func (q *Queries) DeleteProtocol(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, deleteProtocol, id)
 	return err
+}
+
+const getProtocolByCode = `-- name: GetProtocolByCode :one
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url FROM protocols
+WHERE code = $1
+`
+
+func (q *Queries) GetProtocolByCode(ctx context.Context, code string) (Protocol, error) {
+	row := q.db.QueryRowContext(ctx, getProtocolByCode, code)
+	var i Protocol
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.TumorGroup,
+		&i.Code,
+		&i.Name,
+		pq.Array(&i.Tags),
+		&i.Notes,
+		&i.ProtocolUrl,
+		&i.PatientHandoutUrl,
+	)
+	return i, err
 }
 
 const getProtocolByID = `-- name: GetProtocolByID :one

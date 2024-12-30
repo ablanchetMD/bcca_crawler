@@ -12,6 +12,21 @@ import (
 	"github.com/lib/pq"
 )
 
+const addArticleReferenceToProtocol = `-- name: AddArticleReferenceToProtocol :exec
+INSERT INTO protocol_references_value (protocol_id, reference_id)
+VALUES ($1, $2)
+`
+
+type AddArticleReferenceToProtocolParams struct {
+	ProtocolID  uuid.UUID
+	ReferenceID uuid.UUID
+}
+
+func (q *Queries) AddArticleReferenceToProtocol(ctx context.Context, arg AddArticleReferenceToProtocolParams) error {
+	_, err := q.db.ExecContext(ctx, addArticleReferenceToProtocol, arg.ProtocolID, arg.ReferenceID)
+	return err
+}
+
 const addManyArticleReferenceToProtocol = `-- name: AddManyArticleReferenceToProtocol :exec
 INSERT INTO protocol_references_value (protocol_id, reference_id)
 VALUES ($1::UUID[], $2::UUID[])
@@ -30,7 +45,7 @@ func (q *Queries) AddManyArticleReferenceToProtocol(ctx context.Context, arg Add
 
 const createArticleReference = `-- name: CreateArticleReference :one
 INSERT INTO article_references (title, authors, journal, year, joi, pmid)
-VALUES ($1, $2, $3, $4, $5, $6)
+VALUES ($1, $2, $3, $4, $5, $6)    
 RETURNING id, created_at, updated_at, title, authors, journal, year, pmid, joi
 `
 
@@ -77,6 +92,40 @@ func (q *Queries) DeleteArticleReference(ctx context.Context, id uuid.UUID) erro
 	return err
 }
 
+const getArticleReferenceByData = `-- name: GetArticleReferenceByData :one
+SELECT id, created_at, updated_at, title, authors, journal, year, pmid, joi FROM article_references
+WHERE title = $1 AND authors = $2 AND journal = $3 AND year = $4
+`
+
+type GetArticleReferenceByDataParams struct {
+	Title   string
+	Authors string
+	Journal string
+	Year    string
+}
+
+func (q *Queries) GetArticleReferenceByData(ctx context.Context, arg GetArticleReferenceByDataParams) (ArticleReference, error) {
+	row := q.db.QueryRowContext(ctx, getArticleReferenceByData,
+		arg.Title,
+		arg.Authors,
+		arg.Journal,
+		arg.Year,
+	)
+	var i ArticleReference
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Title,
+		&i.Authors,
+		&i.Journal,
+		&i.Year,
+		&i.Pmid,
+		&i.Joi,
+	)
+	return i, err
+}
+
 const getArticleReferenceByID = `-- name: GetArticleReferenceByID :one
 SELECT id, created_at, updated_at, title, authors, journal, year, pmid, joi FROM article_references
 WHERE id = $1
@@ -100,40 +149,32 @@ func (q *Queries) GetArticleReferenceByID(ctx context.Context, id uuid.UUID) (Ar
 }
 
 const getArticleReferencesByProtocol = `-- name: GetArticleReferencesByProtocol :many
-SELECT article_references.id, article_references.title, article_references.authors, article_references.journal, article_references.year, article_references.joi, article_references.pmid
+SELECT article_references.id, article_references.created_at, article_references.updated_at, article_references.title, article_references.authors, article_references.journal, article_references.year, article_references.pmid, article_references.joi
 FROM article_references
 JOIN protocol_references_value ON article_references.id = protocol_references_value.reference_id
 WHERE protocol_references_value.protocol_id = $1
-ORDER BY year DESC
+ORDER BY article_references.year DESC
 `
 
-type GetArticleReferencesByProtocolRow struct {
-	ID      uuid.UUID
-	Title   string
-	Authors string
-	Journal string
-	Year    string
-	Joi     string
-	Pmid    string
-}
-
-func (q *Queries) GetArticleReferencesByProtocol(ctx context.Context, protocolID uuid.UUID) ([]GetArticleReferencesByProtocolRow, error) {
+func (q *Queries) GetArticleReferencesByProtocol(ctx context.Context, protocolID uuid.UUID) ([]ArticleReference, error) {
 	rows, err := q.db.QueryContext(ctx, getArticleReferencesByProtocol, protocolID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetArticleReferencesByProtocolRow
+	var items []ArticleReference
 	for rows.Next() {
-		var i GetArticleReferencesByProtocolRow
+		var i ArticleReference
 		if err := rows.Scan(
 			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 			&i.Title,
 			&i.Authors,
 			&i.Journal,
 			&i.Year,
-			&i.Joi,
 			&i.Pmid,
+			&i.Joi,
 		); err != nil {
 			return nil, err
 		}

@@ -1,6 +1,6 @@
 -- name: CreateArticleReference :one
 INSERT INTO article_references (title, authors, journal, year, joi, pmid)
-VALUES ($1, $2, $3, $4, $5, $6)
+VALUES ($1, $2, $3, $4, $5, $6)    
 RETURNING *;
 
 -- name: UpdateArticleReference :one
@@ -25,12 +25,19 @@ SELECT * FROM article_references
 WHERE id = $1;
 
 -- name: GetArticleReferencesByProtocol :many
-SELECT article_references.id, article_references.title, article_references.authors, article_references.journal, article_references.year, article_references.joi, article_references.pmid
+SELECT article_references.*
 FROM article_references
 JOIN protocol_references_value ON article_references.id = protocol_references_value.reference_id
 WHERE protocol_references_value.protocol_id = $1
-ORDER BY year DESC;
+ORDER BY article_references.year DESC;
 
+-- name: AddArticleReferenceToProtocol :exec
+INSERT INTO protocol_references_value (protocol_id, reference_id)
+VALUES ($1, $2);
+
+-- name: GetArticleReferenceByData :one
+SELECT * FROM article_references
+WHERE title = $1 AND authors = $2 AND journal = $3 AND year = $4;
 
 -- name: AddManyArticleReferenceToProtocol :exec
 INSERT INTO protocol_references_value (protocol_id, reference_id)

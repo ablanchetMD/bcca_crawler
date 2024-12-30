@@ -1,13 +1,12 @@
 -- name: InsertEligibilityCriteria :one
 INSERT INTO protocol_eligibility_criteria (type, description)
 VALUES ($1, $2)
-RETURNING id, created_at, updated_at, type, description;
+RETURNING *;
 
--- name: InsertManyEligibilityCriteria :many
+-- name: InsertManyEligibilityCriteria :exec
 INSERT INTO protocol_eligibility_criteria (type, description)
-VALUES ($1::TEXT[], $2::TEXT[])
-ON CONFLICT DO NOTHING
-RETURNING id, created_at, updated_at, type, description;
+VALUES ($1::UUID[], $2::UUID[])
+ON CONFLICT DO NOTHING;
 
 -- name: UpdateEligibilityCriteria :one
 UPDATE protocol_eligibility_criteria
@@ -22,11 +21,19 @@ RETURNING *;
 DELETE FROM protocol_eligibility_criteria
 WHERE id = $1;
 
+-- name: GetElibilityCriteriaByDescription :one
+SELECT * FROM protocol_eligibility_criteria
+WHERE description = $1;
 
--- name: LinkEligibilityToProtocol :exec
+-- name: LinkManyEligibilityToProtocol :exec
 INSERT INTO protocol_eligibility_criteria_values (protocol_id, criteria_id)
 VALUES ($1::UUID[], $2::UUID[])
 ON CONFLICT DO NOTHING;
+
+-- name: LinkEligibilityToProtocol :exec
+INSERT INTO protocol_eligibility_criteria_values (protocol_id, criteria_id)
+VALUES ($1, $2);
+
 
 -- name: UnlinkEligibilityFromProtocol :exec
 DELETE FROM protocol_eligibility_criteria_values
@@ -36,12 +43,12 @@ WHERE protocol_id = $1 AND criteria_id = $2;
 SELECT * FROM protocol_eligibility_criteria
 WHERE id = $1;
 
--- name: GetEligibilityCriteriaBy :many
+-- name: GetEligibilityCriteriaByType :many
 SELECT * FROM protocol_eligibility_criteria
 WHERE type = $1;
 
 -- name: GetEligibilityByProtocol :many
-SELECT c.id, c.type, c.description
+SELECT c.*
 FROM protocol_eligibility_criteria c
 JOIN protocol_eligibility_criteria_values v ON c.id = v.criteria_id
 WHERE v.protocol_id = $1;

@@ -72,3 +72,7 @@ WHERE id = $1;
 SELECT * FROM medications
 WHERE category = $1
 ORDER BY name ASC;
+
+-- name: GetMedicationByName :one
+SELECT * FROM medications
+WHERE name = $1;

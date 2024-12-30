@@ -101,8 +101,6 @@ CREATE TABLE protocol_supportive_medication (
   notes TEXT NOT NULL DEFAULT ''
 );
 
-
-
 CREATE TABLE toxicity_modifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),

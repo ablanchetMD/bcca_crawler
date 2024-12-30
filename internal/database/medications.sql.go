@@ -211,6 +211,25 @@ func (q *Queries) GetMedicationByID(ctx context.Context, id uuid.UUID) (Medicati
 	return i, err
 }
 
+const getMedicationByName = `-- name: GetMedicationByName :one
+SELECT id, created_at, updated_at, name, description, category FROM medications
+WHERE name = $1
+`
+
+func (q *Queries) GetMedicationByName(ctx context.Context, name string) (Medication, error) {
+	row := q.db.QueryRowContext(ctx, getMedicationByName, name)
+	var i Medication
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+		&i.Description,
+		&i.Category,
+	)
+	return i, err
+}
+
 const getMedications = `-- name: GetMedications :many
 SELECT id, created_at, updated_at, name, description, category FROM medications
 ORDER BY name ASC
