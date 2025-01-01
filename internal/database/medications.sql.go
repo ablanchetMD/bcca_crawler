@@ -7,54 +7,9 @@ package database
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 )
-
-const addManyMedications = `-- name: AddManyMedications :many
-INSERT INTO medications (name, description, category)
-VALUES ($1::TEXT[], $2::TEXT[], $3::TEXT[])
-ON CONFLICT (name) DO NOTHING
-RETURNING id, created_at, updated_at, name, description, category
-`
-
-type AddManyMedicationsParams struct {
-	Column1 []string
-	Column2 []string
-	Column3 []string
-}
-
-func (q *Queries) AddManyMedications(ctx context.Context, arg AddManyMedicationsParams) ([]Medication, error) {
-	rows, err := q.db.QueryContext(ctx, addManyMedications, pq.Array(arg.Column1), pq.Array(arg.Column2), pq.Array(arg.Column3))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Medication
-	for rows.Next() {
-		var i Medication
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Name,
-			&i.Description,
-			&i.Category,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
 
 const addMedication = `-- name: AddMedication :one
 INSERT INTO medications (name, description, category)
@@ -64,7 +19,7 @@ RETURNING id, created_at, updated_at, name, description, category
 
 type AddMedicationParams struct {
 	Name        string
-	Description sql.NullString
+	Description string
 	Category    string
 }
 
@@ -82,86 +37,82 @@ func (q *Queries) AddMedication(ctx context.Context, arg AddMedicationParams) (M
 	return i, err
 }
 
-const addPreMedication = `-- name: AddPreMedication :one
-INSERT INTO protocol_premedication (medication, dose, route, frequency, duration, notes)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, created_at, updated_at, medication, dose, route, frequency, duration, notes
+const addMedicationModification = `-- name: AddMedicationModification :one
+INSERT INTO medication_modifications (category, description, adjustment, medication_id)
+VALUES ($1, $2, $3, $4)
+RETURNING id, created_at, updated_at, category, description, adjustment, medication_id
 `
 
-type AddPreMedicationParams struct {
-	Medication uuid.UUID
-	Dose       string
-	Route      string
-	Frequency  string
-	Duration   string
-	Notes      string
+type AddMedicationModificationParams struct {
+	Category     string
+	Description  string
+	Adjustment   string
+	MedicationID uuid.UUID
 }
 
-func (q *Queries) AddPreMedication(ctx context.Context, arg AddPreMedicationParams) (ProtocolPremedication, error) {
-	row := q.db.QueryRowContext(ctx, addPreMedication,
-		arg.Medication,
-		arg.Dose,
-		arg.Route,
-		arg.Frequency,
-		arg.Duration,
-		arg.Notes,
+func (q *Queries) AddMedicationModification(ctx context.Context, arg AddMedicationModificationParams) (MedicationModification, error) {
+	row := q.db.QueryRowContext(ctx, addMedicationModification,
+		arg.Category,
+		arg.Description,
+		arg.Adjustment,
+		arg.MedicationID,
 	)
-	var i ProtocolPremedication
+	var i MedicationModification
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.Medication,
-		&i.Dose,
-		&i.Route,
-		&i.Frequency,
-		&i.Duration,
-		&i.Notes,
+		&i.Category,
+		&i.Description,
+		&i.Adjustment,
+		&i.MedicationID,
 	)
 	return i, err
 }
 
 const addPreMedicationToProtocol = `-- name: AddPreMedicationToProtocol :exec
-INSERT INTO protocol_pre_medications_values (protocol_id, pre_medication_id)
+INSERT INTO protocol_pre_medications_values (protocol_id, medication_prescription_id)
 VALUES ($1, $2)
 ON CONFLICT DO NOTHING
 `
 
 type AddPreMedicationToProtocolParams struct {
-	ProtocolID      uuid.UUID
-	PreMedicationID uuid.UUID
+	ProtocolID               uuid.UUID
+	MedicationPrescriptionID uuid.UUID
 }
 
 func (q *Queries) AddPreMedicationToProtocol(ctx context.Context, arg AddPreMedicationToProtocolParams) error {
-	_, err := q.db.ExecContext(ctx, addPreMedicationToProtocol, arg.ProtocolID, arg.PreMedicationID)
+	_, err := q.db.ExecContext(ctx, addPreMedicationToProtocol, arg.ProtocolID, arg.MedicationPrescriptionID)
 	return err
 }
 
-const addSupportiveMedication = `-- name: AddSupportiveMedication :one
-INSERT INTO protocol_supportive_medication (medication, dose, route, frequency, duration, notes)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, created_at, updated_at, medication, dose, route, frequency, duration, notes
+const addPrescription = `-- name: AddPrescription :one
+INSERT INTO medication_prescription (medication, dose, route, frequency, duration, instructions, renewals)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, created_at, updated_at, medication, dose, route, frequency, duration, instructions, renewals
 `
 
-type AddSupportiveMedicationParams struct {
-	Medication uuid.UUID
-	Dose       string
-	Route      string
-	Frequency  string
-	Duration   string
-	Notes      string
+type AddPrescriptionParams struct {
+	Medication   uuid.UUID
+	Dose         string
+	Route        string
+	Frequency    string
+	Duration     string
+	Instructions string
+	Renewals     int32
 }
 
-func (q *Queries) AddSupportiveMedication(ctx context.Context, arg AddSupportiveMedicationParams) (ProtocolSupportiveMedication, error) {
-	row := q.db.QueryRowContext(ctx, addSupportiveMedication,
+func (q *Queries) AddPrescription(ctx context.Context, arg AddPrescriptionParams) (MedicationPrescription, error) {
+	row := q.db.QueryRowContext(ctx, addPrescription,
 		arg.Medication,
 		arg.Dose,
 		arg.Route,
 		arg.Frequency,
 		arg.Duration,
-		arg.Notes,
+		arg.Instructions,
+		arg.Renewals,
 	)
-	var i ProtocolSupportiveMedication
+	var i MedicationPrescription
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,
@@ -171,24 +122,25 @@ func (q *Queries) AddSupportiveMedication(ctx context.Context, arg AddSupportive
 		&i.Route,
 		&i.Frequency,
 		&i.Duration,
-		&i.Notes,
+		&i.Instructions,
+		&i.Renewals,
 	)
 	return i, err
 }
 
 const addSupportiveMedicationToProtocol = `-- name: AddSupportiveMedicationToProtocol :exec
-INSERT INTO protocol_supportive_medication_values (protocol_id, supportive_medication_id)
+INSERT INTO protocol_supportive_medication_values (protocol_id, medication_prescription_id)
 VALUES ($1, $2)
 ON CONFLICT DO NOTHING
 `
 
 type AddSupportiveMedicationToProtocolParams struct {
-	ProtocolID             uuid.UUID
-	SupportiveMedicationID uuid.UUID
+	ProtocolID               uuid.UUID
+	MedicationPrescriptionID uuid.UUID
 }
 
 func (q *Queries) AddSupportiveMedicationToProtocol(ctx context.Context, arg AddSupportiveMedicationToProtocolParams) error {
-	_, err := q.db.ExecContext(ctx, addSupportiveMedicationToProtocol, arg.ProtocolID, arg.SupportiveMedicationID)
+	_, err := q.db.ExecContext(ctx, addSupportiveMedicationToProtocol, arg.ProtocolID, arg.MedicationPrescriptionID)
 	return err
 }
 
@@ -228,6 +180,59 @@ func (q *Queries) GetMedicationByName(ctx context.Context, name string) (Medicat
 		&i.Category,
 	)
 	return i, err
+}
+
+const getMedicationModificationsByProtocol = `-- name: GetMedicationModificationsByProtocol :many
+SELECT m.id as medication_id, m.name, m.description, m.category, mod.id as modification_id, mod.category as modification_category, mod.description as modification_description, mod.adjustment
+FROM medication_modifications mod
+JOIN medications m ON mod.medication_id = m.id
+JOIN protocol_treatment pt ON m.id = pt.medication
+JOIN treatment_cycles_values tc ON pt.id = tc.protocol_treatment_id
+JOIN protocol_cycles pc ON tc.protocol_cycles_id = pc.id
+WHERE pc.protocol_id = $1
+`
+
+type GetMedicationModificationsByProtocolRow struct {
+	MedicationID            uuid.UUID
+	Name                    string
+	Description             string
+	Category                string
+	ModificationID          uuid.UUID
+	ModificationCategory    string
+	ModificationDescription string
+	Adjustment              string
+}
+
+func (q *Queries) GetMedicationModificationsByProtocol(ctx context.Context, protocolID uuid.UUID) ([]GetMedicationModificationsByProtocolRow, error) {
+	rows, err := q.db.QueryContext(ctx, getMedicationModificationsByProtocol, protocolID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetMedicationModificationsByProtocolRow
+	for rows.Next() {
+		var i GetMedicationModificationsByProtocolRow
+		if err := rows.Scan(
+			&i.MedicationID,
+			&i.Name,
+			&i.Description,
+			&i.Category,
+			&i.ModificationID,
+			&i.ModificationCategory,
+			&i.ModificationDescription,
+			&i.Adjustment,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getMedications = `-- name: GetMedications :many
@@ -301,25 +306,62 @@ func (q *Queries) GetMedicationsByCategory(ctx context.Context, category string)
 	return items, nil
 }
 
+const getModificationsByMedication = `-- name: GetModificationsByMedication :many
+SELECT id, created_at, updated_at, category, description, adjustment, medication_id FROM medication_modifications
+WHERE medication_id = $1
+`
+
+func (q *Queries) GetModificationsByMedication(ctx context.Context, medicationID uuid.UUID) ([]MedicationModification, error) {
+	rows, err := q.db.QueryContext(ctx, getModificationsByMedication, medicationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MedicationModification
+	for rows.Next() {
+		var i MedicationModification
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Category,
+			&i.Description,
+			&i.Adjustment,
+			&i.MedicationID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getPreMedicationsByProtocol = `-- name: GetPreMedicationsByProtocol :many
-SELECT m.id as medication_id, m.name, m.description, m.category, s.id as pre_medication_id, s.dose, s.route, s.frequency, s.duration, s.notes
+SELECT m.id as medication_id, m.name, m.description, m.category, p.id as medication_prescription_id, p.dose, p.route, p.frequency, p.duration, p.instructions, p.renewals
 FROM medications m
-JOIN protocol_premedication s ON m.id = s.medication
-JOIN protocol_pre_medications_values p ON s.id = p.pre_medication_id
-WHERE p.protocol_id = $1
+JOIN medication_prescription p ON m.id = p.medication
+JOIN protocol_pre_medications_values s ON p.id = s.medication_prescription_id
+WHERE s.protocol_id = $1
 `
 
 type GetPreMedicationsByProtocolRow struct {
-	MedicationID    uuid.UUID
-	Name            string
-	Description     sql.NullString
-	Category        string
-	PreMedicationID uuid.UUID
-	Dose            string
-	Route           string
-	Frequency       string
-	Duration        string
-	Notes           string
+	MedicationID             uuid.UUID
+	Name                     string
+	Description              string
+	Category                 string
+	MedicationPrescriptionID uuid.UUID
+	Dose                     string
+	Route                    string
+	Frequency                string
+	Duration                 string
+	Instructions             string
+	Renewals                 int32
 }
 
 func (q *Queries) GetPreMedicationsByProtocol(ctx context.Context, protocolID uuid.UUID) ([]GetPreMedicationsByProtocolRow, error) {
@@ -336,12 +378,13 @@ func (q *Queries) GetPreMedicationsByProtocol(ctx context.Context, protocolID uu
 			&i.Name,
 			&i.Description,
 			&i.Category,
-			&i.PreMedicationID,
+			&i.MedicationPrescriptionID,
 			&i.Dose,
 			&i.Route,
 			&i.Frequency,
 			&i.Duration,
-			&i.Notes,
+			&i.Instructions,
+			&i.Renewals,
 		); err != nil {
 			return nil, err
 		}
@@ -357,24 +400,25 @@ func (q *Queries) GetPreMedicationsByProtocol(ctx context.Context, protocolID uu
 }
 
 const getSupportiveMedicationsByProtocol = `-- name: GetSupportiveMedicationsByProtocol :many
-SELECT m.id as medication_id, m.name, m.description, m.category, p.id as supportive_medication_id, p.dose, p.route, p.frequency, p.duration, p.notes
+SELECT m.id as medication_id, m.name, m.description, m.category, p.id as medication_prescription_id, p.dose, p.route, p.frequency, p.duration, p.instructions, p.renewals
 FROM medications m
-JOIN protocol_supportive_medication p ON m.id = p.medication
-JOIN protocol_supportive_medication_values s ON p.id = s.supportive_medication_id
+JOIN medication_prescription p ON m.id = p.medication
+JOIN protocol_supportive_medication_values s ON p.id = s.medication_prescription_id
 WHERE s.protocol_id = $1
 `
 
 type GetSupportiveMedicationsByProtocolRow struct {
-	MedicationID           uuid.UUID
-	Name                   string
-	Description            sql.NullString
-	Category               string
-	SupportiveMedicationID uuid.UUID
-	Dose                   string
-	Route                  string
-	Frequency              string
-	Duration               string
-	Notes                  string
+	MedicationID             uuid.UUID
+	Name                     string
+	Description              string
+	Category                 string
+	MedicationPrescriptionID uuid.UUID
+	Dose                     string
+	Route                    string
+	Frequency                string
+	Duration                 string
+	Instructions             string
+	Renewals                 int32
 }
 
 func (q *Queries) GetSupportiveMedicationsByProtocol(ctx context.Context, protocolID uuid.UUID) ([]GetSupportiveMedicationsByProtocolRow, error) {
@@ -391,12 +435,13 @@ func (q *Queries) GetSupportiveMedicationsByProtocol(ctx context.Context, protoc
 			&i.Name,
 			&i.Description,
 			&i.Category,
-			&i.SupportiveMedicationID,
+			&i.MedicationPrescriptionID,
 			&i.Dose,
 			&i.Route,
 			&i.Frequency,
 			&i.Duration,
-			&i.Notes,
+			&i.Instructions,
+			&i.Renewals,
 		); err != nil {
 			return nil, err
 		}
@@ -411,52 +456,93 @@ func (q *Queries) GetSupportiveMedicationsByProtocol(ctx context.Context, protoc
 	return items, nil
 }
 
-const removePreMedication = `-- name: RemovePreMedication :exec
-DELETE FROM protocol_premedication
+const removeMedicationModification = `-- name: RemoveMedicationModification :exec
+DELETE FROM medication_modifications
 WHERE id = $1
 `
 
-func (q *Queries) RemovePreMedication(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, removePreMedication, id)
+func (q *Queries) RemoveMedicationModification(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, removeMedicationModification, id)
 	return err
 }
 
 const removePreMedicationFromProtocol = `-- name: RemovePreMedicationFromProtocol :exec
 DELETE FROM protocol_pre_medications_values
-WHERE protocol_id = $1 AND pre_medication_id = $2
+WHERE protocol_id = $1 AND medication_prescription_id = $2
 `
 
 type RemovePreMedicationFromProtocolParams struct {
-	ProtocolID      uuid.UUID
-	PreMedicationID uuid.UUID
+	ProtocolID               uuid.UUID
+	MedicationPrescriptionID uuid.UUID
 }
 
 func (q *Queries) RemovePreMedicationFromProtocol(ctx context.Context, arg RemovePreMedicationFromProtocolParams) error {
-	_, err := q.db.ExecContext(ctx, removePreMedicationFromProtocol, arg.ProtocolID, arg.PreMedicationID)
+	_, err := q.db.ExecContext(ctx, removePreMedicationFromProtocol, arg.ProtocolID, arg.MedicationPrescriptionID)
 	return err
 }
 
-const removeSupportiveMedication = `-- name: RemoveSupportiveMedication :exec
-DELETE FROM protocol_supportive_medication
+const removePrescription = `-- name: RemovePrescription :exec
+DELETE FROM medication_prescription
 WHERE id = $1
 `
 
-func (q *Queries) RemoveSupportiveMedication(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, removeSupportiveMedication, id)
+func (q *Queries) RemovePrescription(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, removePrescription, id)
 	return err
 }
 
 const removeSupportiveMedicationFromProtocol = `-- name: RemoveSupportiveMedicationFromProtocol :exec
 DELETE FROM protocol_supportive_medication_values
-WHERE protocol_id = $1 AND supportive_medication_id = $2
+WHERE protocol_id = $1 AND medication_prescription_id = $2
 `
 
 type RemoveSupportiveMedicationFromProtocolParams struct {
-	ProtocolID             uuid.UUID
-	SupportiveMedicationID uuid.UUID
+	ProtocolID               uuid.UUID
+	MedicationPrescriptionID uuid.UUID
 }
 
 func (q *Queries) RemoveSupportiveMedicationFromProtocol(ctx context.Context, arg RemoveSupportiveMedicationFromProtocolParams) error {
-	_, err := q.db.ExecContext(ctx, removeSupportiveMedicationFromProtocol, arg.ProtocolID, arg.SupportiveMedicationID)
+	_, err := q.db.ExecContext(ctx, removeSupportiveMedicationFromProtocol, arg.ProtocolID, arg.MedicationPrescriptionID)
 	return err
+}
+
+const updateMedicationModification = `-- name: UpdateMedicationModification :one
+UPDATE medication_modifications
+SET
+    updated_at = NOW(),
+    category = $2,
+    description = $3,
+    adjustment = $4,
+    medication_id = $5
+WHERE id = $1
+RETURNING id, created_at, updated_at, category, description, adjustment, medication_id
+`
+
+type UpdateMedicationModificationParams struct {
+	ID           uuid.UUID
+	Category     string
+	Description  string
+	Adjustment   string
+	MedicationID uuid.UUID
+}
+
+func (q *Queries) UpdateMedicationModification(ctx context.Context, arg UpdateMedicationModificationParams) (MedicationModification, error) {
+	row := q.db.QueryRowContext(ctx, updateMedicationModification,
+		arg.ID,
+		arg.Category,
+		arg.Description,
+		arg.Adjustment,
+		arg.MedicationID,
+	)
+	var i MedicationModification
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Category,
+		&i.Description,
+		&i.Adjustment,
+		&i.MedicationID,
+	)
+	return i, err
 }

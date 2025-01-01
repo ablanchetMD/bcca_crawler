@@ -40,7 +40,7 @@ VALUES (
     $4,
     $5
 )
-RETURNING id, created_at, updated_at, code, name, tags, notes, tumor_group
+RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes
 `
 
 type CreateCancerParams struct {
@@ -64,11 +64,11 @@ func (q *Queries) CreateCancer(ctx context.Context, arg CreateCancerParams) (Can
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TumorGroup,
 		&i.Code,
 		&i.Name,
 		pq.Array(&i.Tags),
 		&i.Notes,
-		&i.TumorGroup,
 	)
 	return i, err
 }
@@ -84,7 +84,7 @@ func (q *Queries) DeleteCancer(ctx context.Context, id uuid.UUID) error {
 }
 
 const getCancerByID = `-- name: GetCancerByID :one
-SELECT id, created_at, updated_at, code, name, tags, notes, tumor_group FROM cancers
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM cancers
 WHERE id = $1
 `
 
@@ -95,17 +95,17 @@ func (q *Queries) GetCancerByID(ctx context.Context, id uuid.UUID) (Cancer, erro
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TumorGroup,
 		&i.Code,
 		&i.Name,
 		pq.Array(&i.Tags),
 		&i.Notes,
-		&i.TumorGroup,
 	)
 	return i, err
 }
 
 const getCancers = `-- name: GetCancers :many
-SELECT id, created_at, updated_at, code, name, tags, notes, tumor_group FROM cancers
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM cancers
 ORDER BY name ASC
 LIMIT $1 OFFSET $2
 `
@@ -128,11 +128,11 @@ func (q *Queries) GetCancers(ctx context.Context, arg GetCancersParams) ([]Cance
 			&i.ID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.TumorGroup,
 			&i.Code,
 			&i.Name,
 			pq.Array(&i.Tags),
 			&i.Notes,
-			&i.TumorGroup,
 		); err != nil {
 			return nil, err
 		}
@@ -148,7 +148,7 @@ func (q *Queries) GetCancers(ctx context.Context, arg GetCancersParams) ([]Cance
 }
 
 const getCancersByTags = `-- name: GetCancersByTags :many
-SELECT id, created_at, updated_at, code, name, tags, notes, tumor_group FROM cancers
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM cancers
 WHERE tags @> $1
 ORDER BY name ASC
 LIMIT $2 OFFSET $3
@@ -173,11 +173,11 @@ func (q *Queries) GetCancersByTags(ctx context.Context, arg GetCancersByTagsPara
 			&i.ID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.TumorGroup,
 			&i.Code,
 			&i.Name,
 			pq.Array(&i.Tags),
 			&i.Notes,
-			&i.TumorGroup,
 		); err != nil {
 			return nil, err
 		}
@@ -193,7 +193,7 @@ func (q *Queries) GetCancersByTags(ctx context.Context, arg GetCancersByTagsPara
 }
 
 const getCancersOnlyTumorGroupAndTagsAsc = `-- name: GetCancersOnlyTumorGroupAndTagsAsc :many
-SELECT id, created_at, updated_at, code, name, tags, notes, tumor_group FROM cancers
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM cancers
 WHERE tumor_group = $1
 AND tags @> $2
 ORDER BY name ASC
@@ -225,11 +225,11 @@ func (q *Queries) GetCancersOnlyTumorGroupAndTagsAsc(ctx context.Context, arg Ge
 			&i.ID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.TumorGroup,
 			&i.Code,
 			&i.Name,
 			pq.Array(&i.Tags),
 			&i.Notes,
-			&i.TumorGroup,
 		); err != nil {
 			return nil, err
 		}
@@ -245,7 +245,7 @@ func (q *Queries) GetCancersOnlyTumorGroupAndTagsAsc(ctx context.Context, arg Ge
 }
 
 const getCancersOnlyTumorGroupAsc = `-- name: GetCancersOnlyTumorGroupAsc :many
-SELECT id, created_at, updated_at, code, name, tags, notes, tumor_group FROM cancers
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes FROM cancers
 WHERE tumor_group = $1
 ORDER BY name ASC
 LIMIT $2 OFFSET $3
@@ -270,11 +270,11 @@ func (q *Queries) GetCancersOnlyTumorGroupAsc(ctx context.Context, arg GetCancer
 			&i.ID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.TumorGroup,
 			&i.Code,
 			&i.Name,
 			pq.Array(&i.Tags),
 			&i.Notes,
-			&i.TumorGroup,
 		); err != nil {
 			return nil, err
 		}
@@ -290,7 +290,7 @@ func (q *Queries) GetCancersOnlyTumorGroupAsc(ctx context.Context, arg GetCancer
 }
 
 const getProtocolsForCancer = `-- name: GetProtocolsForCancer :many
-SELECT p.id, p.created_at, p.updated_at, p.tumor_group, p.code, p.name, p.tags, p.notes, p.protocol_url, p.patient_handout_url 
+SELECT p.id, p.created_at, p.updated_at, p.tumor_group, p.code, p.name, p.tags, p.notes, p.protocol_url, p.patient_handout_url, p.revised_on, p.activated_on 
 FROM cancer_protocols cp
 JOIN protocols p ON cp.protocol_id = p.id
 WHERE cp.cancer_id = $1
@@ -316,6 +316,8 @@ func (q *Queries) GetProtocolsForCancer(ctx context.Context, cancerID uuid.UUID)
 			&i.Notes,
 			&i.ProtocolUrl,
 			&i.PatientHandoutUrl,
+			&i.RevisedOn,
+			&i.ActivatedOn,
 		); err != nil {
 			return nil, err
 		}
@@ -355,7 +357,7 @@ SET
     tags = $5,
     notes = $6
 WHERE id = $1
-RETURNING id, created_at, updated_at, code, name, tags, notes, tumor_group
+RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes
 `
 
 type UpdateCancerParams struct {
@@ -381,11 +383,11 @@ func (q *Queries) UpdateCancer(ctx context.Context, arg UpdateCancerParams) (Can
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TumorGroup,
 		&i.Code,
 		&i.Name,
 		pq.Array(&i.Tags),
 		&i.Notes,
-		&i.TumorGroup,
 	)
 	return i, err
 }

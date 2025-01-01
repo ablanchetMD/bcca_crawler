@@ -15,7 +15,7 @@ import (
 const createProtocol = `-- name: CreateProtocol :one
 INSERT INTO protocols (tumor_group, code, name, tags, notes)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url
+RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url, revised_on, activated_on
 `
 
 type CreateProtocolParams struct {
@@ -46,6 +46,52 @@ func (q *Queries) CreateProtocol(ctx context.Context, arg CreateProtocolParams) 
 		&i.Notes,
 		&i.ProtocolUrl,
 		&i.PatientHandoutUrl,
+		&i.RevisedOn,
+		&i.ActivatedOn,
+	)
+	return i, err
+}
+
+const createProtocolbyScraping = `-- name: CreateProtocolbyScraping :one
+INSERT INTO protocols (tumor_group, code, name, tags, notes, revised_on, activated_on)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url, revised_on, activated_on
+`
+
+type CreateProtocolbyScrapingParams struct {
+	TumorGroup  string
+	Code        string
+	Name        string
+	Tags        []string
+	Notes       string
+	RevisedOn   string
+	ActivatedOn string
+}
+
+func (q *Queries) CreateProtocolbyScraping(ctx context.Context, arg CreateProtocolbyScrapingParams) (Protocol, error) {
+	row := q.db.QueryRowContext(ctx, createProtocolbyScraping,
+		arg.TumorGroup,
+		arg.Code,
+		arg.Name,
+		pq.Array(arg.Tags),
+		arg.Notes,
+		arg.RevisedOn,
+		arg.ActivatedOn,
+	)
+	var i Protocol
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.TumorGroup,
+		&i.Code,
+		&i.Name,
+		pq.Array(&i.Tags),
+		&i.Notes,
+		&i.ProtocolUrl,
+		&i.PatientHandoutUrl,
+		&i.RevisedOn,
+		&i.ActivatedOn,
 	)
 	return i, err
 }
@@ -61,7 +107,7 @@ func (q *Queries) DeleteProtocol(ctx context.Context, id uuid.UUID) error {
 }
 
 const getProtocolByCode = `-- name: GetProtocolByCode :one
-SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url FROM protocols
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url, revised_on, activated_on FROM protocols
 WHERE code = $1
 `
 
@@ -79,12 +125,14 @@ func (q *Queries) GetProtocolByCode(ctx context.Context, code string) (Protocol,
 		&i.Notes,
 		&i.ProtocolUrl,
 		&i.PatientHandoutUrl,
+		&i.RevisedOn,
+		&i.ActivatedOn,
 	)
 	return i, err
 }
 
 const getProtocolByID = `-- name: GetProtocolByID :one
-SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url FROM protocols
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url, revised_on, activated_on FROM protocols
 WHERE id = $1
 `
 
@@ -102,12 +150,14 @@ func (q *Queries) GetProtocolByID(ctx context.Context, id uuid.UUID) (Protocol, 
 		&i.Notes,
 		&i.ProtocolUrl,
 		&i.PatientHandoutUrl,
+		&i.RevisedOn,
+		&i.ActivatedOn,
 	)
 	return i, err
 }
 
 const getProtocolsAsc = `-- name: GetProtocolsAsc :many
-SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url FROM protocols
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url, revised_on, activated_on FROM protocols
 ORDER BY name ASC
 LIMIT $1 OFFSET $2
 `
@@ -137,6 +187,8 @@ func (q *Queries) GetProtocolsAsc(ctx context.Context, arg GetProtocolsAscParams
 			&i.Notes,
 			&i.ProtocolUrl,
 			&i.PatientHandoutUrl,
+			&i.RevisedOn,
+			&i.ActivatedOn,
 		); err != nil {
 			return nil, err
 		}
@@ -152,7 +204,7 @@ func (q *Queries) GetProtocolsAsc(ctx context.Context, arg GetProtocolsAscParams
 }
 
 const getProtocolsDesc = `-- name: GetProtocolsDesc :many
-SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url FROM protocols
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url, revised_on, activated_on FROM protocols
 ORDER BY name DESC
 LIMIT $1 OFFSET $2
 `
@@ -182,6 +234,8 @@ func (q *Queries) GetProtocolsDesc(ctx context.Context, arg GetProtocolsDescPara
 			&i.Notes,
 			&i.ProtocolUrl,
 			&i.PatientHandoutUrl,
+			&i.RevisedOn,
+			&i.ActivatedOn,
 		); err != nil {
 			return nil, err
 		}
@@ -197,7 +251,7 @@ func (q *Queries) GetProtocolsDesc(ctx context.Context, arg GetProtocolsDescPara
 }
 
 const getProtocolsOnlyTumorGroupAndTagsAsc = `-- name: GetProtocolsOnlyTumorGroupAndTagsAsc :many
-SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url FROM protocols
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url, revised_on, activated_on FROM protocols
 WHERE tumor_group = $1
 AND tags @> $2
 ORDER BY name ASC
@@ -236,6 +290,8 @@ func (q *Queries) GetProtocolsOnlyTumorGroupAndTagsAsc(ctx context.Context, arg 
 			&i.Notes,
 			&i.ProtocolUrl,
 			&i.PatientHandoutUrl,
+			&i.RevisedOn,
+			&i.ActivatedOn,
 		); err != nil {
 			return nil, err
 		}
@@ -251,7 +307,7 @@ func (q *Queries) GetProtocolsOnlyTumorGroupAndTagsAsc(ctx context.Context, arg 
 }
 
 const getProtocolsOnlyTumorGroupAndTagsDesc = `-- name: GetProtocolsOnlyTumorGroupAndTagsDesc :many
-SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url FROM protocols
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url, revised_on, activated_on FROM protocols
 WHERE tumor_group = $1
 AND tags @> $2
 ORDER BY name DESC
@@ -290,6 +346,8 @@ func (q *Queries) GetProtocolsOnlyTumorGroupAndTagsDesc(ctx context.Context, arg
 			&i.Notes,
 			&i.ProtocolUrl,
 			&i.PatientHandoutUrl,
+			&i.RevisedOn,
+			&i.ActivatedOn,
 		); err != nil {
 			return nil, err
 		}
@@ -305,7 +363,7 @@ func (q *Queries) GetProtocolsOnlyTumorGroupAndTagsDesc(ctx context.Context, arg
 }
 
 const getProtocolsOnlyTumorGroupAsc = `-- name: GetProtocolsOnlyTumorGroupAsc :many
-SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url FROM protocols
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url, revised_on, activated_on FROM protocols
 WHERE tumor_group = $1
 ORDER BY name ASC
 LIMIT $2 OFFSET $3
@@ -337,6 +395,8 @@ func (q *Queries) GetProtocolsOnlyTumorGroupAsc(ctx context.Context, arg GetProt
 			&i.Notes,
 			&i.ProtocolUrl,
 			&i.PatientHandoutUrl,
+			&i.RevisedOn,
+			&i.ActivatedOn,
 		); err != nil {
 			return nil, err
 		}
@@ -352,7 +412,7 @@ func (q *Queries) GetProtocolsOnlyTumorGroupAsc(ctx context.Context, arg GetProt
 }
 
 const getProtocolsOnlyTumorGroupDesc = `-- name: GetProtocolsOnlyTumorGroupDesc :many
-SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url FROM protocols
+SELECT id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url, revised_on, activated_on FROM protocols
 WHERE tumor_group = $1
 ORDER BY name DESC
 LIMIT $2 OFFSET $3
@@ -384,6 +444,8 @@ func (q *Queries) GetProtocolsOnlyTumorGroupDesc(ctx context.Context, arg GetPro
 			&i.Notes,
 			&i.ProtocolUrl,
 			&i.PatientHandoutUrl,
+			&i.RevisedOn,
+			&i.ActivatedOn,
 		); err != nil {
 			return nil, err
 		}
@@ -408,7 +470,7 @@ SET
     tags = $5,
     notes = $6
 WHERE id = $1
-RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url
+RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url, revised_on, activated_on
 `
 
 type UpdateProtocolParams struct {
@@ -441,6 +503,8 @@ func (q *Queries) UpdateProtocol(ctx context.Context, arg UpdateProtocolParams) 
 		&i.Notes,
 		&i.ProtocolUrl,
 		&i.PatientHandoutUrl,
+		&i.RevisedOn,
+		&i.ActivatedOn,
 	)
 	return i, err
 }

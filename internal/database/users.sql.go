@@ -63,7 +63,7 @@ VALUES (
     $4,
     $5
 )
-RETURNING id, created_at, updated_at, email, password, role, is_verified, deleted_at, deleted_by, last_active
+RETURNING id, created_at, updated_at, email, role, is_verified, deleted_at, deleted_by, last_active, password
 `
 
 type CreateUserParams struct {
@@ -88,12 +88,12 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Email,
-		&i.Password,
 		&i.Role,
 		&i.IsVerified,
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.LastActive,
+		&i.Password,
 	)
 	return i, err
 }
@@ -149,7 +149,7 @@ func (q *Queries) GetRefreshToken(ctx context.Context, token string) (GetRefresh
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, created_at, updated_at, email, password, role, is_verified, deleted_at, deleted_by, last_active FROM users WHERE email = $1
+SELECT id, created_at, updated_at, email, role, is_verified, deleted_at, deleted_by, last_active, password FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -160,18 +160,18 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Email,
-		&i.Password,
 		&i.Role,
 		&i.IsVerified,
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.LastActive,
+		&i.Password,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, created_at, updated_at, email, password, role, is_verified, deleted_at, deleted_by, last_active FROM users WHERE id = $1
+SELECT id, created_at, updated_at, email, role, is_verified, deleted_at, deleted_by, last_active, password FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -182,12 +182,12 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Email,
-		&i.Password,
 		&i.Role,
 		&i.IsVerified,
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.LastActive,
+		&i.Password,
 	)
 	return i, err
 }
@@ -204,7 +204,7 @@ func (q *Queries) GetUserRoleByID(ctx context.Context, id uuid.UUID) (string, er
 }
 
 const getUsers = `-- name: GetUsers :many
-SELECT id, created_at, updated_at, email, password, role, is_verified, deleted_at, deleted_by, last_active FROM users
+SELECT id, created_at, updated_at, email, role, is_verified, deleted_at, deleted_by, last_active, password FROM users
 ORDER BY email ASC
 LIMIT $1 OFFSET $2
 `
@@ -228,12 +228,12 @@ func (q *Queries) GetUsers(ctx context.Context, arg GetUsersParams) ([]User, err
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Email,
-			&i.Password,
 			&i.Role,
 			&i.IsVerified,
 			&i.DeletedAt,
 			&i.DeletedBy,
 			&i.LastActive,
+			&i.Password,
 		); err != nil {
 			return nil, err
 		}
@@ -249,7 +249,7 @@ func (q *Queries) GetUsers(ctx context.Context, arg GetUsersParams) ([]User, err
 }
 
 const getUsersByRole = `-- name: GetUsersByRole :many
-SELECT id, created_at, updated_at, email, password, role, is_verified, deleted_at, deleted_by, last_active FROM users
+SELECT id, created_at, updated_at, email, role, is_verified, deleted_at, deleted_by, last_active, password FROM users
 WHERE role = $1
 ORDER BY email ASC
 LIMIT $2 OFFSET $3
@@ -275,12 +275,12 @@ func (q *Queries) GetUsersByRole(ctx context.Context, arg GetUsersByRoleParams) 
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Email,
-			&i.Password,
 			&i.Role,
 			&i.IsVerified,
 			&i.DeletedAt,
 			&i.DeletedBy,
 			&i.LastActive,
+			&i.Password,
 		); err != nil {
 			return nil, err
 		}
@@ -374,7 +374,7 @@ WHERE id = $1
         OR $7 IS DISTINCT FROM deleted_by
         OR $8 IS DISTINCT FROM last_active        
     )
-RETURNING id, created_at, updated_at, email, password, role, is_verified, deleted_at, deleted_by, last_active
+RETURNING id, created_at, updated_at, email, role, is_verified, deleted_at, deleted_by, last_active, password
 `
 
 type UpdateUserParams struct {
@@ -405,12 +405,12 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Email,
-		&i.Password,
 		&i.Role,
 		&i.IsVerified,
 		&i.DeletedAt,
 		&i.DeletedBy,
 		&i.LastActive,
+		&i.Password,
 	)
 	return i, err
 }

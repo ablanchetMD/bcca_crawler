@@ -8,11 +8,12 @@ import (
 type ProtocolPayload struct {	
 	ProtocolSummary             SummaryProtocol                 `json:"SummaryProtocol"`
 	ProtocolEligibilityCriteria []ProtocolEligibilityCriterion `json:"ProtocolEligibilityCriteria"`
-	ProtocolPrecautions        []ProtocolPrecaution        `json:"ProtocolPrecautions"`
-	ProtocolCautions		   []ProtocolCaution		   `json:"ProtocolCautions"`
-	Tests                      Tests                       `json:"Tests"`
+	ProtocolPrecautions        []ProtocolPrecaution        		`json:"ProtocolPrecautions"`
+	ProtocolCautions		   []ProtocolCaution			   `json:"ProtocolCautions"`
+	Tests                      Tests                     	  `json:"Tests"`
 	ProtocolCycles             []ProtocolCycle             `json:"ProtocolCycles"`	
-	ToxicityModifications      []ToxicityModification      `json:"ToxicityModifications"`
+	Toxicities			       []Toxicity      				`json:"Toxicities"`
+	TreatmentModifications	   []MedicationModification    `json:"TreatmentModifications"`
 	Physicians                 []Physician                 `json:"Physicians"`
 	ArticleReferences          []ArticleReference          `json:"ArticleReferences"`
 }
@@ -40,6 +41,10 @@ type SummaryProtocol struct {
 	Name       string `json:"Name"`
 	Tags       []string `json:"Tags"`
 	Notes      string `json:"Notes"`
+	RevisedOn  string `json:"RevisedOn"`
+	ActivatedOn string `json:"ActivatedOn"`
+	ProtocolUrl string `json:"ProtocolUrl"`
+	HandOutUrl string `json:"HandOutUrl"`
 }
 
 type ProtocolEligibilityCriterion struct {
@@ -67,8 +72,7 @@ type Treatment struct {
 	Route                 string                 `json:"Route"`
 	Frequency             string                 `json:"Frequency"`
 	Duration              string                 `json:"Duration"`
-	AdministrationGuide   string                 `json:"AdministrationGuide"`
-	TreatmentModifications []TreatmentModification `json:"TreatmentModifications"`
+	AdministrationGuide   string                 `json:"AdministrationGuide"`	
 }
 
 type Tests struct {
@@ -87,18 +91,38 @@ type FollowUpTests struct {
 	IfClinicallyIndicated  []string `json:"IfClinicallyIndicated"`
 }
 
-type TreatmentModification struct {
-	Id          uuid.UUID `json:"Id"`
-	Category    string `json:"Category"`
-	Description string `json:"Description"`
-	Adjustement string `json:"Adjustement"`
+type MedicationModification struct {
+	MedicationId			uuid.UUID 						`json:"MedicationId"`	
+	Medication  			string 							`json:"Medication"`
+	ModificationCategory 	[]ModificationCategory 			`json:"ModificationCategory"`
 }
+
+type ModificationCategory struct {
+	Category 		string			 `json:"Category"`	
+	Modifications 	[]Modifications	 `json:"Modifications"`
+}
+
+type Modifications struct {
+	Id          uuid.UUID 		`json:"Id"`
+	Description string 			`json:"Description"`
+	Adjustment  string			`json:"Adjustment"`
+}
+
 
 type ToxicityModification struct {
 	Id          uuid.UUID `json:"Id"`
-	Title       string `json:"Title"`
-	Grade       string `json:"Grade"`
-	Adjustement string `json:"Adjustement"`
+	GradeId     uuid.UUID `json:"GradeId"`	
+	Grade       string    `json:"Grade"`
+	GradeDescription string `json:"GradeDescription"`
+	Adjustment  string `json:"Adjustment"`
+}
+
+type Toxicity struct {	
+	Id            uuid.UUID `json:"Id"`
+	Title         string `json:"Title"`
+	Description   string `json:"Description"`
+	Category      string `json:"Category"`
+	Modifications []ToxicityModification `json:"Modifications"`
 }
 
 type ProtocolCycle struct {
@@ -139,6 +163,8 @@ func mapSummaryProtocol(src database.Protocol) SummaryProtocol {
 		Name:       src.Name,
 		Tags:       src.Tags,
 		Notes:      src.Notes,
+		ProtocolUrl: src.ProtocolUrl,
+		HandOutUrl: src.PatientHandoutUrl,
 	}
 }
 
@@ -186,14 +212,6 @@ func mapTreatment(src database.ProtocolTreatment) Treatment {
 	}
 }
 
-func mapTreatmentModification(src database.TreatmentModification) TreatmentModification {
-	return TreatmentModification{
-		Id:          src.ID,
-		Category:    src.Category,
-		Description: src.Description,
-		Adjustement: src.Adjustement,
-	}
-}
 
 func mapTest(src []database.Test) []string {
 	var tests []string
@@ -203,11 +221,90 @@ func mapTest(src []database.Test) []string {
 	return tests
 }
 
-func mapToxicityModification(src database.ToxicityModification) ToxicityModification {
-	return ToxicityModification{
-		Id:          src.ID,
-		Title:       src.Title,
-		Grade:       src.Grade,
-		Adjustement: src.Adjustement,
+
+func mapToToxicities(rows []database.GetToxicityModificationByProtocolRow) []Toxicity {
+    // Map to group toxicities by their ID
+    toxicityMap := make(map[uuid.UUID]*Toxicity)
+
+    for _, row := range rows {
+        // Check if the toxicity already exists in the map
+        if _, exists := toxicityMap[row.ID]; !exists {
+            // Add a new toxicity to the map
+            toxicityMap[row.ID] = &Toxicity{
+                Id:          row.ID,
+                Title:       row.ToxicityTitle,
+                Description: row.ToxicityGradeDescription, // Assuming this maps correctly
+                Modifications: []ToxicityModification{},
+            }
+        }
+
+        // Add the modification to the existing toxicity
+        toxicityMap[row.ID].Modifications = append(toxicityMap[row.ID].Modifications, ToxicityModification{
+            Id:               row.ID,
+            GradeId:          row.ToxicityGradeID,
+            Grade:            row.ToxicityGrade,
+            GradeDescription: row.ToxicityGradeDescription,
+            Adjustment:       row.Adjustment,
+        })
+    }
+
+    // Convert the map to a slice
+    toxicities := make([]Toxicity, 0, len(toxicityMap))
+    for _, toxicity := range toxicityMap {
+        toxicities = append(toxicities, *toxicity)
+    }
+
+    return toxicities
+}
+
+
+
+func mapToMedicationModifications(rows []database.GetMedicationModificationsByProtocolRow) []MedicationModification {
+	// Map to group medications by MedicationID
+	medicationMap := make(map[uuid.UUID]*MedicationModification)
+
+	for _, row := range rows {
+		// Check if the medication already exists in the map
+		if _, exists := medicationMap[row.MedicationID]; !exists {
+			// Add a new medication to the map
+			medicationMap[row.MedicationID] = &MedicationModification{
+				MedicationId: row.MedicationID,
+				Medication:   row.Name,
+				ModificationCategory: []ModificationCategory{},
+			}
+		}
+
+		// Find or create the ModificationCategory within the Medication
+		var category *ModificationCategory
+		for i := range medicationMap[row.MedicationID].ModificationCategory {
+			if medicationMap[row.MedicationID].ModificationCategory[i].Category == row.ModificationCategory {
+				category = &medicationMap[row.MedicationID].ModificationCategory[i]
+				break
+			}
+		}
+
+		// If the category doesn't exist, create it
+		if category == nil {
+			category = &ModificationCategory{
+				Category:     row.ModificationCategory,
+				Modifications: []Modifications{},
+			}
+			medicationMap[row.MedicationID].ModificationCategory = append(medicationMap[row.MedicationID].ModificationCategory, *category)
+		}
+
+		// Add the modification to the category
+		category.Modifications = append(category.Modifications, Modifications{
+			Id:          row.ModificationID,
+			Description: row.ModificationDescription,
+			Adjustment:  row.Adjustment,
+		})
 	}
+
+	// Convert the map to a slice
+	medications := make([]MedicationModification, 0, len(medicationMap))
+	for _, medication := range medicationMap {
+		medications = append(medications, *medication)
+	}
+
+	return medications
 }

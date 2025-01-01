@@ -3,6 +3,11 @@ INSERT INTO protocols (tumor_group, code, name, tags, notes)
 VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
+-- name: CreateProtocolbyScraping :one
+INSERT INTO protocols (tumor_group, code, name, tags, notes, revised_on, activated_on)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING *;
+
 -- name: UpdateProtocol :one
 UPDATE protocols
 SET
@@ -62,7 +67,3 @@ WHERE tumor_group = $1
 AND tags @> $2
 ORDER BY name DESC
 LIMIT $3 OFFSET $4;
-
-
-
-

@@ -5,7 +5,12 @@ CREATE TABLE users (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   email TEXT NOT NULL UNIQUE,
-  password TEXT NOT NULL  
+  role TEXT NOT NULL DEFAULT 'user',
+  is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  deleted_at TIMESTAMP,
+  deleted_by UUID REFERENCES users(id),
+  last_active TIMESTAMP,
+  password TEXT NOT NULL
 );
 
 CREATE TABLE refresh_tokens (
@@ -19,6 +24,6 @@ CREATE TABLE refresh_tokens (
 
 -- +goose Down
 
-DROP TABLE users;
 DROP TABLE refresh_tokens;
+DROP TABLE users;
 

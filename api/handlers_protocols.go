@@ -162,7 +162,7 @@ func HandleGetProtocolSummary(c *config.Config, w http.ResponseWriter, r *http.R
 		return
 	}
 
-	response,err := CMD_GetProtocolBy(c,"id",parsed_id.String())
+	response,err := CMD_GetProtocolBy(c,r.Context(),"id",parsed_id.String())
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting protocol: %s", parsed_id.String()))
 		return
@@ -178,7 +178,7 @@ func HandleGetProtocolSummaryCode(c *config.Config, w http.ResponseWriter, r *ht
 		return
     }	
 
-	response,err := CMD_GetProtocolBy(c,"code",code)
+	response,err := CMD_GetProtocolBy(c,r.Context(),"code",code)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting protocol: %s", code))
 		return

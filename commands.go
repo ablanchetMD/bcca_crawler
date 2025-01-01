@@ -1,17 +1,18 @@
 package main
 
 import (
-	"bcca_crawler/api"
 	"bcca_crawler/ai_helper"
+	"bcca_crawler/api"
 	"bcca_crawler/crawler"
 	"bcca_crawler/internal/config"
 	"bcca_crawler/internal/middleware"
 	"bcca_crawler/routes"
+	"context"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
-
+	"io"
 )
 
 type command struct {
@@ -78,9 +79,30 @@ func handlerAnalyzePDF(s *config.Config, cmd command) error {
 	return nil
 }
 
+func handlerSearchPubmed(s *config.Config, cmd command) error {
+
+	url := "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term="+cmd.Args[0]+"&retmode=json"
+    resp, err := http.Get(url)
+    if err != nil {
+        fmt.Println("Error:", err)
+        return err
+    }
+    defer resp.Body.Close()
+
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        fmt.Println("Error reading response:", err)
+        return err
+    }
+
+    fmt.Println(string(body))
+	return nil
+}
+
 func handlerCheckDatabase(s *config.Config, cmd command) error {
 	// Check the database
-	payload,err := api.CMD_GetProtocolBy(s,"code",cmd.Args[0])
+	ctx := context.Background()
+	payload,err := api.CMD_GetProtocolBy(s,ctx,"code",cmd.Args[0])
 	if err != nil {
 		fmt.Println("Error checking database: ", err)
 		return err

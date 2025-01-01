@@ -27,11 +27,11 @@ type Cancer struct {
 	ID         uuid.UUID
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+	TumorGroup string
 	Code       sql.NullString
 	Name       sql.NullString
 	Tags       []string
 	Notes      string
-	TumorGroup string
 }
 
 type CancerProtocol struct {
@@ -54,8 +54,31 @@ type Medication struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	Name        string
-	Description sql.NullString
+	Description string
 	Category    string
+}
+
+type MedicationModification struct {
+	ID           uuid.UUID
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	Category     string
+	Description  string
+	Adjustment   string
+	MedicationID uuid.UUID
+}
+
+type MedicationPrescription struct {
+	ID           uuid.UUID
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	Medication   uuid.UUID
+	Dose         string
+	Route        string
+	Frequency    string
+	Duration     string
+	Instructions string
+	Renewals     int32
 }
 
 type Physician struct {
@@ -79,6 +102,8 @@ type Protocol struct {
 	Notes             string
 	ProtocolUrl       string
 	PatientHandoutUrl string
+	RevisedOn         string
+	ActivatedOn       string
 }
 
 type ProtocolBaselineTest struct {
@@ -155,8 +180,8 @@ type ProtocolPpo struct {
 }
 
 type ProtocolPreMedicationsValue struct {
-	ProtocolID      uuid.UUID
-	PreMedicationID uuid.UUID
+	ProtocolID               uuid.UUID
+	MedicationPrescriptionID uuid.UUID
 }
 
 type ProtocolPrecaution struct {
@@ -172,38 +197,23 @@ type ProtocolPrecautionsValue struct {
 	PrecautionID uuid.UUID
 }
 
-type ProtocolPremedication struct {
-	ID         uuid.UUID
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	Medication uuid.UUID
-	Dose       string
-	Route      string
-	Frequency  string
-	Duration   string
-	Notes      string
-}
-
 type ProtocolReferencesValue struct {
 	ProtocolID  uuid.UUID
 	ReferenceID uuid.UUID
 }
 
-type ProtocolSupportiveMedication struct {
-	ID         uuid.UUID
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	Medication uuid.UUID
-	Dose       string
-	Route      string
-	Frequency  string
-	Duration   string
-	Notes      string
+type ProtocolSupportiveMedicationValue struct {
+	ProtocolID               uuid.UUID
+	MedicationPrescriptionID uuid.UUID
 }
 
-type ProtocolSupportiveMedicationValue struct {
-	ProtocolID             uuid.UUID
-	SupportiveMedicationID uuid.UUID
+type ProtocolToxModification struct {
+	ID              uuid.UUID
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	Adjustment      string
+	ToxicityGradeID uuid.UUID
+	ProtocolID      uuid.UUID
 }
 
 type ProtocolTreatment struct {
@@ -235,29 +245,27 @@ type Test struct {
 	Description sql.NullString
 }
 
-type ToxicityModification struct {
+type Toxicity struct {
 	ID          uuid.UUID
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	Title       string
-	Grade       string
-	Adjustement string
-	ProtocolID  uuid.UUID
+	Category    string
+	Description string
 }
 
-type TreatmentCyclesJunction struct {
-	ProtocolTreatmentID uuid.UUID
-	ProtocolCyclesID    uuid.UUID
-}
-
-type TreatmentModification struct {
+type ToxicityGrade struct {
 	ID          uuid.UUID
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
-	Category    string
+	Grade       string
 	Description string
-	Adjustement string
-	TreatmentID uuid.UUID
+	ToxicityID  uuid.UUID
+}
+
+type TreatmentCyclesValue struct {
+	ProtocolTreatmentID uuid.UUID
+	ProtocolCyclesID    uuid.UUID
 }
 
 type User struct {
@@ -265,10 +273,10 @@ type User struct {
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 	Email      string
-	Password   string
 	Role       string
 	IsVerified bool
 	DeletedAt  sql.NullTime
 	DeletedBy  uuid.NullUUID
 	LastActive sql.NullTime
+	Password   string
 }

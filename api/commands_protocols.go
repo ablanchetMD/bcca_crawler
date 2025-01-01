@@ -26,10 +26,178 @@ func CMD_DeleteProtocol(c *config.Config, arg string) error {
 	return nil
 }
 
+func GetProtocolReferences(c *config.Config,ctx context.Context,protocolID uuid.UUID) ([]ArticleReference, error) {
+	articles,err := c.Db.GetArticleReferencesByProtocol(ctx,protocolID)
+	if err != nil {
+		return nil, err
+	}
 
-func CMD_GetProtocolBy(c *config.Config,ByWhat string, arg string) (ProtocolPayload, error) {
-	ctx := context.Background()
+	r_articles := []ArticleReference{}
+	for _, a := range articles {
+		r_articles = append(r_articles, mapArticleRef(a))
+	}
+	return r_articles, nil
+}
 
+func GetProtocolPhysicians(c *config.Config,ctx context.Context,protocolID uuid.UUID) ([]Physician, error) {
+	contact_physicians,err := c.Db.GetPhysicianByProtocol(ctx,protocolID)
+	if err != nil {
+		return nil, err
+	}
+
+	r_contact_physicians := []Physician{}
+	for _, p := range contact_physicians {
+		r_contact_physicians = append(r_contact_physicians, mapPhysician(p))
+	}
+	return r_contact_physicians, nil
+}
+
+func GetProtocolCautions(c *config.Config,ctx context.Context,protocolID uuid.UUID) ([]ProtocolCaution, error) {
+	cautions,err := c.Db.GetProtocolCautionsByProtocol(ctx,protocolID)
+	if err != nil {
+		return nil, err
+	}
+
+	r_cautions := []ProtocolCaution{}
+	for _, c := range cautions {
+		r_cautions = append(r_cautions, mapCaution(c))
+	}
+	return r_cautions, nil
+}
+
+func GetProtocolPrecautions(c *config.Config,ctx context.Context,protocolID uuid.UUID) ([]ProtocolPrecaution, error) {
+	precautions,err := c.Db.GetProtocolPrecautionsByProtocol(ctx,protocolID)
+	if err != nil {
+		return nil, err
+	}
+
+	r_precautions := []ProtocolPrecaution{}
+	for _, p := range precautions {
+		r_precautions = append(r_precautions, mapPrecaution(p))
+	}
+	return r_precautions, nil
+}
+
+func GetProtocolEligibilityCriteria(c *config.Config,ctx context.Context,protocolID uuid.UUID) ([]ProtocolEligibilityCriterion, error) {
+	elig_criterias,err := c.Db.GetEligibilityByProtocol(ctx,protocolID)
+	if err != nil {
+		return nil, err
+	}
+
+	r_elig_criterias := []ProtocolEligibilityCriterion{}
+	for _, ec := range elig_criterias {		
+		r_elig_criterias = append(r_elig_criterias, mapEligibilityCriterion(ec))
+	}
+	return r_elig_criterias, nil
+}
+
+func GetBaselineTests(c *config.Config,ctx context.Context,protocolID uuid.UUID) (BaselineTests, error) {
+	baseline_tests,err := c.Db.GetBaselineTestsByProtocol(ctx,protocolID)
+	if err != nil {
+		return BaselineTests{}, err
+	}
+
+	r_baseline_tests := mapTest(baseline_tests)
+
+	nonurgent_tests,err := c.Db.GetNonUrgentTestsByProtocol(ctx,protocolID)
+	if err != nil {
+		return BaselineTests{}, err
+	}
+
+	r_nonurgent_tests := mapTest(nonurgent_tests)
+
+	ifnec_tests,err := c.Db.GetIfNecessaryTestsByProtocol(ctx,protocolID)
+	if err != nil {
+		return BaselineTests{}, err
+	}
+
+	r_ifnec_tests := mapTest(ifnec_tests)
+
+	return BaselineTests{
+		RequiredBeforeTreatment: r_baseline_tests,
+		RequiredButCanProceed:   r_nonurgent_tests,
+		IfClinicallyIndicated:   r_ifnec_tests,
+	}, nil
+}
+
+func GetFollowUpTests(c *config.Config,ctx context.Context,protocolID uuid.UUID) (FollowUpTests, error) {
+	followup_tests,err := c.Db.GetFollowupTestsByProtocol(ctx,protocolID)
+	if err != nil {
+		return FollowUpTests{}, err
+	}
+
+	r_followup_tests := mapTest(followup_tests)
+
+	followup_ifnec_tests,err := c.Db.GetFollowupIfNecessaryTestsByProtocol(ctx,protocolID)
+	if err != nil {
+		return FollowUpTests{}, err
+	}
+
+	r_followup_ifnec_tests := mapTest(followup_ifnec_tests)
+
+	return FollowUpTests{
+		Required:               r_followup_tests,
+		IfClinicallyIndicated:  r_followup_ifnec_tests,
+	}, nil
+}
+
+
+func GetProtocolToxicities(c *config.Config,ctx context.Context,protocolID uuid.UUID) ([]Toxicity, error) {
+	tox_mod,err := c.Db.GetToxicityModificationByProtocol(ctx,protocolID)
+	if err != nil {
+		return nil, err
+	}
+	
+	return mapToToxicities(tox_mod), nil
+}
+
+func GetProtocolModifications(c *config.Config,ctx context.Context,protocolID uuid.UUID) ([]MedicationModification, error) {
+	med_mod,err := c.Db.GetMedicationModificationsByProtocol(ctx,protocolID)
+	if err != nil {
+		return nil, err
+	}
+	
+	return mapToMedicationModifications(med_mod), nil
+}
+
+func GetProtocolCycles(c *config.Config,ctx context.Context,protocolID uuid.UUID) ([]ProtocolCycle, error) {
+	cycles,err := c.Db.GetCyclesByProtocol(ctx,protocolID)
+	if err != nil {
+		return nil, err
+	}
+
+	r_cycles := []ProtocolCycle{}
+	for _, cyc := range cycles {
+		r_cycle := mapCycle(cyc)
+		treatments,err := c.Db.GetTreatmentsByCycle(ctx,cyc.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		r_treatments := []Treatment{}
+		for _, treat := range treatments {
+			med,err := c.Db.GetMedicationByID(ctx,treat.Medication)
+			if err != nil {
+				return nil, err
+			}
+			
+			r_treatment := mapTreatment(treat)
+			r_treatment.MedicationName = med.Name			
+			
+			r_treatments = append(r_treatments, r_treatment)
+
+		}
+
+		r_cycle.Treatments = r_treatments
+		r_cycles = append(r_cycles, r_cycle)
+	}
+
+	return r_cycles, nil
+}
+
+
+func CMD_GetProtocolBy(c *config.Config,ctx context.Context, ByWhat string, arg string) (ProtocolPayload, error) {
+	
 	Payload := ProtocolPayload{}
 	protocol := database.Protocol{}
 	err := error(nil)
@@ -58,189 +226,81 @@ func CMD_GetProtocolBy(c *config.Config,ByWhat string, arg string) (ProtocolPayl
 	}
 	r_protocol := mapSummaryProtocol(protocol)
 
-	articles,err := c.Db.GetArticleReferencesByProtocol(ctx,protocol.ID)
+	r_articles,err := GetProtocolReferences(c,ctx,protocol.ID)
 	if err != nil {
-		fmt.Println("Error getting articles: ", err)
+		fmt.Println("Error getting article references: ", err)
 		return Payload, err
 	}
 
-	r_articles := []ArticleReference{}
-	for _, a := range articles {
-		r_articles = append(r_articles, mapArticleRef(a))
-	}
-
-	elig_criterias,err := c.Db.GetEligibilityByProtocol(ctx,protocol.ID)
+	r_elig_criterias,err := GetProtocolEligibilityCriteria(c,ctx,protocol.ID)
 	if err != nil {
 		fmt.Println("Error getting eligibility criteria: ", err)
 		return Payload, err
 	}
 
-	r_elig_criterias := []ProtocolEligibilityCriterion{}
-	for _, ec := range elig_criterias {		
-		r_elig_criterias = append(r_elig_criterias, mapEligibilityCriterion(ec))
-	}
-
-	
-	baseline_tests,err := c.Db.GetBaselineTestsByProtocol(ctx,protocol.ID)
-
+	r_baseline_tests,err := GetBaselineTests(c,ctx,protocol.ID)
 	if err != nil {
 		fmt.Println("Error getting baseline tests: ", err)
 		return Payload, err
 	}
 
-	r_baseline_tests := mapTest(baseline_tests)
-
-	nonurgent_tests,err := c.Db.GetNonUrgentTestsByProtocol(ctx,protocol.ID)
-
-	if err != nil {
-		fmt.Println("Error getting nonurgent tests: ", err)
-		return Payload, err
-	}
-
-	r_nonurgent_tests := mapTest(nonurgent_tests)
-
-	ifnec_tests,err := c.Db.GetIfNecessaryTestsByProtocol(ctx,protocol.ID)
-
-	if err != nil {
-		fmt.Println("Error getting if necessary tests: ", err)
-		return Payload, err
-	}
-
-	r_ifnec_tests := mapTest(ifnec_tests)
-
-	followup_tests,err := c.Db.GetFollowupTestsByProtocol(ctx,protocol.ID)
-
+	r_followup_tests,err := GetFollowUpTests(c,ctx,protocol.ID)
 	if err != nil {
 		fmt.Println("Error getting followup tests: ", err)
 		return Payload, err
 	}
 
-	r_followup_tests := mapTest(followup_tests)
-
-	followup_ifnec_tests,err := c.Db.GetFollowupIfNecessaryTestsByProtocol(ctx,protocol.ID)
-
-	if err != nil {
-		fmt.Println("Error getting followup if necessary tests: ", err)
-		return Payload, err
-	}
-
-	r_followup_ifnec_tests := mapTest(followup_ifnec_tests)
-
-	contact_physicians,err := c.Db.GetPhysicianByProtocol(ctx,protocol.ID)
-
-
+	r_contact_physicians,err := GetProtocolPhysicians(c,ctx,protocol.ID)
 	if err != nil {
 		fmt.Println("Error getting contact physicians: ", err)
 		return Payload, err
 	}
 
-	r_contact_physicians := []Physician{}
-	for _, p := range contact_physicians {
-		r_contact_physicians = append(r_contact_physicians, mapPhysician(p))
-	}
-
-	cautions,err := c.Db.GetProtocolCautionsByProtocol(ctx,protocol.ID)
-
+	r_cautions,err := GetProtocolCautions(c,ctx,protocol.ID)
 	if err != nil {
 		fmt.Println("Error getting protocol cautions: ", err)
 		return Payload, err
 	}
 
-	r_cautions := []ProtocolCaution{}
-	for _, c := range cautions {
-		r_cautions = append(r_cautions, mapCaution(c))
-	}
-	
-	precautions,err := c.Db.GetProtocolPrecautionsByProtocol(ctx,protocol.ID)
-
+	r_precautions,err := GetProtocolPrecautions(c,ctx,protocol.ID)
 	if err != nil {
 		fmt.Println("Error getting protocol precautions: ", err)
 		return Payload, err
-	}
+	}	
 
-	r_precautions := []ProtocolPrecaution{}
-	for _, p := range precautions {
-		r_precautions = append(r_precautions, mapPrecaution(p))
-	}
-
-	cycles,err := c.Db.GetCyclesByProtocol(ctx,protocol.ID)
+	r_cycles,err := GetProtocolCycles(c,ctx,protocol.ID)
 
 	if err != nil {
 		fmt.Println("Error getting protocol cycles: ", err)
 		return Payload, err
 	}
 
-	r_cycles := []ProtocolCycle{}
+	r_med_mod,err := GetProtocolModifications(c,ctx,protocol.ID)
+	if err != nil {
+		fmt.Println("Error getting medication modifications: ", err)
+		return Payload, err
+	}
+
 	
-
-	for _, cyc := range cycles {
-		r_cycle := mapCycle(cyc)
-		treatments,err := c.Db.GetTreatmentsByCycle(ctx,cyc.ID)
-		if err != nil {
-			fmt.Println("Error getting treatments: ", err)
-			return Payload, err
-		}
-
-		r_treatments := []Treatment{}
-		for _, treat := range treatments {
-			med,err := c.Db.GetMedicationByID(ctx,treat.Medication)
-			if err != nil {
-				fmt.Println("Error getting medication: ", err)
-				return Payload, err
-			}
-			
-			r_treatment := mapTreatment(treat)
-			r_treatment.MedicationName = med.Name
-			adjust,err := c.Db.GetTreatmentModificationsByTreatment(ctx,treat.ID)
-			if err != nil {
-				return Payload, err
-			}
-
-			r_adjust := []TreatmentModification{}
-			for _, adj := range adjust {
-				r_adjust = append(r_adjust, mapTreatmentModification(adj))
-			}
-
-			r_treatment.TreatmentModifications = r_adjust
-			r_treatments = append(r_treatments, r_treatment)
-
-		}
-
-		r_cycle.Treatments = r_treatments
-		r_cycles = append(r_cycles, r_cycle)
-	}
-
-	tox_mod, err := c.Db.GetToxicityModificationsByProtocol(ctx,protocol.ID)
-
-	r_tox_mod := []ToxicityModification{}
-
-	for _, tox := range tox_mod {
-		r_tox_mod = append(r_tox_mod, mapToxicityModification(tox))
-	}
+	r_tox_mod,err := GetProtocolToxicities(c,ctx,protocol.ID)
 
 	if err != nil {
 		fmt.Println("Error getting toxicity modifications: ", err)
 		return Payload, err
 	}
+
 	Payload = ProtocolPayload{
-		ProtocolSummary:          r_protocol,
+		ProtocolSummary:            r_protocol,
 		ProtocolEligibilityCriteria: r_elig_criterias,
 		ProtocolPrecautions:        r_precautions,
 		ProtocolCautions:           r_cautions,
 		Tests:                      Tests{
-			Baseline: BaselineTests{
-				RequiredBeforeTreatment: r_baseline_tests,
-				RequiredButCanProceed:   r_nonurgent_tests,
-				IfClinicallyIndicated:   r_ifnec_tests,
-			},
-			FollowUp: FollowUpTests{
-				Required:               r_followup_tests,
-				IfClinicallyIndicated:  r_followup_ifnec_tests,			
-			
-		},
+			Baseline: r_baseline_tests,
+			FollowUp: r_followup_tests,
 		},
 		ProtocolCycles:             r_cycles,
-		ToxicityModifications:      r_tox_mod,
+		TreatmentModifications:     r_med_mod,
+		Toxicities:     			r_tox_mod,
 		Physicians:                 r_contact_physicians,
 		ArticleReferences:          r_articles,
 	}

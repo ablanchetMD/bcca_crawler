@@ -11,127 +11,32 @@ import (
 	"strings"
 	"encoding/json"
 	"bcca_crawler/internal/database"
+	"bcca_crawler/api"
 	"github.com/lib/pq"
 	"bcca_crawler/internal/config"
 	"database/sql"
 
 )
 
-type Payload struct {
-	ArticleReferences          []ArticleReference          `json:"ArticleReferences"`
-	Medications                []Medication                `json:"Medications"`
-	Physicians                 []Physician                 `json:"Physicians"`
-	Protocols                  []Protocol                  `json:"Protocols"`
-	ProtocolEligibilityCriteria []ProtocolEligibilityCriterion `json:"ProtocolEligibilityCriteria"`
-	ProtocolPrecautions        []ProtocolPrecaution        `json:"ProtocolPrecautions"`
-	ProtocolCautions		   []ProtocolCaution		   `json:"ProtocolCautions"`
-	ProtocolPremedications     []ProtocolPremedication     `json:"ProtocolPremedications"`
-	ProtocolSupportiveMedications []ProtocolSupportiveMedication `json:"ProtocolSupportiveMedications"`
-	ProtocolCycles             []ProtocolCycle             `json:"ProtocolCycles"`
-	Tests                      Tests                       `json:"Tests"`
-	ToxicityModifications      []ToxicityModification      `json:"ToxicityModifications"`
-}
 
-type ArticleReference struct {
-	Title   string `json:"Title"`
-	Authors string `json:"Authors"`
-	Journal string `json:"Journal"`
-	Year    string `json:"Year"`
-	Pmid    string `json:"Pmid"`
-	Joi     string `json:"Joi"`
+type ProtocolPayload struct {	
+	ProtocolSummary             api.SummaryProtocol                  `json:"SummaryProtocol"`
+	Medications                []Medication               			 `json:"Medications"`
+	ProtocolEligibilityCriteria []api.ProtocolEligibilityCriterion	 `json:"ProtocolEligibilityCriteria"`
+	ProtocolPrecautions        []api.ProtocolPrecaution 		     `json:"ProtocolPrecautions"`
+	ProtocolCautions		   []api.ProtocolCaution			 	 `json:"ProtocolCautions"`
+	Tests                      api.Tests                     		 `json:"Tests"`
+	ProtocolCycles             []api.ProtocolCycle           		 `json:"ProtocolCycles"`	
+	Toxicities			       []api.Toxicity      				     `json:"Toxicities"`	
+	Physicians                 []api.Physician                		 `json:"Physicians"`
+	ArticleReferences          []api.ArticleReference        		 `json:"ArticleReferences"`
 }
 
 type Medication struct {
 	Name        string `json:"Name"`
 	Description string `json:"Description"`
 	Category    string `json:"Category"`
-}
-
-type Physician struct {
-	FirstName string `json:"FirstName"`
-	LastName  string `json:"LastName"`
-}
-
-type Protocol struct {
-	TumorGroup string `json:"TumorGroup"`
-	Code       string `json:"Code"`
-	Name       string `json:"Name"`
-}
-
-type ProtocolEligibilityCriterion struct {
-	Type        string `json:"Type"`
-	Description string `json:"Description"`
-}
-
-type ProtocolPrecaution struct {
-	Title       string `json:"Title"`
-	Description string `json:"Description"`
-}
-
-type ProtocolCaution struct {	
-	Description string `json:"Description"`
-}
-
-type ProtocolPremedication struct {
-	Medication string `json:"Medication"`
-	Dose       string `json:"Dose"`
-	Route      string `json:"Route"`
-	Frequency  string `json:"Frequency"`
-	Duration   string `json:"Duration"`
-	Notes      string `json:"Notes"`
-}
-
-type ProtocolSupportiveMedication struct {
-	Medication string `json:"Medication"`
-	Dose       string `json:"Dose"`
-	Route      string `json:"Route"`
-	Frequency  string `json:"Frequency"`
-	Duration   string `json:"Duration"`
-	Notes      string `json:"Notes"`
-}
-
-type ProtocolCycle struct {
-	Cycle         string         `json:"Cycle"`
-	CycleDuration string         `json:"CycleDuration"`
-	Treatments    []Treatment    `json:"Treatments"`
-}
-
-type Treatment struct {
-	Medication            string                 `json:"Medication"`
-	Dose                  string                 `json:"Dose"`
-	Route                 string                 `json:"Route"`
-	Frequency             string                 `json:"Frequency"`
-	Duration              string                 `json:"Duration"`
-	AdministrationGuide   string                 `json:"AdministrationGuide"`
-	TreatmentModifications []TreatmentModification `json:"TreatmentModifications"`
-}
-
-type TreatmentModification struct {
-	Category    string `json:"Category"`
-	Description string `json:"Description"`
-	Adjustement string `json:"Adjustement"`
-}
-
-type Tests struct {
-	Baseline BaselineTests `json:"Baseline"`
-	FollowUp FollowUpTests `json:"FollowUp"`
-}
-
-type BaselineTests struct {
-	RequiredBeforeTreatment []string `json:"RequiredBeforeTreatment"`
-	RequiredButCanProceed   []string `json:"RequiredButCanProceed"`
-	IfClinicallyIndicated   []string `json:"IfClinicallyIndicated"`
-}
-
-type FollowUpTests struct {
-	Required               []string `json:"Required"`
-	IfClinicallyIndicated  []string `json:"IfClinicallyIndicated"`
-}
-
-type ToxicityModification struct {
-	Title       string `json:"Title"`
-	Grade       string `json:"Grade"`
-	Adjustement string `json:"Adjustement"`
+	ModificationCategory 	[]api.ModificationCategory 			`json:"ModificationCategory"`
 }
 
 const ai_prompt = `You are an AI model tasked with analyzing a PDF document and extracting structured information in JSON format. The extracted data must strictly conform to the following JSON structure:
@@ -150,8 +55,16 @@ const ai_prompt = `You are an AI model tasked with analyzing a PDF document and 
   "Medications": [
     {      
       "Name": "string",
-      "Description": "string (nullable)",
-      "Category": "string"
+      "Description": "string",
+      "Category": "string" // Antibiotic, Antiemetic, etc.
+	  "MedicationModifications": [
+			{			
+			"Category": "string", // Hepatic or Renal Impairment
+			Modifications: [{			
+				"Description": "string", // Mild, Moderate, Severe
+				"Adjustement": "string"
+				}]			
+			}
     }
   ],
   "Physicians": [
@@ -160,13 +73,15 @@ const ai_prompt = `You are an AI model tasked with analyzing a PDF document and 
       "LastName": "string"
     }
   ],
-  "Protocols": [
+  "ProtocolSummary":
     {
       "TumorGroup": "string",
       "Code": "string",
       "Name": "string"
+	  "ActivatedOn": "string", // Date format: YYYY-MMM-DD
+	  "RevisedOn": "string" // Date format: YYYY-MMM-DD
     }
-  ],
+  ,
   "ProtocolEligibilityCriteria": [
     {
       "Type": "string", // Inclusion, Exclusion or Other, Split each line as a separate object
@@ -184,49 +99,19 @@ const ai_prompt = `You are an AI model tasked with analyzing a PDF document and 
 	  "Description": "string"
 	}
 ],
-  "ProtocolPremedications": [
-    {
-      "Medication": "string",
-      "Dose": "string",
-      "Route": "string",
-      "Frequency": "string",
-      "Duration": "string",
-      "Notes": "string"
-    }
-  ],
-  "ProtocolSupportiveMedications": [
-    {
-      "Medication": "string",
-      "Dose": "string",
-      "Route": "string",
-      "Frequency": "string",
-      "Duration": "string",
-      "Notes": "string"
-    }
-  ],
-  "ProtocolCycles": [
-    {
-	"Cycle": "string", // If there are no Cycles specified, mention "Cycle 1+"
-	"CycleDuration": "string", //If not specified, mention "28 days"
-	"Treatments": [
-		{
+  "ProtocolCycles": [{
+	"Cycle": "string", // If there are no Cycles specified, return "Cycle 1+"
+	"CycleDuration": "string", //If blank, return "28 days"
+	"Treatments": [{
 		"Medication": "string",
 		"Dose": "string",
-		"Route": "string",
-		"Frequency": "string",
-		"Duration": "string",
-		"AdministrationGuide": "string",
-		"TreatmentModifications": [
-			{			
-			"Category": "string", // Hepatic or Renal Impairment
-			"Description": "string", // Mild, Moderate, Severe
-			"Adjustement": "string"			
-			}
-		]
-		}
-		]
-	}
-  ],
+		"Route": "string", // IV, PO, SC, IM, etc.
+		"Frequency": "string", 
+		"Duration": "string", 
+		"AdministrationGuide": "string"
+		}]
+	}]
+,
 "Tests": {
   "Baseline": {
     "RequiredBeforeTreatment": ["string"],
@@ -238,11 +123,18 @@ const ai_prompt = `You are an AI model tasked with analyzing a PDF document and 
     "IfClinicallyIndicated": ["string"]
   }
 },
-  "ToxicityModifications": [
+  "Toxicities": [
     {      
-      "Title": "string",
-      "Grade": "string",
-      "Adjustement": "string"
+      "Title": "string", // Neuropathy, Thrombopenia, Neutropenia, Diarrhea, etc.
+      "Description": "string",
+	  "Category": "string", // Hematologic, Neurologic, Gastrointestinal, etc.
+	  "Modifications": [
+	  				{
+	  					"Grade": "string", // Grade 1, Grade 2, Grade 3, Grade 4
+						"GradeDescription": "string", 
+						"Adjustement": "string"
+					}
+				]     
     }
   ]
 }
@@ -279,10 +171,10 @@ func (s *Session) Close() {
 	s.client.Close()
 }
 
-func (s *Session) AnalyzePDF(pdfURL string) (Payload, error) {
+func (s *Session) AnalyzePDF(pdfURL string) (ProtocolPayload, error) {
 	pdfBytes, err := downloadPDF(pdfURL)
 	if err != nil {
-		return Payload{}, err
+		return ProtocolPayload{}, err
 	}
 
 	// Create the request.
@@ -327,18 +219,19 @@ func GetAiData(s *config.Config,proto string) error {
 	 }
 
 	fmt.Println("Payload: ", payload)
-	protocol,err := s.Db.CreateProtocol(ctx, database.CreateProtocolParams{		
-		TumorGroup: payload.Protocols[0].TumorGroup,
-		Code: payload.Protocols[0].Code,
-		Name: payload.Protocols[0].Name,
+	protocol,err := s.Db.CreateProtocolbyScraping(ctx, database.CreateProtocolbyScrapingParams{		
+		TumorGroup: payload.ProtocolSummary.TumorGroup,
+		Code: payload.ProtocolSummary.Code,
+		Name: payload.ProtocolSummary.Name,
 		Tags: []string{},
-		Notes: payload.Protocols[0].Name,
+		Notes: payload.ProtocolSummary.Name,
+		RevisedOn: payload.ProtocolSummary.RevisedOn,
+		ActivatedOn: payload.ProtocolSummary.ActivatedOn,
 	})
 	if err != nil {		
 		if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
-			// Duplicate key value violation
-			fmt.Println("Record already exists")
-			protocol,err = s.Db.GetProtocolByCode(ctx, payload.Protocols[0].Code)
+			// Duplicate key value violation			
+			protocol,err = s.Db.GetProtocolByCode(ctx, payload.ProtocolSummary.Code)
 			if err != nil {
 				fmt.Println("Error getting protocol: ", err)
 				return err
@@ -360,8 +253,7 @@ func GetAiData(s *config.Config,proto string) error {
 		})
 		if err != nil {		
 			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
-				// Duplicate key value violation
-				fmt.Println("Record already exists: ", article.Title)
+				// Duplicate key value violation				
 				articleRef,err = s.Db.GetArticleReferenceByData(ctx, database.GetArticleReferenceByDataParams{
 					Title: article.Title,
 					Authors: article.Authors,
@@ -375,32 +267,48 @@ func GetAiData(s *config.Config,proto string) error {
 			}		
 		}
 
-		err = s.Db.AddArticleReferenceToProtocol(ctx, database.AddArticleReferenceToProtocolParams{
+		_ = s.Db.AddArticleReferenceToProtocol(ctx, database.AddArticleReferenceToProtocolParams{
 			ProtocolID: protocol.ID,
 			ReferenceID: articleRef.ID,
-		})
-		if err != nil {
-			fmt.Println("Error adding article reference to protocol: ", err)
-		}			
+		})				
 	}
 
 	
 
 	// Create medications
 	for _, medication := range payload.Medications {
-		_,err := s.Db.AddMedication(ctx, database.AddMedicationParams{
+		med,err := s.Db.AddMedication(ctx, database.AddMedicationParams{
 			Name: medication.Name,
-			Description: sql.NullString{String: medication.Description, Valid: medication.Description != ""},
+			Description: medication.Description,
 			Category: medication.Category,
 		})
 		if err != nil {
-			fmt.Println("Error in trying to create Med: ", medication.Name)
-			fmt.Println("Error: ", err)
-		}		
+			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
+				// Duplicate key value violation				
+				med,err = s.Db.GetMedicationByName(ctx, medication.Name)
+				if err != nil {
+					fmt.Println("Error getting medication: ", err)
+					return err
+				}
+			}			
+		}
+		
+		for _, mod := range medication.ModificationCategory {
+			for _, modx := range mod.Modifications {
+				_,err := s.Db.AddMedicationModification(ctx, database.AddMedicationModificationParams{
+					MedicationID: med.ID,
+					Category: mod.Category,
+					Description: modx.Description,
+					Adjustment: modx.Adjustment,
+				})
+				if err != nil {
+					fmt.Println("Error creating medication modification: ", err)
+				}
+			}
+		}
 	}	
 
-	// Create physicians
-	
+	// Create physicians	
 	
 	for _, physician := range payload.Physicians {
 		email := strings.ToLower(physician.FirstName) + "." + strings.ToLower(physician.LastName) + "@bccancer.bc.ca"
@@ -413,8 +321,7 @@ func GetAiData(s *config.Config,proto string) error {
 		})
 		if err != nil {
 			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
-				// Duplicate key value violation
-				fmt.Println("Physician Record already exists so retrieving from database.")
+				// Duplicate key value violation				
 				phys,err = s.Db.GetPhysicianByName(ctx, database.GetPhysicianByNameParams{
 					FirstName: physician.FirstName,
 					LastName: physician.LastName,
@@ -429,13 +336,10 @@ func GetAiData(s *config.Config,proto string) error {
 			}
 		}
 
-		err = s.Db.AddPhysicianToProtocol(ctx, database.AddPhysicianToProtocolParams{
+		_ = s.Db.AddPhysicianToProtocol(ctx, database.AddPhysicianToProtocolParams{
 			PhysicianID: phys.ID,
 			ProtocolID: protocol.ID,
-		})
-		if err != nil {
-			fmt.Printf("Error adding %v %v to protocol:%v\n",phys.FirstName,phys.LastName, err)
-		}
+		})		
 			
 	}	
 
@@ -449,7 +353,6 @@ func GetAiData(s *config.Config,proto string) error {
 		if err != nil {
 			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
 				// Duplicate key value violation
-				fmt.Println("Eligibility Record already exists so retrieving from database.")
 				elig,err = s.Db.GetElibilityCriteriaByDescription(ctx, eligibility.Description)
 					
 				if err != nil {
@@ -462,13 +365,10 @@ func GetAiData(s *config.Config,proto string) error {
 			}
 		}
 
-		err = s.Db.LinkEligibilityToProtocol(ctx, database.LinkEligibilityToProtocolParams{
+		_ = s.Db.LinkEligibilityToProtocol(ctx, database.LinkEligibilityToProtocolParams{
 			ProtocolID: protocol.ID,
 			CriteriaID: elig.ID,
-		})
-		if err != nil {
-			fmt.Printf("Error adding %v:%v, to protocol:%v\n",elig.Type,elig.Description, err)
-		}
+		})	
 			
 	}	
 
@@ -482,7 +382,6 @@ func GetAiData(s *config.Config,proto string) error {
 		if err != nil {
 			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
 				// Duplicate key value violation
-				fmt.Println("Precaution Record already exists so retrieving from database.")
 				precaut,err = s.Db.GetProtocolPrecautionByTitleAndDescription(ctx, database.GetProtocolPrecautionByTitleAndDescriptionParams{
 					Title: precaution.Title,
 					Description: precaution.Description,
@@ -498,17 +397,11 @@ func GetAiData(s *config.Config,proto string) error {
 			}
 		}
 
-		err = s.Db.AddProtocolPrecautionToProtocol(ctx, database.AddProtocolPrecautionToProtocolParams{
+		_ = s.Db.AddProtocolPrecautionToProtocol(ctx, database.AddProtocolPrecautionToProtocolParams{
 			ProtocolID: protocol.ID,
 			PrecautionID: precaut.ID,
-		})
-
-		if err != nil {
-			fmt.Printf("Error adding %v:%v, to protocol:%v\n",precaut.Title,precaut.Description, err)
-		}
-	
+		})			
 	}
-
 
 	// Create Protocol Cautions
 	
@@ -530,14 +423,10 @@ func GetAiData(s *config.Config,proto string) error {
 			}
 		}
 
-		err = s.Db.AddProtocolCautionToProtocol(ctx, database.AddProtocolCautionToProtocolParams{
+		_ = s.Db.AddProtocolCautionToProtocol(ctx, database.AddProtocolCautionToProtocolParams{
 			ProtocolID: protocol.ID,
 			CautionID: caut.ID,
-		})
-
-		if err != nil {
-			fmt.Printf("Error adding caution: %v, to protocol:%v\n",caut.Description, err)
-		}
+		})		
 	}
 	
 
@@ -549,7 +438,6 @@ func GetAiData(s *config.Config,proto string) error {
 		if err != nil {
 			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
 				// Duplicate key value violation
-				fmt.Println("Test Record already exists so retrieving from database.")
 				add,err = s.Db.GetTestByName(ctx, test)
 					
 				if err != nil {
@@ -562,14 +450,10 @@ func GetAiData(s *config.Config,proto string) error {
 			}
 		}
 
-		err = s.Db.AddBaselineTest(ctx, database.AddBaselineTestParams{
+		_ = s.Db.AddBaselineTest(ctx, database.AddBaselineTestParams{
 			ProtocolID: protocol.ID,
 			TestID: add.ID,
 		})
-
-		if err != nil {
-			fmt.Printf("Error adding baseline test: %v, to protocol:%v\n",add.Name, err)
-		}
 
 	}	
 
@@ -583,7 +467,6 @@ func GetAiData(s *config.Config,proto string) error {
 		if err != nil {
 			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
 				// Duplicate key value violation
-				fmt.Println("Test Record already exists so retrieving from database.")
 				add,err = s.Db.GetTestByName(ctx, test)
 					
 				if err != nil {
@@ -596,14 +479,10 @@ func GetAiData(s *config.Config,proto string) error {
 			}
 		}
 		
-		err = s.Db.AddNonUrgentTest(ctx, database.AddNonUrgentTestParams{
+		_ = s.Db.AddNonUrgentTest(ctx, database.AddNonUrgentTestParams{
 			ProtocolID: protocol.ID,
 			TestID: add.ID,
 		})
-
-		if err != nil {
-			fmt.Printf("Error adding baseline test non urgent: %v, to protocol:%v\n",add.Name, err)
-		}
 
 	}
 
@@ -618,7 +497,6 @@ func GetAiData(s *config.Config,proto string) error {
 		if err != nil {
 			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
 				// Duplicate key value violation
-				fmt.Println("Test Record already exists so retrieving from database.")
 				add,err = s.Db.GetTestByName(ctx, test)
 					
 				if err != nil {
@@ -631,14 +509,11 @@ func GetAiData(s *config.Config,proto string) error {
 			}
 		}
 		
-		err = s.Db.AddIfNecessaryTest(ctx, database.AddIfNecessaryTestParams{
+		_ = s.Db.AddIfNecessaryTest(ctx, database.AddIfNecessaryTestParams{
 			ProtocolID: protocol.ID,
 			TestID: add.ID,
 		})
 
-		if err != nil {
-			fmt.Printf("Error adding baseline test if clinically indicated: %v, to protocol:%v\n",add.Name, err)
-		}
 	}	
 
 	// Create Tests, follow-up
@@ -651,7 +526,6 @@ func GetAiData(s *config.Config,proto string) error {
 		if err != nil {
 			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
 				// Duplicate key value violation
-				fmt.Println("Test Record already exists so retrieving from database.")
 				add,err = s.Db.GetTestByName(ctx, test)
 					
 				if err != nil {
@@ -664,14 +538,10 @@ func GetAiData(s *config.Config,proto string) error {
 			}
 		}
 		
-		err = s.Db.AddFollowupTest(ctx, database.AddFollowupTestParams{
+		_ = s.Db.AddFollowupTest(ctx, database.AddFollowupTestParams{
 			ProtocolID: protocol.ID,
 			TestID: add.ID,
 		})
-
-		if err != nil {
-			fmt.Printf("Error adding follow-up test required: %v, to protocol:%v\n",add.Name, err)
-		}
 
 	}
 
@@ -685,7 +555,6 @@ func GetAiData(s *config.Config,proto string) error {
 		if err != nil {
 			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
 				// Duplicate key value violation
-				fmt.Println("Test Record already exists so retrieving from database.")
 				add,err = s.Db.GetTestByName(ctx, test)
 					
 				if err != nil {
@@ -698,30 +567,70 @@ func GetAiData(s *config.Config,proto string) error {
 			}
 		}
 		
-		err = s.Db.AddFollowupIfNecessaryTest(ctx, database.AddFollowupIfNecessaryTestParams{
+		_ = s.Db.AddFollowupIfNecessaryTest(ctx, database.AddFollowupIfNecessaryTestParams{
 			ProtocolID: protocol.ID,
 			TestID: add.ID,
 		})
-
-		if err != nil {
-			fmt.Printf("Error adding follow-up test if clinically indicated: %v, to protocol:%v\n",add.Name, err)
-		}
 		
 	}
 	
 
 	// Create Toxicity Modifications
 	
-	for _, tox := range payload.ToxicityModifications {
-		_,err := s.Db.AddToxicityModification(ctx, database.AddToxicityModificationParams{
+	for _, tox := range payload.Toxicities {
+
+		toxicity,err := s.Db.AddToxicity(ctx, database.AddToxicityParams{
 			Title: tox.Title,
-			Grade: tox.Grade,
-			Adjustement: tox.Adjustement,
-			ProtocolID: protocol.ID,
-			
+			Description: tox.Description,
+			Category: tox.Category,
 		})
+
 		if err != nil {
-			fmt.Println("Error creating toxicity modification: ", err)
+			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
+				// Duplicate key value violation
+				toxicity,err = s.Db.GetToxicityByName(ctx, tox.Title)
+					
+				if err != nil {
+					fmt.Println("Error getting toxicity: ", err)
+					return err
+				}
+			} else {
+				fmt.Println("Error creating toxicity: ", err)
+				return err
+			}
+		}
+
+		for _, mod := range tox.Modifications {
+			grade,err := s.Db.AddToxicityGrade(ctx, database.AddToxicityGradeParams{
+				Grade: mod.Grade,
+				Description: mod.GradeDescription,
+				ToxicityID: toxicity.ID,
+			})
+			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
+				// Duplicate key value violation
+				grade,err = s.Db.GetToxicityGradeByGrade(ctx, database.GetToxicityGradeByGradeParams{
+					Grade: mod.Grade,
+					ToxicityID: toxicity.ID,
+				})
+					
+				if err != nil {
+					fmt.Println("Error getting grade: ", err)
+					return err
+				}
+			} else {
+				fmt.Println("Error creating grade: ", err)
+				return err
+			}
+
+			_,err = s.Db.AddToxicityModification(ctx, database.AddToxicityModificationParams{
+				Adjustment: mod.Adjustment,
+				ToxicityGradeID: grade.ID,
+				ProtocolID: protocol.ID,
+			})
+
+			if err != nil {
+				fmt.Println("Error creating toxicity modification: ", err)
+			}
 		}
 
 	}
@@ -738,13 +647,30 @@ func GetAiData(s *config.Config,proto string) error {
 			ProtocolID: protocol.ID,
 		})
 		if err != nil {
-			fmt.Println("Error creating protocol cycle: ", err)
+			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
+				// Duplicate key value violation
+				fmt.Println("Cycle Record already exists so retrieving from database.")
+				cycle,err = s.Db.GetCycleByData(ctx, database.GetCycleByDataParams{
+					Cycle: cyc.Cycle,
+					CycleDuration: cyc.CycleDuration,
+					ProtocolID: protocol.ID,
+				})
+
+				if err != nil {
+					fmt.Println("Error getting cycle: ", err)
+					return err
+				}
+			} else {
+				fmt.Println("Error creating cycle: ", err)
+				return err
+			}
+			
 		}
 
 		for _, treatx := range cyc.Treatments {
 			med,err := s.Db.AddMedication(ctx, database.AddMedicationParams{
-				Name: treatx.Medication,
-				Description: sql.NullString{String: "", Valid: false},
+				Name: treatx.MedicationName,
+				Description: "",
 				Category: "Treatment",
 			})
 			if err != nil {
@@ -752,7 +678,7 @@ func GetAiData(s *config.Config,proto string) error {
 				if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
 					// Duplicate key value violation
 					fmt.Println("Medication Record already exists so retrieving from database.")
-					med,err = s.Db.GetMedicationByName(ctx, treatx.Medication)
+					med,err = s.Db.GetMedicationByName(ctx, treatx.MedicationName)
 
 					if err != nil {
 						fmt.Println("Error getting medication: ", err)
@@ -793,29 +719,12 @@ func GetAiData(s *config.Config,proto string) error {
 					fmt.Println("Error creating treatment: ", err)
 					return err
 				}
-			}
-
-			for _, mod := range treatx.TreatmentModifications {
-				_,err := s.Db.AddTreatmentModification(ctx, database.AddTreatmentModificationParams{
-					Category: mod.Category,
-					Description: mod.Description,
-					Adjustement: mod.Adjustement,
-					TreatmentID: treatment.ID,
-				})
-				if err != nil {
-					fmt.Println("Error creating treatment modification: ", err)
-				}
-			}
+			}			
 		
-			_err := s.Db.AddTreatmentToCycle(ctx, database.AddTreatmentToCycleParams{
+			_ = s.Db.AddTreatmentToCycle(ctx, database.AddTreatmentToCycleParams{
 				ProtocolCyclesID: cycle.ID,
 				ProtocolTreatmentID: treatment.ID,				
 			})
-			if _err != nil {
-				fmt.Println("Error adding treatment to cycle: ", _err)
-			}
-			
-
 		}
 	
 	}	
@@ -874,7 +783,7 @@ func extractJSON(contentStr string) (string, error) {
 }
 
 // Function to handle each request, send it, and parse the response
-func handleRequest(ctx context.Context, model *genai.GenerativeModel, reqParts []genai.Part) (payload Payload, err error) {
+func handleRequest(ctx context.Context, model *genai.GenerativeModel, reqParts []genai.Part) (payload ProtocolPayload, err error) {
 	resp, err := model.GenerateContent(ctx, reqParts...)
 	if err != nil {
 		fmt.Printf("Request failed: %v\n", err)
@@ -893,7 +802,7 @@ func handleRequest(ctx context.Context, model *genai.GenerativeModel, reqParts [
 			}
 
 			// Parse the extracted JSON data
-			var payload Payload
+			var payload ProtocolPayload
 			err = json.Unmarshal([]byte(jsonData), &payload)
 			if err != nil {
 				fmt.Printf("Request - Error unmarshaling JSON: %v\n", err)
