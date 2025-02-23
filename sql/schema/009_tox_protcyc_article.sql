@@ -20,7 +20,7 @@ CREATE TABLE article_references (
   year TEXT NOT NULL,
   UNIQUE (title,authors,journal,year),
   pmid TEXT NOT NULL DEFAULT '',
-  joi TEXT NOT NULL DEFAULT ''
+  doi TEXT NOT NULL DEFAULT ''
 );
 
 -- +goose Down

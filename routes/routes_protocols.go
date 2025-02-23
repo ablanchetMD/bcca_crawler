@@ -4,6 +4,7 @@ import (
 	"bcca_crawler/internal/config"
 	"net/http"
 	"bcca_crawler/api"
+	"bcca_crawler/api/protocols"
 )
 
 func RegisterProtocolRoutes(prefix string, mux *http.ServeMux, s *config.Config) {
@@ -40,6 +41,37 @@ func RegisterProtocolRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 			api.HandleUpdateProtocol(s, w, r)
 		case http.MethodDelete:
 			api.HandleDeleteProtocol(s, w, r)
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	mux.HandleFunc(prefix +"/protocols/eligibility", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			protocols.HandleGetEligibilityCriteria(s, w, r)
+		case http.MethodPut:
+			protocols.HandleUpsertEligibilityCriteria(s, w, r)				
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	mux.HandleFunc(prefix +"/protocols/eligibility/link/{id}", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodDelete:
+			protocols.HandleRemoveEligibilityFromProtocol(s, w, r)
+		case http.MethodPost:
+			protocols.HandleAddEligibilityCriteriaToProtocol(s, w, r)			
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	mux.HandleFunc(prefix +"/protocols/eligibility/{id}", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodDelete:
+			protocols.HandleDeleteEligibilityCriteriaByID(s, w, r)						
 		default:
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		}

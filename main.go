@@ -21,6 +21,13 @@ func init() {
 	validate = validator.New()
 	validate.RegisterValidation("tumorgroup", api.TumorGroupValidator)
 	validate.RegisterValidation("passwordstrength", api.PasswordStrengthValidator)
+	validate.RegisterValidation("eligibility_criteria", api.EligibilityCriteriaValidator)
+	validate.RegisterValidation("test_protocol_category", api.TestCategoryValidator)
+	validate.RegisterValidation("test_protocol_urgency", api.TestUrgencyValidator)
+	validate.RegisterValidation("physician_site", api.PhysicianSiteValidator)
+	validate.RegisterValidation("prescription_route", api.PrescriptionRouteValidator)
+	validate.RegisterValidation("protocol_prescription_category", api.ProtocolPrescriptionCategoryValidator)
+	validate.RegisterValidation("grade", api.GradeValidator)
 }
 
 func main() {

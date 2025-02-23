@@ -7,10 +7,26 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 )
+
+const addEligibilityToProtocol = `-- name: AddEligibilityToProtocol :exec
+INSERT INTO protocol_eligibility_criteria_values (protocol_id, criteria_id)
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING
+`
+
+type AddEligibilityToProtocolParams struct {
+	ProtocolID uuid.UUID `json:"protocol_id"`
+	CriteriaID uuid.UUID `json:"criteria_id"`
+}
+
+func (q *Queries) AddEligibilityToProtocol(ctx context.Context, arg AddEligibilityToProtocolParams) error {
+	_, err := q.db.ExecContext(ctx, addEligibilityToProtocol, arg.ProtocolID, arg.CriteriaID)
+	return err
+}
 
 const deleteEligibilityCriteria = `-- name: DeleteEligibilityCriteria :exec
 DELETE FROM protocol_eligibility_criteria
@@ -20,6 +36,53 @@ WHERE id = $1
 func (q *Queries) DeleteEligibilityCriteria(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, deleteEligibilityCriteria, id)
 	return err
+}
+
+const getElibilityCriteria = `-- name: GetElibilityCriteria :many
+SELECT pec.id, pec.created_at, pec.updated_at, pec.type, pec.description, ARRAY_AGG(ROW(pecv.protocol_id,p.code)) AS protocol_ids
+FROM protocol_eligibility_criteria pec
+JOIN protocol_eligibility_criteria_values pecv ON pec.id = pecv.criteria_id
+JOIN protocols p ON pecv.protocol_id = p.id
+GROUP BY pec.id
+`
+
+type GetElibilityCriteriaRow struct {
+	ID          uuid.UUID       `json:"id"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+	Type        EligibilityEnum `json:"type"`
+	Description string          `json:"description"`
+	ProtocolIds interface{}     `json:"protocol_ids"`
+}
+
+func (q *Queries) GetElibilityCriteria(ctx context.Context) ([]GetElibilityCriteriaRow, error) {
+	rows, err := q.db.QueryContext(ctx, getElibilityCriteria)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetElibilityCriteriaRow{}
+	for rows.Next() {
+		var i GetElibilityCriteriaRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Type,
+			&i.Description,
+			&i.ProtocolIds,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getElibilityCriteriaByDescription = `-- name: GetElibilityCriteriaByDescription :one
@@ -53,7 +116,7 @@ func (q *Queries) GetEligibilityByProtocol(ctx context.Context, protocolID uuid.
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ProtocolEligibilityCriterium
+	items := []ProtocolEligibilityCriterium{}
 	for rows.Next() {
 		var i ProtocolEligibilityCriterium
 		if err := rows.Scan(
@@ -77,43 +140,70 @@ func (q *Queries) GetEligibilityByProtocol(ctx context.Context, protocolID uuid.
 }
 
 const getEligibilityCriteriaByID = `-- name: GetEligibilityCriteriaByID :one
-SELECT id, created_at, updated_at, type, description FROM protocol_eligibility_criteria
-WHERE id = $1
+SELECT pec.id, pec.created_at, pec.updated_at, pec.type, pec.description, ARRAY_AGG(ROW(pecv.protocol_id,p.code)) AS protocol_ids
+FROM protocol_eligibility_criteria pec
+JOIN protocol_eligibility_criteria_values pecv ON pec.id = pecv.criteria_id
+JOIN protocols p ON pecv.protocol_id = p.id
+WHERE pec.id = $1
 `
 
-func (q *Queries) GetEligibilityCriteriaByID(ctx context.Context, id uuid.UUID) (ProtocolEligibilityCriterium, error) {
+type GetEligibilityCriteriaByIDRow struct {
+	ID          uuid.UUID       `json:"id"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+	Type        EligibilityEnum `json:"type"`
+	Description string          `json:"description"`
+	ProtocolIds interface{}     `json:"protocol_ids"`
+}
+
+func (q *Queries) GetEligibilityCriteriaByID(ctx context.Context, id uuid.UUID) (GetEligibilityCriteriaByIDRow, error) {
 	row := q.db.QueryRowContext(ctx, getEligibilityCriteriaByID, id)
-	var i ProtocolEligibilityCriterium
+	var i GetEligibilityCriteriaByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Type,
 		&i.Description,
+		&i.ProtocolIds,
 	)
 	return i, err
 }
 
 const getEligibilityCriteriaByType = `-- name: GetEligibilityCriteriaByType :many
-SELECT id, created_at, updated_at, type, description FROM protocol_eligibility_criteria
-WHERE type = $1
+SELECT pec.id, pec.created_at, pec.updated_at, pec.type, pec.description, ARRAY_AGG(ROW(pecv.protocol_id,p.code)) AS protocol_ids
+FROM protocol_eligibility_criteria pec
+JOIN protocol_eligibility_criteria_values pecv ON pec.id = pecv.criteria_id
+JOIN protocols p ON pecv.protocol_id = p.id
+WHERE LOWER(pec.type) = LOWER($1)
+GROUP BY pec.id
 `
 
-func (q *Queries) GetEligibilityCriteriaByType(ctx context.Context, type_ string) ([]ProtocolEligibilityCriterium, error) {
-	rows, err := q.db.QueryContext(ctx, getEligibilityCriteriaByType, type_)
+type GetEligibilityCriteriaByTypeRow struct {
+	ID          uuid.UUID       `json:"id"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+	Type        EligibilityEnum `json:"type"`
+	Description string          `json:"description"`
+	ProtocolIds interface{}     `json:"protocol_ids"`
+}
+
+func (q *Queries) GetEligibilityCriteriaByType(ctx context.Context, lower string) ([]GetEligibilityCriteriaByTypeRow, error) {
+	rows, err := q.db.QueryContext(ctx, getEligibilityCriteriaByType, lower)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ProtocolEligibilityCriterium
+	items := []GetEligibilityCriteriaByTypeRow{}
 	for rows.Next() {
-		var i ProtocolEligibilityCriterium
+		var i GetEligibilityCriteriaByTypeRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Type,
 			&i.Description,
+			&i.ProtocolIds,
 		); err != nil {
 			return nil, err
 		}
@@ -135,8 +225,8 @@ RETURNING id, created_at, updated_at, type, description
 `
 
 type InsertEligibilityCriteriaParams struct {
-	Type        string
-	Description string
+	Type        EligibilityEnum `json:"type"`
+	Description string          `json:"description"`
 }
 
 func (q *Queries) InsertEligibilityCriteria(ctx context.Context, arg InsertEligibilityCriteriaParams) (ProtocolEligibilityCriterium, error) {
@@ -152,50 +242,18 @@ func (q *Queries) InsertEligibilityCriteria(ctx context.Context, arg InsertEligi
 	return i, err
 }
 
-const insertManyEligibilityCriteria = `-- name: InsertManyEligibilityCriteria :exec
-INSERT INTO protocol_eligibility_criteria (type, description)
-VALUES ($1::UUID[], $2::UUID[])
-ON CONFLICT DO NOTHING
-`
-
-type InsertManyEligibilityCriteriaParams struct {
-	Column1 []uuid.UUID
-	Column2 []uuid.UUID
-}
-
-func (q *Queries) InsertManyEligibilityCriteria(ctx context.Context, arg InsertManyEligibilityCriteriaParams) error {
-	_, err := q.db.ExecContext(ctx, insertManyEligibilityCriteria, pq.Array(arg.Column1), pq.Array(arg.Column2))
-	return err
-}
-
 const linkEligibilityToProtocol = `-- name: LinkEligibilityToProtocol :exec
 INSERT INTO protocol_eligibility_criteria_values (protocol_id, criteria_id)
 VALUES ($1, $2)
 `
 
 type LinkEligibilityToProtocolParams struct {
-	ProtocolID uuid.UUID
-	CriteriaID uuid.UUID
+	ProtocolID uuid.UUID `json:"protocol_id"`
+	CriteriaID uuid.UUID `json:"criteria_id"`
 }
 
 func (q *Queries) LinkEligibilityToProtocol(ctx context.Context, arg LinkEligibilityToProtocolParams) error {
 	_, err := q.db.ExecContext(ctx, linkEligibilityToProtocol, arg.ProtocolID, arg.CriteriaID)
-	return err
-}
-
-const linkManyEligibilityToProtocol = `-- name: LinkManyEligibilityToProtocol :exec
-INSERT INTO protocol_eligibility_criteria_values (protocol_id, criteria_id)
-VALUES ($1::UUID[], $2::UUID[])
-ON CONFLICT DO NOTHING
-`
-
-type LinkManyEligibilityToProtocolParams struct {
-	Column1 []uuid.UUID
-	Column2 []uuid.UUID
-}
-
-func (q *Queries) LinkManyEligibilityToProtocol(ctx context.Context, arg LinkManyEligibilityToProtocolParams) error {
-	_, err := q.db.ExecContext(ctx, linkManyEligibilityToProtocol, pq.Array(arg.Column1), pq.Array(arg.Column2))
 	return err
 }
 
@@ -205,8 +263,8 @@ WHERE protocol_id = $1 AND criteria_id = $2
 `
 
 type UnlinkEligibilityFromProtocolParams struct {
-	ProtocolID uuid.UUID
-	CriteriaID uuid.UUID
+	ProtocolID uuid.UUID `json:"protocol_id"`
+	CriteriaID uuid.UUID `json:"criteria_id"`
 }
 
 func (q *Queries) UnlinkEligibilityFromProtocol(ctx context.Context, arg UnlinkEligibilityFromProtocolParams) error {
@@ -225,9 +283,9 @@ RETURNING id, created_at, updated_at, type, description
 `
 
 type UpdateEligibilityCriteriaParams struct {
-	ID          uuid.UUID
-	Type        string
-	Description string
+	ID          uuid.UUID       `json:"id"`
+	Type        EligibilityEnum `json:"type"`
+	Description string          `json:"description"`
 }
 
 func (q *Queries) UpdateEligibilityCriteria(ctx context.Context, arg UpdateEligibilityCriteriaParams) (ProtocolEligibilityCriterium, error) {
@@ -240,5 +298,51 @@ func (q *Queries) UpdateEligibilityCriteria(ctx context.Context, arg UpdateEligi
 		&i.Type,
 		&i.Description,
 	)
+	return i, err
+}
+
+const upsertEligibilityCriteria = `-- name: UpsertEligibilityCriteria :one
+INSERT INTO protocol_eligibility_criteria (id, type, description, updated_at)
+VALUES ($1, $2, $3, NOW())
+ON CONFLICT (id) DO UPDATE
+SET type = EXCLUDED.type,
+    description = EXCLUDED.description,
+    updated_at = NOW()
+RETURNING id, created_at, updated_at, type, description
+`
+
+type UpsertEligibilityCriteriaParams struct {
+	ID          uuid.UUID       `json:"id"`
+	Type        EligibilityEnum `json:"type"`
+	Description string          `json:"description"`
+}
+
+func (q *Queries) UpsertEligibilityCriteria(ctx context.Context, arg UpsertEligibilityCriteriaParams) (ProtocolEligibilityCriterium, error) {
+	row := q.db.QueryRowContext(ctx, upsertEligibilityCriteria, arg.ID, arg.Type, arg.Description)
+	var i ProtocolEligibilityCriterium
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Type,
+		&i.Description,
+	)
+	return i, err
+}
+
+const verifyLinkEligibilityToProtocol = `-- name: VerifyLinkEligibilityToProtocol :one
+SELECT protocol_id, criteria_id FROM protocol_eligibility_criteria_values
+WHERE protocol_id = $1 AND criteria_id = $2
+`
+
+type VerifyLinkEligibilityToProtocolParams struct {
+	ProtocolID uuid.UUID `json:"protocol_id"`
+	CriteriaID uuid.UUID `json:"criteria_id"`
+}
+
+func (q *Queries) VerifyLinkEligibilityToProtocol(ctx context.Context, arg VerifyLinkEligibilityToProtocolParams) (ProtocolEligibilityCriteriaValue, error) {
+	row := q.db.QueryRowContext(ctx, verifyLinkEligibilityToProtocol, arg.ProtocolID, arg.CriteriaID)
+	var i ProtocolEligibilityCriteriaValue
+	err := row.Scan(&i.ProtocolID, &i.CriteriaID)
 	return i, err
 }

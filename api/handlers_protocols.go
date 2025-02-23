@@ -30,6 +30,11 @@ type ProtocolRequest struct {
 	Name    string `json:"name" validate:"required,min=1,max=250"`
 	Tags    []string `json:"tags" validate:"omitempty,max=10,dive,min=1,max=50"`
 	Notes   string `json:"notes" validate:"omitempty,max=500"`
+	ProtocolUrl string `json:"protocol_url" validate:"omitempty,max=250"`
+	PatientHandoutUrl string `json:"patient_handout_url" validate:"omitempty,max=250"`
+	RevisedOn string `json:"revised_on" validate:"omitempty,max=25"`
+	ActivatedOn string `json:"activated_on" validate:"omitempty,max=25"`
+
 }
 
 type Protocols struct {
@@ -145,6 +150,10 @@ func HandleUpdateProtocol(c *config.Config, w http.ResponseWriter, r *http.Reque
 		Name: req.Name,
 		Tags: req.Tags,
 		Notes: req.Notes,
+		ProtocolUrl: req.ProtocolUrl,
+		PatientHandoutUrl: req.PatientHandoutUrl,
+		RevisedOn: req.RevisedOn,
+		ActivatedOn: req.ActivatedOn,
 	})
 
 	if err != nil {

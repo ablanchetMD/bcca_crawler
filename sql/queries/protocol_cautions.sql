@@ -32,6 +32,51 @@ INSERT INTO protocol_cautions (description)
 VALUES ($1) 
 RETURNING *;
 
+-- name: UpsertCaution :one
+INSERT INTO protocol_cautions (id, description)
+VALUES ($1, $2)
+ON CONFLICT (id) DO UPDATE
+SET description = EXCLUDED.description,
+    updated_at = NOW()
+RETURNING *;
+
+-- name: GetCautionWithProtocols :many
+SELECT pec.*, ARRAY_AGG(ROW(pecv.protocol_id,p.code)) AS protocol_ids
+FROM protocol_cautions pec
+JOIN protocol_cautions_values pecv ON pec.id = pecv.caution_id
+JOIN protocols p ON pecv.protocol_id = p.id
+GROUP BY pec.id;
+
+-- name: GetCautionByIDWithProtocols :one
+SELECT pec.*, ARRAY_AGG(ROW(pecv.protocol_id,p.code)) AS protocol_ids
+FROM protocol_cautions pec
+JOIN protocol_cautions_values pecv ON pec.id = pecv.caution_id
+JOIN protocols p ON pecv.protocol_id = p.id
+WHERE pec.id = $1;
+
+-- name: UpsertPrecaution :one
+INSERT INTO protocol_precautions (id,title, description)
+VALUES ($1, $2, $3)
+ON CONFLICT (id) DO UPDATE
+SET description = EXCLUDED.description,
+    title = EXCLUDED.title,
+    updated_at = NOW()
+RETURNING *;
+
+-- name: GetPrecautionWithProtocols :many
+SELECT pec.*, ARRAY_AGG(ROW(pecv.protocol_id,p.code)) AS protocol_ids
+FROM protocol_precautions pec
+JOIN protocol_precautions_values pecv ON pec.id = pecv.precaution_id
+JOIN protocols p ON pecv.protocol_id = p.id
+GROUP BY pec.id;
+
+-- name: GetPrecautionByIDWithProtocols :one
+SELECT pec.*, ARRAY_AGG(ROW(pecv.protocol_id,p.code)) AS protocol_ids
+FROM protocol_precautions pec
+JOIN protocol_precautions_values pecv ON pec.id = pecv.precaution_id
+JOIN protocols p ON pecv.protocol_id = p.id
+WHERE pec.id = $1;
+
 -- name: GetProtocolCautionByID :one
 SELECT * FROM protocol_cautions WHERE id = $1;
 

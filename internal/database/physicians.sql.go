@@ -19,8 +19,8 @@ ON CONFLICT DO NOTHING
 `
 
 type AddManyPhysicianToProtocolParams struct {
-	Column1 []uuid.UUID
-	Column2 []uuid.UUID
+	Column1 []uuid.UUID `json:"column_1"`
+	Column2 []uuid.UUID `json:"column_2"`
 }
 
 func (q *Queries) AddManyPhysicianToProtocol(ctx context.Context, arg AddManyPhysicianToProtocolParams) error {
@@ -34,8 +34,8 @@ VALUES ($1, $2)
 `
 
 type AddPhysicianToProtocolParams struct {
-	ProtocolID  uuid.UUID
-	PhysicianID uuid.UUID
+	ProtocolID  uuid.UUID `json:"protocol_id"`
+	PhysicianID uuid.UUID `json:"physician_id"`
 }
 
 func (q *Queries) AddPhysicianToProtocol(ctx context.Context, arg AddPhysicianToProtocolParams) error {
@@ -55,10 +55,10 @@ RETURNING id, created_at, updated_at, first_name, last_name, email, site
 `
 
 type CreatePhysicianParams struct {
-	FirstName string
-	LastName  string
-	Email     string
-	Site      string
+	FirstName string            `json:"first_name"`
+	LastName  string            `json:"last_name"`
+	Email     string            `json:"email"`
+	Site      PhysicianSiteEnum `json:"site"`
 }
 
 func (q *Queries) CreatePhysician(ctx context.Context, arg CreatePhysicianParams) (Physician, error) {
@@ -117,8 +117,8 @@ WHERE first_name = $1 AND last_name = $2
 `
 
 type GetPhysicianByNameParams struct {
-	FirstName string
-	LastName  string
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
 }
 
 func (q *Queries) GetPhysicianByName(ctx context.Context, arg GetPhysicianByNameParams) (Physician, error) {
@@ -150,7 +150,7 @@ func (q *Queries) GetPhysicianByProtocol(ctx context.Context, protocolID uuid.UU
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Physician
+	items := []Physician{}
 	for rows.Next() {
 		var i Physician
 		if err := rows.Scan(
@@ -186,7 +186,7 @@ func (q *Queries) GetPhysicians(ctx context.Context) ([]Physician, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Physician
+	items := []Physician{}
 	for rows.Next() {
 		var i Physician
 		if err := rows.Scan(
@@ -217,13 +217,13 @@ WHERE site = $1
 ORDER BY last_name ASC
 `
 
-func (q *Queries) GetPhysiciansBySite(ctx context.Context, site string) ([]Physician, error) {
+func (q *Queries) GetPhysiciansBySite(ctx context.Context, site PhysicianSiteEnum) ([]Physician, error) {
 	rows, err := q.db.QueryContext(ctx, getPhysiciansBySite, site)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Physician
+	items := []Physician{}
 	for rows.Next() {
 		var i Physician
 		if err := rows.Scan(
@@ -254,8 +254,8 @@ WHERE protocol_id = $1 AND physician_id = $2
 `
 
 type RemovePhysicianFromProtocolParams struct {
-	ProtocolID  uuid.UUID
-	PhysicianID uuid.UUID
+	ProtocolID  uuid.UUID `json:"protocol_id"`
+	PhysicianID uuid.UUID `json:"physician_id"`
 }
 
 func (q *Queries) RemovePhysicianFromProtocol(ctx context.Context, arg RemovePhysicianFromProtocolParams) error {
@@ -276,11 +276,11 @@ returning id, created_at, updated_at, first_name, last_name, email, site
 `
 
 type UpdatePhysicianParams struct {
-	ID        uuid.UUID
-	FirstName string
-	LastName  string
-	Email     string
-	Site      string
+	ID        uuid.UUID         `json:"id"`
+	FirstName string            `json:"first_name"`
+	LastName  string            `json:"last_name"`
+	Email     string            `json:"email"`
+	Site      PhysicianSiteEnum `json:"site"`
 }
 
 func (q *Queries) UpdatePhysician(ctx context.Context, arg UpdatePhysicianParams) (Physician, error) {

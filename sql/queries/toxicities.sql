@@ -3,9 +3,77 @@ INSERT INTO toxicities (title, category, description)
 VALUES ($1, $2, $3)
 RETURNING *;
 
--- name: GetToxicity :one
-SELECT * FROM toxicities
-WHERE id = $1;
+-- name: GetToxicityByID :one
+SELECT
+    t.id AS id,
+    t.created_at AS created_at,
+    t.updated_at AS updated_at,
+    t.title AS title,
+    t.category AS category,
+    t.description AS description,
+    json_agg(
+        json_build_object(
+            'id', tg.id,
+            'created_at', tg.created_at,
+            'updated_at', tg.updated_at,
+            'grade', tg.grade,
+            'description', tg.description
+        )
+    ) AS grades
+FROM
+    toxicities t
+LEFT JOIN
+    toxicity_grades tg ON t.id = tg.toxicity_id
+WHERE t.id = $1;
+
+-- name: GetToxicitiesWithGrades :many
+SELECT
+    t.id AS id,
+    t.created_at AS created_at,
+    t.updated_at AS updated_at,
+    t.title AS title,
+    t.category AS category,
+    t.description AS description,
+    json_agg(
+        json_build_object(
+            'id', tg.id,
+            'created_at', tg.created_at,
+            'updated_at', tg.updated_at,
+            'grade', tg.grade,
+            'description', tg.description
+        )
+    ) AS grades
+FROM
+    toxicities t
+LEFT JOIN
+    toxicity_grades tg ON t.id = tg.toxicity_id
+GROUP BY
+    t.id, t.created_at, t.updated_at, t.title, t.category, t.description;
+
+-- name: GetToxicitiesWithGradesAndAdjustments :many
+SELECT 
+    t.id,
+    t.created_at,
+    t.updated_at,
+    t.title,
+    t.category,
+    t.description,
+    JSON_AGG(
+        JSON_BUILD_OBJECT(
+            'id', tg.id,
+            'created_at', tg.created_at,
+            'updated_at', tg.updated_at,
+            'grade', tg.grade,
+            'description', tg.description,
+            'adjustment', ptm.adjustment
+        ) 
+        ORDER BY tg.grade
+    ) as grades
+FROM toxicities t
+LEFT JOIN toxicity_grades tg ON t.id = tg.toxicity_id
+LEFT JOIN protocol_tox_modifications ptm ON tg.id = ptm.toxicity_grade_id AND ptm.protocol_id = $1
+GROUP BY t.id, t.created_at, t.updated_at, t.title, t.category, t.description
+ORDER BY t.title;
 
 -- name: UpdateToxicity :one
 UPDATE toxicities
@@ -15,6 +83,36 @@ SET
     category = $3,
     description = $4
 WHERE id = $1
+RETURNING *;
+
+-- name: UpsertToxicity :one
+INSERT INTO toxicities (id,title,category,description)
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4    
+)
+ON CONFLICT (id) DO UPDATE SET
+    title = EXCLUDED.title,
+    category = EXCLUDED.category,
+    description = EXCLUDED.description,
+    updated_at = NOW()
+RETURNING *;
+
+-- name: UpsertToxicityGrades :many
+INSERT INTO toxicity_grades (id,grade,description,toxicity_id,updated_at)
+SELECT
+COALESCE(NULLIF(elem->>'id', '')::uuid, gen_random_uuid())      AS id,
+elem->>'grade'                                                 AS grade,
+COALESCE(elem->>'description', '')                             AS description,
+$1                                                             AS toxicity_id, 
+NOW()                                                          AS updated_at
+FROM jsonb_array_elements($2::jsonb) elem
+ON CONFLICT (grade, toxicity_id)
+DO UPDATE
+SET description = EXCLUDED.description,
+updated_at  = NOW()
 RETURNING *;
 
 -- name: RemoveToxicity :exec
@@ -51,6 +149,17 @@ WHERE id = $1;
 -- name: AddToxicityModification :one
 INSERT INTO protocol_tox_modifications (adjustment, toxicity_grade_id, protocol_id)
 VALUES ($1, $2, $3)
+RETURNING *;
+
+-- name: UpsertToxicityToProtocol :one
+INSERT INTO protocol_tox_modifications (id, toxicity_grade_id, adjustment, protocol_id)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (id) DO UPDATE
+SET
+    toxicity_grade_id = EXCLUDED.toxicity_grade_id,
+    adjustment = EXCLUDED.adjustment,
+    protocol_id = EXCLUDED.protocol_id,
+    updated_at = NOW()
 RETURNING *;
 
 -- name: GetToxicityModificationByProtocol :many

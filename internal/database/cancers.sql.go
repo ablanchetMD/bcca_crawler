@@ -22,8 +22,8 @@ VALUES (
 `
 
 type AddProtocolToCancerParams struct {
-	CancerID   uuid.UUID
-	ProtocolID uuid.UUID
+	CancerID   uuid.UUID `json:"cancer_id"`
+	ProtocolID uuid.UUID `json:"protocol_id"`
 }
 
 func (q *Queries) AddProtocolToCancer(ctx context.Context, arg AddProtocolToCancerParams) error {
@@ -44,11 +44,11 @@ RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes
 `
 
 type CreateCancerParams struct {
-	Code       sql.NullString
-	Name       sql.NullString
-	TumorGroup string
-	Tags       []string
-	Notes      string
+	Code       sql.NullString `json:"code"`
+	Name       sql.NullString `json:"name"`
+	TumorGroup string         `json:"tumor_group"`
+	Tags       []string       `json:"tags"`
+	Notes      string         `json:"notes"`
 }
 
 func (q *Queries) CreateCancer(ctx context.Context, arg CreateCancerParams) (Cancer, error) {
@@ -111,8 +111,8 @@ LIMIT $1 OFFSET $2
 `
 
 type GetCancersParams struct {
-	Limit  int32
-	Offset int32
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
 }
 
 func (q *Queries) GetCancers(ctx context.Context, arg GetCancersParams) ([]Cancer, error) {
@@ -121,7 +121,7 @@ func (q *Queries) GetCancers(ctx context.Context, arg GetCancersParams) ([]Cance
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Cancer
+	items := []Cancer{}
 	for rows.Next() {
 		var i Cancer
 		if err := rows.Scan(
@@ -155,9 +155,9 @@ LIMIT $2 OFFSET $3
 `
 
 type GetCancersByTagsParams struct {
-	Tags   []string
-	Limit  int32
-	Offset int32
+	Tags   []string `json:"tags"`
+	Limit  int32    `json:"limit"`
+	Offset int32    `json:"offset"`
 }
 
 func (q *Queries) GetCancersByTags(ctx context.Context, arg GetCancersByTagsParams) ([]Cancer, error) {
@@ -166,7 +166,7 @@ func (q *Queries) GetCancersByTags(ctx context.Context, arg GetCancersByTagsPara
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Cancer
+	items := []Cancer{}
 	for rows.Next() {
 		var i Cancer
 		if err := rows.Scan(
@@ -201,10 +201,10 @@ LIMIT $3 OFFSET $4
 `
 
 type GetCancersOnlyTumorGroupAndTagsAscParams struct {
-	TumorGroup string
-	Tags       []string
-	Limit      int32
-	Offset     int32
+	TumorGroup string   `json:"tumor_group"`
+	Tags       []string `json:"tags"`
+	Limit      int32    `json:"limit"`
+	Offset     int32    `json:"offset"`
 }
 
 func (q *Queries) GetCancersOnlyTumorGroupAndTagsAsc(ctx context.Context, arg GetCancersOnlyTumorGroupAndTagsAscParams) ([]Cancer, error) {
@@ -218,7 +218,7 @@ func (q *Queries) GetCancersOnlyTumorGroupAndTagsAsc(ctx context.Context, arg Ge
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Cancer
+	items := []Cancer{}
 	for rows.Next() {
 		var i Cancer
 		if err := rows.Scan(
@@ -252,9 +252,9 @@ LIMIT $2 OFFSET $3
 `
 
 type GetCancersOnlyTumorGroupAscParams struct {
-	TumorGroup string
-	Limit      int32
-	Offset     int32
+	TumorGroup string `json:"tumor_group"`
+	Limit      int32  `json:"limit"`
+	Offset     int32  `json:"offset"`
 }
 
 func (q *Queries) GetCancersOnlyTumorGroupAsc(ctx context.Context, arg GetCancersOnlyTumorGroupAscParams) ([]Cancer, error) {
@@ -263,7 +263,7 @@ func (q *Queries) GetCancersOnlyTumorGroupAsc(ctx context.Context, arg GetCancer
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Cancer
+	items := []Cancer{}
 	for rows.Next() {
 		var i Cancer
 		if err := rows.Scan(
@@ -302,7 +302,7 @@ func (q *Queries) GetProtocolsForCancer(ctx context.Context, cancerID uuid.UUID)
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Protocol
+	items := []Protocol{}
 	for rows.Next() {
 		var i Protocol
 		if err := rows.Scan(
@@ -338,8 +338,8 @@ WHERE cancer_id = $1 AND protocol_id = $2
 `
 
 type RemoveProtocolFromCancerParams struct {
-	CancerID   uuid.UUID
-	ProtocolID uuid.UUID
+	CancerID   uuid.UUID `json:"cancer_id"`
+	ProtocolID uuid.UUID `json:"protocol_id"`
 }
 
 func (q *Queries) RemoveProtocolFromCancer(ctx context.Context, arg RemoveProtocolFromCancerParams) error {
@@ -361,12 +361,12 @@ RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes
 `
 
 type UpdateCancerParams struct {
-	ID         uuid.UUID
-	Code       sql.NullString
-	Name       sql.NullString
-	TumorGroup string
-	Tags       []string
-	Notes      string
+	ID         uuid.UUID      `json:"id"`
+	Code       sql.NullString `json:"code"`
+	Name       sql.NullString `json:"name"`
+	TumorGroup string         `json:"tumor_group"`
+	Tags       []string       `json:"tags"`
+	Notes      string         `json:"notes"`
 }
 
 func (q *Queries) UpdateCancer(ctx context.Context, arg UpdateCancerParams) (Cancer, error) {

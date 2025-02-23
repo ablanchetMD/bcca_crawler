@@ -3,6 +3,8 @@ package api
 import (
 	"bcca_crawler/internal/database"
 	"github.com/google/uuid"
+	"encoding/json"
+	"time"
 )
 
 type ProtocolPayload struct {	
@@ -19,23 +21,28 @@ type ProtocolPayload struct {
 }
 
 type ArticleReference struct {
-	Id      uuid.UUID   `json:"Id"`
+	Id      uuid.UUID   `json:"id"`
 	Title   string `json:"Title"`
 	Authors string `json:"Authors"`
 	Journal string `json:"Journal"`
 	Year    string `json:"Year"`
 	Pmid    string `json:"Pmid"`
-	Joi     string `json:"Joi"`
+	Doi     string `json:"Doi"`
+}
+
+type LinkedProtocols struct {
+	ID string `json:"id"`
+	Code string `json:"code"`
 }
 
 type Physician struct {
-	Id 	  uuid.UUID `json:"Id"`
+	Id 	  uuid.UUID `json:"id"`
 	FirstName string `json:"FirstName"`
 	LastName  string `json:"LastName"`
 }
 
 type SummaryProtocol struct {
-	Id		 uuid.UUID `json:"Id"`
+	Id		 uuid.UUID `json:"id"`
 	TumorGroup string `json:"TumorGroup"`
 	Code       string `json:"Code"`
 	Name       string `json:"Name"`
@@ -48,26 +55,26 @@ type SummaryProtocol struct {
 }
 
 type ProtocolEligibilityCriterion struct {
-	Id 		uuid.UUID `json:"Id"`
-	Type        string `json:"Type"`
+	Id 			uuid.UUID `json:"id"`
+	Type        database.EligibilityEnum `json:"Type"`
 	Description string `json:"Description"`
 }
 
 type ProtocolPrecaution struct {
-	Id 		uuid.UUID `json:"Id"`
+	Id 		uuid.UUID `json:"id"`
 	Title       string `json:"Title"`
 	Description string `json:"Description"`
 }
 
 type ProtocolCaution struct {	
-	Id 		uuid.UUID `json:"Id"`
+	Id 		uuid.UUID `json:"id"`
 	Description string `json:"Description"`
 }
 
 type Treatment struct {
-	Id                    uuid.UUID              `json:"Id"`
+	Id                    uuid.UUID              `json:"id"`
 	MedicationName        string             	 `json:"Medication"`
-	MedicationId		  uuid.UUID              `json:"MedicationId"`
+	MedicationId		  uuid.UUID              `json:"MedicationID"`
 	Dose                  string                 `json:"Dose"`
 	Route                 string                 `json:"Route"`
 	Frequency             string                 `json:"Frequency"`
@@ -103,14 +110,14 @@ type ModificationCategory struct {
 }
 
 type Modifications struct {
-	Id          uuid.UUID 		`json:"Id"`
+	Id          uuid.UUID 		`json:"id"`
 	Description string 			`json:"Description"`
 	Adjustment  string			`json:"Adjustment"`
 }
 
 
 type ToxicityModification struct {
-	Id          uuid.UUID `json:"Id"`
+	Id          uuid.UUID `json:"id"`
 	GradeId     uuid.UUID `json:"GradeId"`	
 	Grade       string    `json:"Grade"`
 	GradeDescription string `json:"GradeDescription"`
@@ -118,21 +125,207 @@ type ToxicityModification struct {
 }
 
 type Toxicity struct {	
-	Id            uuid.UUID `json:"Id"`
+	Id            uuid.UUID `json:"id"`
 	Title         string `json:"Title"`
 	Description   string `json:"Description"`
 	Category      string `json:"Category"`
 	Modifications []ToxicityModification `json:"Modifications"`
 }
 
+type ToxicityGrade struct {
+    ID          uuid.UUID  `json:"id"`
+    CreatedAt   time.Time  `json:"created_at"`
+    UpdatedAt   time.Time  `json:"updated_at"`
+    Grade       string     `json:"grade"`
+    Description string     `json:"description"`
+}
+
+type ToxicityWithGrades struct {
+    ID          uuid.UUID        `json:"id"`
+    CreatedAt   time.Time        `json:"created_at"`
+    UpdatedAt   time.Time        `json:"updated_at"`
+    Title       string           `json:"title"`
+    Category    string           `json:"category"`
+    Description string           `json:"description"`
+    Grades      []ToxicityGrade  `json:"grades"`
+}
+
+type ToxicityGradeWithAdjustment struct {
+    ID          uuid.UUID  `json:"id"`
+    CreatedAt   time.Time  `json:"createdAt"`
+    UpdatedAt   time.Time  `json:"updatedAt"`
+    Grade       string     `json:"grade"`
+    Description string     `json:"description"`
+    Adjustment  *string    `json:"adjustment"` // pointer because it might be null
+}
+
+type ToxicityWithGradesAndAdjustments struct {
+    ID          uuid.UUID                     `json:"id"`
+    CreatedAt   time.Time                     `json:"createdAt"`
+    UpdatedAt   time.Time                     `json:"updatedAt"`
+    Title       string                        `json:"title"`
+    Category    string                        `json:"category"`
+    Description string                        `json:"description"`
+    Grades      []ToxicityGradeWithAdjustment `json:"grades"`
+}
+
+
+// Conversion function
+func MapToToxicityWithGrades(row database.GetToxicitiesWithGradesRow) (ToxicityWithGrades, error) {
+    var grades []ToxicityGrade
+    if err := json.Unmarshal(row.Grades, &grades); err != nil {
+        return ToxicityWithGrades{}, err
+    }
+    
+    return ToxicityWithGrades{
+        ID:          row.ID,
+        CreatedAt:   row.CreatedAt,
+        UpdatedAt:   row.UpdatedAt,
+        Title:       row.Title,
+        Category:    row.Category,
+        Description: row.Description,
+        Grades:      grades,
+    }, nil
+}
+
+func MapToToxicityWithGradesOne(row database.GetToxicityByIDRow) (ToxicityWithGrades, error) {
+    var grades []ToxicityGrade
+    if err := json.Unmarshal(row.Grades, &grades); err != nil {
+        return ToxicityWithGrades{}, err
+    }
+    
+    return ToxicityWithGrades{
+        ID:          row.ID,
+        CreatedAt:   row.CreatedAt,
+        UpdatedAt:   row.UpdatedAt,
+        Title:       row.Title,
+        Category:    row.Category,
+        Description: row.Description,
+        Grades:      grades,
+    }, nil
+}
+
+func MapToToxicityWithGradesAndAdjustments(row database.GetToxicitiesWithGradesAndAdjustmentsRow) (ToxicityWithGradesAndAdjustments, error) {
+    var grades []ToxicityGradeWithAdjustment
+    if err := json.Unmarshal(row.Grades, &grades); err != nil {
+        return ToxicityWithGradesAndAdjustments{}, err
+    }
+    
+    return ToxicityWithGradesAndAdjustments{
+        ID:          row.ID,
+        CreatedAt:   row.CreatedAt,
+        UpdatedAt:   row.UpdatedAt,
+        Title:       row.Title,
+        Category:    row.Category,
+        Description: row.Description,
+        Grades:      grades,
+    }, nil
+}
+
+func MapToToxicityGrade(tox database.ToxicityGrade) ToxicityGrade {
+	return ToxicityGrade{
+		ID:          tox.ID,
+		CreatedAt:   tox.CreatedAt,
+		UpdatedAt:   tox.UpdatedAt,		
+		Description: tox.Description,		
+		Grade:      string(tox.Grade),
+	}
+}
+
 type ProtocolCycle struct {
-	Id            uuid.UUID `json:"Id"`
+	Id            uuid.UUID `json:"id"`
 	Cycle         string         `json:"Cycle"`
 	CycleDuration string         `json:"CycleDuration"`
 	Treatments    []Treatment    `json:"Treatments"`
 }
 
+type MedicationResp struct {
+	ID 			string `json:"id"`
+	Name 		string `json:"name"`
+	Description string `json:"description"`
+	Category 	string `json:"category"`
+}
 
+func MapMedication(src database.Medication) MedicationResp {
+	return MedicationResp{
+		ID:          src.ID.String(),
+		Name:        src.Name,
+		Description: src.Description,
+		Category:    src.Category,
+	}
+}
+
+type MedModificationResp struct {
+	ID 			string `json:"id"`
+	MedicationID string `json:"medication_id"`
+	Category 	string `json:"category"`
+	Subcategory string `json:"subcategory"`
+	Adjustment 	string `json:"adjustment"`
+}
+
+func MapMedModification(src database.MedicationModification) MedModificationResp {
+	return MedModificationResp{
+		ID:          src.ID.String(),
+		MedicationID: src.MedicationID.String(),
+		Category:    src.Category,
+		Subcategory: src.Subcategory,
+		Adjustment:  src.Adjustment,
+	}
+}
+
+type PrescriptionResp struct {
+	ID 			string `json:"id"`
+	MedicationID string `json:"medication_id"`
+	MedicationName string `json:"medication_name"`
+	Dose 		string `json:"dose"`
+	Route 		string `json:"route"`
+	Frequency 	string `json:"frequency"`
+	Duration 	string `json:"duration"`
+	Instructions string `json:"instructions"`
+	Renewals 	int32 `json:"renewals"`
+}
+
+func MapPrescriptionByProtByCat(src database.GetPrescriptionsByProtocolByCategoryRow) PrescriptionResp {
+	return PrescriptionResp{
+		ID:            src.MedicationPrescriptionID.String(),
+		MedicationID:  src.MedicationID.String(),
+		MedicationName: src.Name,
+		Dose:          src.Dose,
+		Route:         string(src.Route),
+		Frequency:     src.Frequency,
+		Duration:      src.Duration,
+		Instructions:  src.Instructions,
+		Renewals:      src.Renewals,
+	}
+}
+
+func MapPrescriptionsByID(src database.GetPrescriptionByIDRow) PrescriptionResp {
+	return PrescriptionResp{
+		ID:            src.MedicationPrescriptionID.String(),
+		MedicationID:  src.MedicationID.String(),
+		MedicationName: src.Name,
+		Dose:          src.Dose,
+		Route:         string(src.Route),
+		Frequency:     src.Frequency,
+		Duration:      src.Duration,
+		Instructions:  src.Instructions,
+		Renewals:      src.Renewals,
+	}
+}
+
+func MapPrescription(src database.GetPrescriptionsRow) PrescriptionResp {
+	return PrescriptionResp{
+		ID:            src.MedicationPrescriptionID.String(),
+		MedicationID:  src.MedicationID.String(),
+		MedicationName: src.Name,
+		Dose:          src.Dose,
+		Route:         string(src.Route),
+		Frequency:     src.Frequency,
+		Duration:      src.Duration,
+		Instructions:  src.Instructions,
+		Renewals:      src.Renewals,
+	}
+}
 
 func mapArticleRef(src database.ArticleReference) ArticleReference {
 	
@@ -143,7 +336,7 @@ func mapArticleRef(src database.ArticleReference) ArticleReference {
 		Journal: src.Journal,
 		Year:      src.Year,
 		Pmid:    src.Pmid,
-		Joi:    src.Joi,
+		Doi:    src.Doi,
 	}
 }
 
@@ -168,7 +361,31 @@ func mapSummaryProtocol(src database.Protocol) SummaryProtocol {
 	}
 }
 
-func mapEligibilityCriterion(src database.ProtocolEligibilityCriterium) ProtocolEligibilityCriterion {
+type LabResp struct {
+	ID 			string `json:"id"`
+	Name 		string `json:"name"`
+	Description string `json:"description"`
+	FormUrl 	string `json:"form_url"`
+	Unit 		string `json:"unit"`
+	LowerLimit 	float64 `json:"lower_limit"`
+	UpperLimit 	float64 `json:"upper_limit"`
+	TestCategory string `json:"test_category"`	
+}
+
+func MapLab(src database.Test) LabResp {
+	return LabResp{
+		ID:          src.ID.String(),
+		Name:       src.Name,
+		Description: src.Description,
+		FormUrl:     src.FormUrl,
+		Unit:        src.Unit,
+		LowerLimit:  src.LowerLimit,
+		UpperLimit:  src.UpperLimit,
+		TestCategory: src.TestCategory,
+	}
+}
+
+func MapEligibilityCriterion(src database.ProtocolEligibilityCriterium) ProtocolEligibilityCriterion {
 	return ProtocolEligibilityCriterion{
 		Id: 		src.ID,
 		Type:        src.Type,
@@ -176,7 +393,7 @@ func mapEligibilityCriterion(src database.ProtocolEligibilityCriterium) Protocol
 	}
 }
 
-func mapPrecaution(src database.ProtocolPrecaution) ProtocolPrecaution {
+func MapPrecaution(src database.ProtocolPrecaution) ProtocolPrecaution {
 	return ProtocolPrecaution{
 		Id: 		src.ID,
 		Title:       src.Title,
@@ -184,14 +401,14 @@ func mapPrecaution(src database.ProtocolPrecaution) ProtocolPrecaution {
 	}
 }
 
-func mapCaution(src database.ProtocolCaution) ProtocolCaution {
+func MapCaution(src database.ProtocolCaution) ProtocolCaution {
 	return ProtocolCaution{
 		Id: 		src.ID,
 		Description: src.Description,
 	}
 }
 
-func mapCycle(src database.ProtocolCycle) ProtocolCycle {
+func MapCycle(src database.ProtocolCycle) ProtocolCycle {
 	return ProtocolCycle{
 		Id:            src.ID,
 		Cycle:         src.Cycle,
@@ -200,7 +417,7 @@ func mapCycle(src database.ProtocolCycle) ProtocolCycle {
 }
 
 
-func mapTreatment(src database.ProtocolTreatment) Treatment {
+func MapTreatment(src database.ProtocolTreatment) Treatment {
 	return Treatment{
 		Id:                    src.ID,
 		MedicationId: 		   src.Medication,		
@@ -242,7 +459,7 @@ func mapToToxicities(rows []database.GetToxicityModificationByProtocolRow) []Tox
         toxicityMap[row.ID].Modifications = append(toxicityMap[row.ID].Modifications, ToxicityModification{
             Id:               row.ID,
             GradeId:          row.ToxicityGradeID,
-            Grade:            row.ToxicityGrade,
+			Grade:            string(row.ToxicityGrade),
             GradeDescription: row.ToxicityGradeDescription,
             Adjustment:       row.Adjustment,
         })
@@ -259,7 +476,7 @@ func mapToToxicities(rows []database.GetToxicityModificationByProtocolRow) []Tox
 
 
 
-func mapToMedicationModifications(rows []database.GetMedicationModificationsByProtocolRow) []MedicationModification {
+func MapToMedicationModifications(rows []database.GetMedicationModificationsByProtocolRow) []MedicationModification {
 	// Map to group medications by MedicationID
 	medicationMap := make(map[uuid.UUID]*MedicationModification)
 
@@ -295,7 +512,7 @@ func mapToMedicationModifications(rows []database.GetMedicationModificationsByPr
 		// Add the modification to the category
 		category.Modifications = append(category.Modifications, Modifications{
 			Id:          row.ModificationID,
-			Description: row.ModificationDescription,
+			Description: row.ModificationSubcategory,
 			Adjustment:  row.Adjustment,
 		})
 	}

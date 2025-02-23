@@ -16,7 +16,11 @@ SET
     code = $3,
     name = $4,
     tags = $5,
-    notes = $6
+    notes = $6,
+    protocol_url = $7,
+    patient_handout_url = $8,
+    revised_on = $9,
+    activated_on = $10
 WHERE id = $1
 RETURNING *;
 

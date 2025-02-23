@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,9 +20,9 @@ RETURNING id, created_at, updated_at, title, category, description
 `
 
 type AddToxicityParams struct {
-	Title       string
-	Category    string
-	Description string
+	Title       string `json:"title"`
+	Category    string `json:"category"`
+	Description string `json:"description"`
 }
 
 func (q *Queries) AddToxicity(ctx context.Context, arg AddToxicityParams) (Toxicity, error) {
@@ -45,9 +46,9 @@ RETURNING id, created_at, updated_at, grade, description, toxicity_id
 `
 
 type AddToxicityGradeParams struct {
-	Grade       string
-	Description string
-	ToxicityID  uuid.UUID
+	Grade       GradeEnum `json:"grade"`
+	Description string    `json:"description"`
+	ToxicityID  uuid.UUID `json:"toxicity_id"`
 }
 
 func (q *Queries) AddToxicityGrade(ctx context.Context, arg AddToxicityGradeParams) (ToxicityGrade, error) {
@@ -71,9 +72,9 @@ RETURNING id, created_at, updated_at, adjustment, toxicity_grade_id, protocol_id
 `
 
 type AddToxicityModificationParams struct {
-	Adjustment      string
-	ToxicityGradeID uuid.UUID
-	ProtocolID      uuid.UUID
+	Adjustment      string    `json:"adjustment"`
+	ToxicityGradeID uuid.UUID `json:"toxicity_grade_id"`
+	ProtocolID      uuid.UUID `json:"protocol_id"`
 }
 
 func (q *Queries) AddToxicityModification(ctx context.Context, arg AddToxicityModificationParams) (ProtocolToxModification, error) {
@@ -90,14 +91,176 @@ func (q *Queries) AddToxicityModification(ctx context.Context, arg AddToxicityMo
 	return i, err
 }
 
-const getToxicity = `-- name: GetToxicity :one
-SELECT id, created_at, updated_at, title, category, description FROM toxicities
-WHERE id = $1
+const getToxicitiesWithGrades = `-- name: GetToxicitiesWithGrades :many
+SELECT
+    t.id AS id,
+    t.created_at AS created_at,
+    t.updated_at AS updated_at,
+    t.title AS title,
+    t.category AS category,
+    t.description AS description,
+    json_agg(
+        json_build_object(
+            'id', tg.id,
+            'created_at', tg.created_at,
+            'updated_at', tg.updated_at,
+            'grade', tg.grade,
+            'description', tg.description
+        )
+    ) AS grades
+FROM
+    toxicities t
+LEFT JOIN
+    toxicity_grades tg ON t.id = tg.toxicity_id
+GROUP BY
+    t.id, t.created_at, t.updated_at, t.title, t.category, t.description
 `
 
-func (q *Queries) GetToxicity(ctx context.Context, id uuid.UUID) (Toxicity, error) {
-	row := q.db.QueryRowContext(ctx, getToxicity, id)
-	var i Toxicity
+type GetToxicitiesWithGradesRow struct {
+	ID          uuid.UUID       `json:"id"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+	Title       string          `json:"title"`
+	Category    string          `json:"category"`
+	Description string          `json:"description"`
+	Grades      json.RawMessage `json:"grades"`
+}
+
+func (q *Queries) GetToxicitiesWithGrades(ctx context.Context) ([]GetToxicitiesWithGradesRow, error) {
+	rows, err := q.db.QueryContext(ctx, getToxicitiesWithGrades)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetToxicitiesWithGradesRow{}
+	for rows.Next() {
+		var i GetToxicitiesWithGradesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Title,
+			&i.Category,
+			&i.Description,
+			&i.Grades,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getToxicitiesWithGradesAndAdjustments = `-- name: GetToxicitiesWithGradesAndAdjustments :many
+SELECT 
+    t.id,
+    t.created_at,
+    t.updated_at,
+    t.title,
+    t.category,
+    t.description,
+    JSON_AGG(
+        JSON_BUILD_OBJECT(
+            'id', tg.id,
+            'created_at', tg.created_at,
+            'updated_at', tg.updated_at,
+            'grade', tg.grade,
+            'description', tg.description,
+            'adjustment', ptm.adjustment
+        ) 
+        ORDER BY tg.grade
+    ) as grades
+FROM toxicities t
+LEFT JOIN toxicity_grades tg ON t.id = tg.toxicity_id
+LEFT JOIN protocol_tox_modifications ptm ON tg.id = ptm.toxicity_grade_id AND ptm.protocol_id = $1
+GROUP BY t.id, t.created_at, t.updated_at, t.title, t.category, t.description
+ORDER BY t.title
+`
+
+type GetToxicitiesWithGradesAndAdjustmentsRow struct {
+	ID          uuid.UUID       `json:"id"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+	Title       string          `json:"title"`
+	Category    string          `json:"category"`
+	Description string          `json:"description"`
+	Grades      json.RawMessage `json:"grades"`
+}
+
+func (q *Queries) GetToxicitiesWithGradesAndAdjustments(ctx context.Context, protocolID uuid.UUID) ([]GetToxicitiesWithGradesAndAdjustmentsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getToxicitiesWithGradesAndAdjustments, protocolID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetToxicitiesWithGradesAndAdjustmentsRow{}
+	for rows.Next() {
+		var i GetToxicitiesWithGradesAndAdjustmentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Title,
+			&i.Category,
+			&i.Description,
+			&i.Grades,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getToxicityByID = `-- name: GetToxicityByID :one
+SELECT
+    t.id AS id,
+    t.created_at AS created_at,
+    t.updated_at AS updated_at,
+    t.title AS title,
+    t.category AS category,
+    t.description AS description,
+    json_agg(
+        json_build_object(
+            'id', tg.id,
+            'created_at', tg.created_at,
+            'updated_at', tg.updated_at,
+            'grade', tg.grade,
+            'description', tg.description
+        )
+    ) AS grades
+FROM
+    toxicities t
+LEFT JOIN
+    toxicity_grades tg ON t.id = tg.toxicity_id
+WHERE t.id = $1
+`
+
+type GetToxicityByIDRow struct {
+	ID          uuid.UUID       `json:"id"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+	Title       string          `json:"title"`
+	Category    string          `json:"category"`
+	Description string          `json:"description"`
+	Grades      json.RawMessage `json:"grades"`
+}
+
+func (q *Queries) GetToxicityByID(ctx context.Context, id uuid.UUID) (GetToxicityByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getToxicityByID, id)
+	var i GetToxicityByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,
@@ -105,6 +268,7 @@ func (q *Queries) GetToxicity(ctx context.Context, id uuid.UUID) (Toxicity, erro
 		&i.Title,
 		&i.Category,
 		&i.Description,
+		&i.Grades,
 	)
 	return i, err
 }
@@ -153,8 +317,8 @@ WHERE grade = $1 AND toxicity_id = $2
 `
 
 type GetToxicityGradeByGradeParams struct {
-	Grade      string
-	ToxicityID uuid.UUID
+	Grade      GradeEnum `json:"grade"`
+	ToxicityID uuid.UUID `json:"toxicity_id"`
 }
 
 func (q *Queries) GetToxicityGradeByGrade(ctx context.Context, arg GetToxicityGradeByGradeParams) (ToxicityGrade, error) {
@@ -184,15 +348,15 @@ WHERE protocol_tox_modifications.protocol_id = $1
 `
 
 type GetToxicityModificationByProtocolRow struct {
-	ID                       uuid.UUID
-	CreatedAt                time.Time
-	UpdatedAt                time.Time
-	Adjustment               string
-	ToxicityGradeID          uuid.UUID
-	ProtocolID               uuid.UUID
-	ToxicityTitle            string
-	ToxicityGradeDescription string
-	ToxicityGrade            string
+	ID                       uuid.UUID `json:"id"`
+	CreatedAt                time.Time `json:"created_at"`
+	UpdatedAt                time.Time `json:"updated_at"`
+	Adjustment               string    `json:"adjustment"`
+	ToxicityGradeID          uuid.UUID `json:"toxicity_grade_id"`
+	ProtocolID               uuid.UUID `json:"protocol_id"`
+	ToxicityTitle            string    `json:"toxicity_title"`
+	ToxicityGradeDescription string    `json:"toxicity_grade_description"`
+	ToxicityGrade            GradeEnum `json:"toxicity_grade"`
 }
 
 func (q *Queries) GetToxicityModificationByProtocol(ctx context.Context, protocolID uuid.UUID) ([]GetToxicityModificationByProtocolRow, error) {
@@ -201,7 +365,7 @@ func (q *Queries) GetToxicityModificationByProtocol(ctx context.Context, protoco
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetToxicityModificationByProtocolRow
+	items := []GetToxicityModificationByProtocolRow{}
 	for rows.Next() {
 		var i GetToxicityModificationByProtocolRow
 		if err := rows.Scan(
@@ -239,7 +403,7 @@ func (q *Queries) GetToxicityModificationsByTreatment(ctx context.Context, proto
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ProtocolToxModification
+	items := []ProtocolToxModification{}
 	for rows.Next() {
 		var i ProtocolToxModification
 		if err := rows.Scan(
@@ -305,10 +469,10 @@ RETURNING id, created_at, updated_at, title, category, description
 `
 
 type UpdateToxicityParams struct {
-	ID          uuid.UUID
-	Title       string
-	Category    string
-	Description string
+	ID          uuid.UUID `json:"id"`
+	Title       string    `json:"title"`
+	Category    string    `json:"category"`
+	Description string    `json:"description"`
 }
 
 func (q *Queries) UpdateToxicity(ctx context.Context, arg UpdateToxicityParams) (Toxicity, error) {
@@ -342,10 +506,10 @@ RETURNING id, created_at, updated_at, grade, description, toxicity_id
 `
 
 type UpdateToxicityGradeParams struct {
-	ID          uuid.UUID
-	Grade       string
-	Description string
-	ToxicityID  uuid.UUID
+	ID          uuid.UUID `json:"id"`
+	Grade       GradeEnum `json:"grade"`
+	Description string    `json:"description"`
+	ToxicityID  uuid.UUID `json:"toxicity_id"`
 }
 
 func (q *Queries) UpdateToxicityGrade(ctx context.Context, arg UpdateToxicityGradeParams) (ToxicityGrade, error) {
@@ -379,10 +543,10 @@ RETURNING id, created_at, updated_at, adjustment, toxicity_grade_id, protocol_id
 `
 
 type UpdateToxicityModificationParams struct {
-	ID              uuid.UUID
-	Adjustment      string
-	ToxicityGradeID uuid.UUID
-	ProtocolID      uuid.UUID
+	ID              uuid.UUID `json:"id"`
+	Adjustment      string    `json:"adjustment"`
+	ToxicityGradeID uuid.UUID `json:"toxicity_grade_id"`
+	ProtocolID      uuid.UUID `json:"protocol_id"`
 }
 
 func (q *Queries) UpdateToxicityModification(ctx context.Context, arg UpdateToxicityModificationParams) (ProtocolToxModification, error) {
@@ -390,6 +554,137 @@ func (q *Queries) UpdateToxicityModification(ctx context.Context, arg UpdateToxi
 		arg.ID,
 		arg.Adjustment,
 		arg.ToxicityGradeID,
+		arg.ProtocolID,
+	)
+	var i ProtocolToxModification
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Adjustment,
+		&i.ToxicityGradeID,
+		&i.ProtocolID,
+	)
+	return i, err
+}
+
+const upsertToxicity = `-- name: UpsertToxicity :one
+INSERT INTO toxicities (id,title,category,description)
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4    
+)
+ON CONFLICT (id) DO UPDATE SET
+    title = EXCLUDED.title,
+    category = EXCLUDED.category,
+    description = EXCLUDED.description,
+    updated_at = NOW()
+RETURNING id, created_at, updated_at, title, category, description
+`
+
+type UpsertToxicityParams struct {
+	ID          uuid.UUID `json:"id"`
+	Title       string    `json:"title"`
+	Category    string    `json:"category"`
+	Description string    `json:"description"`
+}
+
+func (q *Queries) UpsertToxicity(ctx context.Context, arg UpsertToxicityParams) (Toxicity, error) {
+	row := q.db.QueryRowContext(ctx, upsertToxicity,
+		arg.ID,
+		arg.Title,
+		arg.Category,
+		arg.Description,
+	)
+	var i Toxicity
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Title,
+		&i.Category,
+		&i.Description,
+	)
+	return i, err
+}
+
+const upsertToxicityGrades = `-- name: UpsertToxicityGrades :many
+INSERT INTO toxicity_grades (id,grade,description,toxicity_id,updated_at)
+SELECT
+COALESCE(NULLIF(elem->>'id', '')::uuid, gen_random_uuid())      AS id,
+elem->>'grade'                                                 AS grade,
+COALESCE(elem->>'description', '')                             AS description,
+$1                                                             AS toxicity_id, 
+NOW()                                                          AS updated_at
+FROM jsonb_array_elements($2::jsonb) elem
+ON CONFLICT (grade, toxicity_id)
+DO UPDATE
+SET description = EXCLUDED.description,
+updated_at  = NOW()
+RETURNING id, created_at, updated_at, grade, description, toxicity_id
+`
+
+type UpsertToxicityGradesParams struct {
+	ToxicityID uuid.UUID       `json:"toxicity_id"`
+	Column2    json.RawMessage `json:"column_2"`
+}
+
+func (q *Queries) UpsertToxicityGrades(ctx context.Context, arg UpsertToxicityGradesParams) ([]ToxicityGrade, error) {
+	rows, err := q.db.QueryContext(ctx, upsertToxicityGrades, arg.ToxicityID, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ToxicityGrade{}
+	for rows.Next() {
+		var i ToxicityGrade
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Grade,
+			&i.Description,
+			&i.ToxicityID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const upsertToxicityToProtocol = `-- name: UpsertToxicityToProtocol :one
+INSERT INTO protocol_tox_modifications (id, toxicity_grade_id, adjustment, protocol_id)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (id) DO UPDATE
+SET
+    toxicity_grade_id = EXCLUDED.toxicity_grade_id,
+    adjustment = EXCLUDED.adjustment,
+    protocol_id = EXCLUDED.protocol_id,
+    updated_at = NOW()
+RETURNING id, created_at, updated_at, adjustment, toxicity_grade_id, protocol_id
+`
+
+type UpsertToxicityToProtocolParams struct {
+	ID              uuid.UUID `json:"id"`
+	ToxicityGradeID uuid.UUID `json:"toxicity_grade_id"`
+	Adjustment      string    `json:"adjustment"`
+	ProtocolID      uuid.UUID `json:"protocol_id"`
+}
+
+func (q *Queries) UpsertToxicityToProtocol(ctx context.Context, arg UpsertToxicityToProtocolParams) (ProtocolToxModification, error) {
+	row := q.db.QueryRowContext(ctx, upsertToxicityToProtocol,
+		arg.ID,
+		arg.ToxicityGradeID,
+		arg.Adjustment,
 		arg.ProtocolID,
 	)
 	var i ProtocolToxModification

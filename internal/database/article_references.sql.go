@@ -7,9 +7,9 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 )
 
 const addArticleReferenceToProtocol = `-- name: AddArticleReferenceToProtocol :exec
@@ -18,8 +18,8 @@ VALUES ($1, $2)
 `
 
 type AddArticleReferenceToProtocolParams struct {
-	ProtocolID  uuid.UUID
-	ReferenceID uuid.UUID
+	ProtocolID  uuid.UUID `json:"protocol_id"`
+	ReferenceID uuid.UUID `json:"reference_id"`
 }
 
 func (q *Queries) AddArticleReferenceToProtocol(ctx context.Context, arg AddArticleReferenceToProtocolParams) error {
@@ -27,35 +27,19 @@ func (q *Queries) AddArticleReferenceToProtocol(ctx context.Context, arg AddArti
 	return err
 }
 
-const addManyArticleReferenceToProtocol = `-- name: AddManyArticleReferenceToProtocol :exec
-INSERT INTO protocol_references_value (protocol_id, reference_id)
-VALUES ($1::UUID[], $2::UUID[])
-ON CONFLICT DO NOTHING
-`
-
-type AddManyArticleReferenceToProtocolParams struct {
-	Column1 []uuid.UUID
-	Column2 []uuid.UUID
-}
-
-func (q *Queries) AddManyArticleReferenceToProtocol(ctx context.Context, arg AddManyArticleReferenceToProtocolParams) error {
-	_, err := q.db.ExecContext(ctx, addManyArticleReferenceToProtocol, pq.Array(arg.Column1), pq.Array(arg.Column2))
-	return err
-}
-
 const createArticleReference = `-- name: CreateArticleReference :one
-INSERT INTO article_references (title, authors, journal, year, joi, pmid)
+INSERT INTO article_references (title, authors, journal, year, doi, pmid)
 VALUES ($1, $2, $3, $4, $5, $6)    
-RETURNING id, created_at, updated_at, title, authors, journal, year, pmid, joi
+RETURNING id, created_at, updated_at, title, authors, journal, year, pmid, doi
 `
 
 type CreateArticleReferenceParams struct {
-	Title   string
-	Authors string
-	Journal string
-	Year    string
-	Joi     string
-	Pmid    string
+	Title   string `json:"title"`
+	Authors string `json:"authors"`
+	Journal string `json:"journal"`
+	Year    string `json:"year"`
+	Doi     string `json:"doi"`
+	Pmid    string `json:"pmid"`
 }
 
 func (q *Queries) CreateArticleReference(ctx context.Context, arg CreateArticleReferenceParams) (ArticleReference, error) {
@@ -64,7 +48,7 @@ func (q *Queries) CreateArticleReference(ctx context.Context, arg CreateArticleR
 		arg.Authors,
 		arg.Journal,
 		arg.Year,
-		arg.Joi,
+		arg.Doi,
 		arg.Pmid,
 	)
 	var i ArticleReference
@@ -77,7 +61,7 @@ func (q *Queries) CreateArticleReference(ctx context.Context, arg CreateArticleR
 		&i.Journal,
 		&i.Year,
 		&i.Pmid,
-		&i.Joi,
+		&i.Doi,
 	)
 	return i, err
 }
@@ -93,15 +77,15 @@ func (q *Queries) DeleteArticleReference(ctx context.Context, id uuid.UUID) erro
 }
 
 const getArticleReferenceByData = `-- name: GetArticleReferenceByData :one
-SELECT id, created_at, updated_at, title, authors, journal, year, pmid, joi FROM article_references
+SELECT id, created_at, updated_at, title, authors, journal, year, pmid, doi FROM article_references
 WHERE title = $1 AND authors = $2 AND journal = $3 AND year = $4
 `
 
 type GetArticleReferenceByDataParams struct {
-	Title   string
-	Authors string
-	Journal string
-	Year    string
+	Title   string `json:"title"`
+	Authors string `json:"authors"`
+	Journal string `json:"journal"`
+	Year    string `json:"year"`
 }
 
 func (q *Queries) GetArticleReferenceByData(ctx context.Context, arg GetArticleReferenceByDataParams) (ArticleReference, error) {
@@ -121,13 +105,13 @@ func (q *Queries) GetArticleReferenceByData(ctx context.Context, arg GetArticleR
 		&i.Journal,
 		&i.Year,
 		&i.Pmid,
-		&i.Joi,
+		&i.Doi,
 	)
 	return i, err
 }
 
 const getArticleReferenceByID = `-- name: GetArticleReferenceByID :one
-SELECT id, created_at, updated_at, title, authors, journal, year, pmid, joi FROM article_references
+SELECT id, created_at, updated_at, title, authors, journal, year, pmid, doi FROM article_references
 WHERE id = $1
 `
 
@@ -143,13 +127,91 @@ func (q *Queries) GetArticleReferenceByID(ctx context.Context, id uuid.UUID) (Ar
 		&i.Journal,
 		&i.Year,
 		&i.Pmid,
-		&i.Joi,
+		&i.Doi,
 	)
 	return i, err
 }
 
+const getArticleReferenceByIDWithProtocols = `-- name: GetArticleReferenceByIDWithProtocols :one
+SELECT ar.id, ar.created_at, ar.updated_at, ar.title, ar.authors, ar.journal, ar.year, ar.pmid, ar.doi, ARRAY_AGG(ROW(arpv.protocol_id,p.code)) AS protocol_ids
+FROM article_references ar
+JOIN protocol_references_value arpv ON ar.id = arpv.reference_id
+JOIN protocols p ON arpv.protocol_id = p.id
+WHERE ar.id = $1
+GROUP BY ar.id
+`
+
+type GetArticleReferenceByIDWithProtocolsRow struct {
+	ID          uuid.UUID   `json:"id"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
+	Title       string      `json:"title"`
+	Authors     string      `json:"authors"`
+	Journal     string      `json:"journal"`
+	Year        string      `json:"year"`
+	Pmid        string      `json:"pmid"`
+	Doi         string      `json:"doi"`
+	ProtocolIds interface{} `json:"protocol_ids"`
+}
+
+func (q *Queries) GetArticleReferenceByIDWithProtocols(ctx context.Context, id uuid.UUID) (GetArticleReferenceByIDWithProtocolsRow, error) {
+	row := q.db.QueryRowContext(ctx, getArticleReferenceByIDWithProtocols, id)
+	var i GetArticleReferenceByIDWithProtocolsRow
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Title,
+		&i.Authors,
+		&i.Journal,
+		&i.Year,
+		&i.Pmid,
+		&i.Doi,
+		&i.ProtocolIds,
+	)
+	return i, err
+}
+
+const getArticleReferences = `-- name: GetArticleReferences :many
+SELECT id, created_at, updated_at, title, authors, journal, year, pmid, doi FROM article_references
+ORDER BY year DESC
+`
+
+func (q *Queries) GetArticleReferences(ctx context.Context) ([]ArticleReference, error) {
+	rows, err := q.db.QueryContext(ctx, getArticleReferences)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ArticleReference{}
+	for rows.Next() {
+		var i ArticleReference
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Title,
+			&i.Authors,
+			&i.Journal,
+			&i.Year,
+			&i.Pmid,
+			&i.Doi,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getArticleReferencesByProtocol = `-- name: GetArticleReferencesByProtocol :many
-SELECT article_references.id, article_references.created_at, article_references.updated_at, article_references.title, article_references.authors, article_references.journal, article_references.year, article_references.pmid, article_references.joi
+SELECT article_references.id, article_references.created_at, article_references.updated_at, article_references.title, article_references.authors, article_references.journal, article_references.year, article_references.pmid, article_references.doi
 FROM article_references
 JOIN protocol_references_value ON article_references.id = protocol_references_value.reference_id
 WHERE protocol_references_value.protocol_id = $1
@@ -162,7 +224,7 @@ func (q *Queries) GetArticleReferencesByProtocol(ctx context.Context, protocolID
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ArticleReference
+	items := []ArticleReference{}
 	for rows.Next() {
 		var i ArticleReference
 		if err := rows.Scan(
@@ -174,7 +236,62 @@ func (q *Queries) GetArticleReferencesByProtocol(ctx context.Context, protocolID
 			&i.Journal,
 			&i.Year,
 			&i.Pmid,
-			&i.Joi,
+			&i.Doi,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getArticleReferencesWithProtocols = `-- name: GetArticleReferencesWithProtocols :many
+SELECT ar.id, ar.created_at, ar.updated_at, ar.title, ar.authors, ar.journal, ar.year, ar.pmid, ar.doi, ARRAY_AGG(ROW(arpv.protocol_id,p.code)) AS protocol_ids
+FROM article_references ar
+JOIN protocol_references_value arpv ON ar.id = arpv.reference_id
+JOIN protocols p ON arpv.protocol_id = p.id
+GROUP BY ar.id
+`
+
+type GetArticleReferencesWithProtocolsRow struct {
+	ID          uuid.UUID   `json:"id"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
+	Title       string      `json:"title"`
+	Authors     string      `json:"authors"`
+	Journal     string      `json:"journal"`
+	Year        string      `json:"year"`
+	Pmid        string      `json:"pmid"`
+	Doi         string      `json:"doi"`
+	ProtocolIds interface{} `json:"protocol_ids"`
+}
+
+func (q *Queries) GetArticleReferencesWithProtocols(ctx context.Context) ([]GetArticleReferencesWithProtocolsRow, error) {
+	rows, err := q.db.QueryContext(ctx, getArticleReferencesWithProtocols)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetArticleReferencesWithProtocolsRow{}
+	for rows.Next() {
+		var i GetArticleReferencesWithProtocolsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Title,
+			&i.Authors,
+			&i.Journal,
+			&i.Year,
+			&i.Pmid,
+			&i.Doi,
+			&i.ProtocolIds,
 		); err != nil {
 			return nil, err
 		}
@@ -195,8 +312,8 @@ WHERE protocol_id = $1 AND reference_id = $2
 `
 
 type RemoveArticleReferenceFromProtocolParams struct {
-	ProtocolID  uuid.UUID
-	ReferenceID uuid.UUID
+	ProtocolID  uuid.UUID `json:"protocol_id"`
+	ReferenceID uuid.UUID `json:"reference_id"`
 }
 
 func (q *Queries) RemoveArticleReferenceFromProtocol(ctx context.Context, arg RemoveArticleReferenceFromProtocolParams) error {
@@ -212,20 +329,20 @@ SET
     authors = $3,
     journal = $4,
     year = $5,
-    joi = $6,
+    doi = $6,
     pmid = $7    
 WHERE id = $1
-RETURNING id, created_at, updated_at, title, authors, journal, year, pmid, joi
+RETURNING id, created_at, updated_at, title, authors, journal, year, pmid, doi
 `
 
 type UpdateArticleReferenceParams struct {
-	ID      uuid.UUID
-	Title   string
-	Authors string
-	Journal string
-	Year    string
-	Joi     string
-	Pmid    string
+	ID      uuid.UUID `json:"id"`
+	Title   string    `json:"title"`
+	Authors string    `json:"authors"`
+	Journal string    `json:"journal"`
+	Year    string    `json:"year"`
+	Doi     string    `json:"doi"`
+	Pmid    string    `json:"pmid"`
 }
 
 func (q *Queries) UpdateArticleReference(ctx context.Context, arg UpdateArticleReferenceParams) (ArticleReference, error) {
@@ -235,7 +352,7 @@ func (q *Queries) UpdateArticleReference(ctx context.Context, arg UpdateArticleR
 		arg.Authors,
 		arg.Journal,
 		arg.Year,
-		arg.Joi,
+		arg.Doi,
 		arg.Pmid,
 	)
 	var i ArticleReference
@@ -248,7 +365,56 @@ func (q *Queries) UpdateArticleReference(ctx context.Context, arg UpdateArticleR
 		&i.Journal,
 		&i.Year,
 		&i.Pmid,
-		&i.Joi,
+		&i.Doi,
+	)
+	return i, err
+}
+
+const upsertArticleReference = `-- name: UpsertArticleReference :one
+INSERT INTO article_references (id, title, authors, journal, year, doi, pmid, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+ON CONFLICT (id) DO UPDATE
+SET title = EXCLUDED.title,
+    authors = EXCLUDED.authors,
+    journal = EXCLUDED.journal,
+    year = EXCLUDED.year,
+    doi = EXCLUDED.doi,
+    pmid = EXCLUDED.pmid,    
+    updated_at = NOW()
+RETURNING id, created_at, updated_at, title, authors, journal, year, pmid, doi
+`
+
+type UpsertArticleReferenceParams struct {
+	ID      uuid.UUID `json:"id"`
+	Title   string    `json:"title"`
+	Authors string    `json:"authors"`
+	Journal string    `json:"journal"`
+	Year    string    `json:"year"`
+	Doi     string    `json:"doi"`
+	Pmid    string    `json:"pmid"`
+}
+
+func (q *Queries) UpsertArticleReference(ctx context.Context, arg UpsertArticleReferenceParams) (ArticleReference, error) {
+	row := q.db.QueryRowContext(ctx, upsertArticleReference,
+		arg.ID,
+		arg.Title,
+		arg.Authors,
+		arg.Journal,
+		arg.Year,
+		arg.Doi,
+		arg.Pmid,
+	)
+	var i ArticleReference
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Title,
+		&i.Authors,
+		&i.Journal,
+		&i.Year,
+		&i.Pmid,
+		&i.Doi,
 	)
 	return i, err
 }

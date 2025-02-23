@@ -6,277 +6,576 @@ package database
 
 import (
 	"database/sql"
+	"database/sql/driver"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 )
 
+type CategoryEnum string
+
+const (
+	CategoryEnumBaseline CategoryEnum = "baseline"
+	CategoryEnumFollowup CategoryEnum = "followup"
+	CategoryEnumUnknown  CategoryEnum = "unknown"
+)
+
+func (e *CategoryEnum) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = CategoryEnum(s)
+	case string:
+		*e = CategoryEnum(s)
+	default:
+		return fmt.Errorf("unsupported scan type for CategoryEnum: %T", src)
+	}
+	return nil
+}
+
+type NullCategoryEnum struct {
+	CategoryEnum CategoryEnum `json:"category_enum"`
+	Valid        bool         `json:"valid"` // Valid is true if CategoryEnum is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullCategoryEnum) Scan(value interface{}) error {
+	if value == nil {
+		ns.CategoryEnum, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.CategoryEnum.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullCategoryEnum) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.CategoryEnum), nil
+}
+
+type EligibilityEnum string
+
+const (
+	EligibilityEnumInclusion EligibilityEnum = "inclusion"
+	EligibilityEnumExclusion EligibilityEnum = "exclusion"
+	EligibilityEnumNotes     EligibilityEnum = "notes"
+	EligibilityEnumUnknown   EligibilityEnum = "unknown"
+)
+
+func (e *EligibilityEnum) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = EligibilityEnum(s)
+	case string:
+		*e = EligibilityEnum(s)
+	default:
+		return fmt.Errorf("unsupported scan type for EligibilityEnum: %T", src)
+	}
+	return nil
+}
+
+type NullEligibilityEnum struct {
+	EligibilityEnum EligibilityEnum `json:"eligibility_enum"`
+	Valid           bool            `json:"valid"` // Valid is true if EligibilityEnum is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullEligibilityEnum) Scan(value interface{}) error {
+	if value == nil {
+		ns.EligibilityEnum, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.EligibilityEnum.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullEligibilityEnum) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.EligibilityEnum), nil
+}
+
+type GradeEnum string
+
+const (
+	GradeEnum1       GradeEnum = "1"
+	GradeEnum2       GradeEnum = "2"
+	GradeEnum3       GradeEnum = "3"
+	GradeEnum4       GradeEnum = "4"
+	GradeEnumUnknown GradeEnum = "unknown"
+)
+
+func (e *GradeEnum) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = GradeEnum(s)
+	case string:
+		*e = GradeEnum(s)
+	default:
+		return fmt.Errorf("unsupported scan type for GradeEnum: %T", src)
+	}
+	return nil
+}
+
+type NullGradeEnum struct {
+	GradeEnum GradeEnum `json:"grade_enum"`
+	Valid     bool      `json:"valid"` // Valid is true if GradeEnum is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullGradeEnum) Scan(value interface{}) error {
+	if value == nil {
+		ns.GradeEnum, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.GradeEnum.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullGradeEnum) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.GradeEnum), nil
+}
+
+type MedProtoCategoryEnum string
+
+const (
+	MedProtoCategoryEnumPremed  MedProtoCategoryEnum = "premed"
+	MedProtoCategoryEnumSupport MedProtoCategoryEnum = "support"
+	MedProtoCategoryEnumUnknown MedProtoCategoryEnum = "unknown"
+)
+
+func (e *MedProtoCategoryEnum) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = MedProtoCategoryEnum(s)
+	case string:
+		*e = MedProtoCategoryEnum(s)
+	default:
+		return fmt.Errorf("unsupported scan type for MedProtoCategoryEnum: %T", src)
+	}
+	return nil
+}
+
+type NullMedProtoCategoryEnum struct {
+	MedProtoCategoryEnum MedProtoCategoryEnum `json:"med_proto_category_enum"`
+	Valid                bool                 `json:"valid"` // Valid is true if MedProtoCategoryEnum is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullMedProtoCategoryEnum) Scan(value interface{}) error {
+	if value == nil {
+		ns.MedProtoCategoryEnum, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.MedProtoCategoryEnum.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullMedProtoCategoryEnum) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.MedProtoCategoryEnum), nil
+}
+
+type PhysicianSiteEnum string
+
+const (
+	PhysicianSiteEnumVancouver    PhysicianSiteEnum = "vancouver"
+	PhysicianSiteEnumVictoria     PhysicianSiteEnum = "victoria"
+	PhysicianSiteEnumKelowna      PhysicianSiteEnum = "kelowna"
+	PhysicianSiteEnumSurrey       PhysicianSiteEnum = "surrey"
+	PhysicianSiteEnumPrinceGeorge PhysicianSiteEnum = "prince_george"
+	PhysicianSiteEnumAbbotsford   PhysicianSiteEnum = "abbotsford"
+	PhysicianSiteEnumNanaimo      PhysicianSiteEnum = "nanaimo"
+	PhysicianSiteEnumUnknown      PhysicianSiteEnum = "unknown"
+)
+
+func (e *PhysicianSiteEnum) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = PhysicianSiteEnum(s)
+	case string:
+		*e = PhysicianSiteEnum(s)
+	default:
+		return fmt.Errorf("unsupported scan type for PhysicianSiteEnum: %T", src)
+	}
+	return nil
+}
+
+type NullPhysicianSiteEnum struct {
+	PhysicianSiteEnum PhysicianSiteEnum `json:"physician_site_enum"`
+	Valid             bool              `json:"valid"` // Valid is true if PhysicianSiteEnum is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullPhysicianSiteEnum) Scan(value interface{}) error {
+	if value == nil {
+		ns.PhysicianSiteEnum, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.PhysicianSiteEnum.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullPhysicianSiteEnum) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.PhysicianSiteEnum), nil
+}
+
+type PrescriptionRouteEnum string
+
+const (
+	PrescriptionRouteEnumOral       PrescriptionRouteEnum = "oral"
+	PrescriptionRouteEnumIv         PrescriptionRouteEnum = "iv"
+	PrescriptionRouteEnumIm         PrescriptionRouteEnum = "im"
+	PrescriptionRouteEnumSc         PrescriptionRouteEnum = "sc"
+	PrescriptionRouteEnumTopical    PrescriptionRouteEnum = "topical"
+	PrescriptionRouteEnumInhalation PrescriptionRouteEnum = "inhalation"
+	PrescriptionRouteEnumUnknown    PrescriptionRouteEnum = "unknown"
+)
+
+func (e *PrescriptionRouteEnum) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = PrescriptionRouteEnum(s)
+	case string:
+		*e = PrescriptionRouteEnum(s)
+	default:
+		return fmt.Errorf("unsupported scan type for PrescriptionRouteEnum: %T", src)
+	}
+	return nil
+}
+
+type NullPrescriptionRouteEnum struct {
+	PrescriptionRouteEnum PrescriptionRouteEnum `json:"prescription_route_enum"`
+	Valid                 bool                  `json:"valid"` // Valid is true if PrescriptionRouteEnum is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullPrescriptionRouteEnum) Scan(value interface{}) error {
+	if value == nil {
+		ns.PrescriptionRouteEnum, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.PrescriptionRouteEnum.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullPrescriptionRouteEnum) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.PrescriptionRouteEnum), nil
+}
+
+type UrgencyEnum string
+
+const (
+	UrgencyEnumUrgent      UrgencyEnum = "urgent"
+	UrgencyEnumNonUrgent   UrgencyEnum = "non_urgent"
+	UrgencyEnumIfNecessary UrgencyEnum = "if_necessary"
+	UrgencyEnumUnknown     UrgencyEnum = "unknown"
+)
+
+func (e *UrgencyEnum) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = UrgencyEnum(s)
+	case string:
+		*e = UrgencyEnum(s)
+	default:
+		return fmt.Errorf("unsupported scan type for UrgencyEnum: %T", src)
+	}
+	return nil
+}
+
+type NullUrgencyEnum struct {
+	UrgencyEnum UrgencyEnum `json:"urgency_enum"`
+	Valid       bool        `json:"valid"` // Valid is true if UrgencyEnum is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullUrgencyEnum) Scan(value interface{}) error {
+	if value == nil {
+		ns.UrgencyEnum, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.UrgencyEnum.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullUrgencyEnum) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.UrgencyEnum), nil
+}
+
 type ArticleReference struct {
-	ID        uuid.UUID
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Title     string
-	Authors   string
-	Journal   string
-	Year      string
-	Pmid      string
-	Joi       string
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Title     string    `json:"title"`
+	Authors   string    `json:"authors"`
+	Journal   string    `json:"journal"`
+	Year      string    `json:"year"`
+	Pmid      string    `json:"pmid"`
+	Doi       string    `json:"doi"`
 }
 
 type Cancer struct {
-	ID         uuid.UUID
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	TumorGroup string
-	Code       sql.NullString
-	Name       sql.NullString
-	Tags       []string
-	Notes      string
+	ID         uuid.UUID      `json:"id"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
+	TumorGroup string         `json:"tumor_group"`
+	Code       sql.NullString `json:"code"`
+	Name       sql.NullString `json:"name"`
+	Tags       []string       `json:"tags"`
+	Notes      string         `json:"notes"`
 }
 
 type CancerProtocol struct {
-	CancerID   uuid.UUID
-	ProtocolID uuid.UUID
+	CancerID   uuid.UUID `json:"cancer_id"`
+	ProtocolID uuid.UUID `json:"protocol_id"`
 }
 
 type Log struct {
-	ID        uuid.UUID
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	UserID    uuid.UUID
-	IpAddress string
-	UserAgent string
-	Action    string
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	UserID    uuid.UUID `json:"user_id"`
+	IpAddress string    `json:"ip_address"`
+	UserAgent string    `json:"user_agent"`
+	Action    string    `json:"action"`
 }
 
 type Medication struct {
-	ID          uuid.UUID
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	Name        string
-	Description string
-	Category    string
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Category    string    `json:"category"`
 }
 
 type MedicationModification struct {
-	ID           uuid.UUID
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	Category     string
-	Description  string
-	Adjustment   string
-	MedicationID uuid.UUID
+	ID           uuid.UUID `json:"id"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Category     string    `json:"category"`
+	Subcategory  string    `json:"subcategory"`
+	Adjustment   string    `json:"adjustment"`
+	MedicationID uuid.UUID `json:"medication_id"`
 }
 
 type MedicationPrescription struct {
-	ID           uuid.UUID
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	Medication   uuid.UUID
-	Dose         string
-	Route        string
-	Frequency    string
-	Duration     string
-	Instructions string
-	Renewals     int32
+	ID           uuid.UUID             `json:"id"`
+	CreatedAt    time.Time             `json:"created_at"`
+	UpdatedAt    time.Time             `json:"updated_at"`
+	Medication   uuid.UUID             `json:"medication"`
+	Dose         string                `json:"dose"`
+	Route        PrescriptionRouteEnum `json:"route"`
+	Frequency    string                `json:"frequency"`
+	Duration     string                `json:"duration"`
+	Instructions string                `json:"instructions"`
+	Renewals     int32                 `json:"renewals"`
 }
 
 type Physician struct {
-	ID        uuid.UUID
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	FirstName string
-	LastName  string
-	Email     string
-	Site      string
+	ID        uuid.UUID         `json:"id"`
+	CreatedAt time.Time         `json:"created_at"`
+	UpdatedAt time.Time         `json:"updated_at"`
+	FirstName string            `json:"first_name"`
+	LastName  string            `json:"last_name"`
+	Email     string            `json:"email"`
+	Site      PhysicianSiteEnum `json:"site"`
 }
 
 type Protocol struct {
-	ID                uuid.UUID
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
-	TumorGroup        string
-	Code              string
-	Name              string
-	Tags              []string
-	Notes             string
-	ProtocolUrl       string
-	PatientHandoutUrl string
-	RevisedOn         string
-	ActivatedOn       string
-}
-
-type ProtocolBaselineTest struct {
-	ProtocolID uuid.UUID
-	TestID     uuid.UUID
-}
-
-type ProtocolBaselineTestsIfNecessary struct {
-	ProtocolID uuid.UUID
-	TestID     uuid.UUID
-}
-
-type ProtocolBaselineTestsNonUrgent struct {
-	ProtocolID uuid.UUID
-	TestID     uuid.UUID
+	ID                uuid.UUID `json:"id"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+	TumorGroup        string    `json:"tumor_group"`
+	Code              string    `json:"code"`
+	Name              string    `json:"name"`
+	Tags              []string  `json:"tags"`
+	Notes             string    `json:"notes"`
+	ProtocolUrl       string    `json:"protocol_url"`
+	PatientHandoutUrl string    `json:"patient_handout_url"`
+	RevisedOn         string    `json:"revised_on"`
+	ActivatedOn       string    `json:"activated_on"`
 }
 
 type ProtocolCaution struct {
-	ID          uuid.UUID
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	Description string
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	Description string    `json:"description"`
 }
 
 type ProtocolCautionsValue struct {
-	ProtocolID uuid.UUID
-	CautionID  uuid.UUID
+	ProtocolID uuid.UUID `json:"protocol_id"`
+	CautionID  uuid.UUID `json:"caution_id"`
 }
 
 type ProtocolContactPhysician struct {
-	ProtocolID  uuid.UUID
-	PhysicianID uuid.UUID
+	ProtocolID  uuid.UUID `json:"protocol_id"`
+	PhysicianID uuid.UUID `json:"physician_id"`
 }
 
 type ProtocolCycle struct {
-	ID            uuid.UUID
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	Cycle         string
-	CycleDuration string
-	ProtocolID    uuid.UUID
+	ID            uuid.UUID `json:"id"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	Cycle         string    `json:"cycle"`
+	CycleDuration string    `json:"cycle_duration"`
+	ProtocolID    uuid.UUID `json:"protocol_id"`
 }
 
 type ProtocolEligibilityCriteriaValue struct {
-	ProtocolID uuid.UUID
-	CriteriaID uuid.UUID
+	ProtocolID uuid.UUID `json:"protocol_id"`
+	CriteriaID uuid.UUID `json:"criteria_id"`
 }
 
 type ProtocolEligibilityCriterium struct {
-	ID          uuid.UUID
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	Type        string
-	Description string
+	ID          uuid.UUID       `json:"id"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+	Type        EligibilityEnum `json:"type"`
+	Description string          `json:"description"`
 }
 
-type ProtocolFollowupTest struct {
-	ProtocolID uuid.UUID
-	TestID     uuid.UUID
-}
-
-type ProtocolFollowupTestsIfNecessary struct {
-	ProtocolID uuid.UUID
-	TestID     uuid.UUID
+type ProtocolMed struct {
+	ProtocolID     uuid.UUID            `json:"protocol_id"`
+	PrescriptionID uuid.UUID            `json:"prescription_id"`
+	Category       MedProtoCategoryEnum `json:"category"`
 }
 
 type ProtocolPpo struct {
-	ID         uuid.UUID
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	Title      string
-	Url        string
-	ProtocolID uuid.UUID
-}
-
-type ProtocolPreMedicationsValue struct {
-	ProtocolID               uuid.UUID
-	MedicationPrescriptionID uuid.UUID
+	ID         uuid.UUID `json:"id"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+	Title      string    `json:"title"`
+	Url        string    `json:"url"`
+	ProtocolID uuid.UUID `json:"protocol_id"`
 }
 
 type ProtocolPrecaution struct {
-	ID          uuid.UUID
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	Title       string
-	Description string
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
 }
 
 type ProtocolPrecautionsValue struct {
-	ProtocolID   uuid.UUID
-	PrecautionID uuid.UUID
+	ProtocolID   uuid.UUID `json:"protocol_id"`
+	PrecautionID uuid.UUID `json:"precaution_id"`
 }
 
 type ProtocolReferencesValue struct {
-	ProtocolID  uuid.UUID
-	ReferenceID uuid.UUID
+	ProtocolID  uuid.UUID `json:"protocol_id"`
+	ReferenceID uuid.UUID `json:"reference_id"`
 }
 
-type ProtocolSupportiveMedicationValue struct {
-	ProtocolID               uuid.UUID
-	MedicationPrescriptionID uuid.UUID
+type ProtocolTest struct {
+	ProtocolID uuid.UUID    `json:"protocol_id"`
+	TestID     uuid.UUID    `json:"test_id"`
+	Category   CategoryEnum `json:"category"`
+	Urgency    UrgencyEnum  `json:"urgency"`
 }
 
 type ProtocolToxModification struct {
-	ID              uuid.UUID
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	Adjustment      string
-	ToxicityGradeID uuid.UUID
-	ProtocolID      uuid.UUID
+	ID              uuid.UUID `json:"id"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+	Adjustment      string    `json:"adjustment"`
+	ToxicityGradeID uuid.UUID `json:"toxicity_grade_id"`
+	ProtocolID      uuid.UUID `json:"protocol_id"`
 }
 
 type ProtocolTreatment struct {
-	ID                  uuid.UUID
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-	Medication          uuid.UUID
-	Dose                string
-	Route               string
-	Frequency           string
-	Duration            string
-	AdministrationGuide string
+	ID                  uuid.UUID `json:"id"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+	Medication          uuid.UUID `json:"medication"`
+	Dose                string    `json:"dose"`
+	Route               string    `json:"route"`
+	Frequency           string    `json:"frequency"`
+	Duration            string    `json:"duration"`
+	AdministrationGuide string    `json:"administration_guide"`
 }
 
 type RefreshToken struct {
-	Token     string
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	ExpiresAt time.Time
-	RevokedAt sql.NullTime
-	UserID    uuid.UUID
+	Token     string       `json:"token"`
+	CreatedAt time.Time    `json:"created_at"`
+	UpdatedAt time.Time    `json:"updated_at"`
+	ExpiresAt time.Time    `json:"expires_at"`
+	RevokedAt sql.NullTime `json:"revoked_at"`
+	UserID    uuid.UUID    `json:"user_id"`
 }
 
 type Test struct {
-	ID          uuid.UUID
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	Name        string
-	Description sql.NullString
+	ID           uuid.UUID `json:"id"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Name         string    `json:"name"`
+	Description  string    `json:"description"`
+	FormUrl      string    `json:"form_url"`
+	Unit         string    `json:"unit"`
+	LowerLimit   float64   `json:"lower_limit"`
+	UpperLimit   float64   `json:"upper_limit"`
+	TestCategory string    `json:"test_category"`
 }
 
 type Toxicity struct {
-	ID          uuid.UUID
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	Title       string
-	Category    string
-	Description string
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	Title       string    `json:"title"`
+	Category    string    `json:"category"`
+	Description string    `json:"description"`
 }
 
 type ToxicityGrade struct {
-	ID          uuid.UUID
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	Grade       string
-	Description string
-	ToxicityID  uuid.UUID
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	Grade       GradeEnum `json:"grade"`
+	Description string    `json:"description"`
+	ToxicityID  uuid.UUID `json:"toxicity_id"`
 }
 
 type TreatmentCyclesValue struct {
-	ProtocolTreatmentID uuid.UUID
-	ProtocolCyclesID    uuid.UUID
+	ProtocolTreatmentID uuid.UUID `json:"protocol_treatment_id"`
+	ProtocolCyclesID    uuid.UUID `json:"protocol_cycles_id"`
 }
 
 type User struct {
-	ID         uuid.UUID
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	Email      string
-	Role       string
-	IsVerified bool
-	DeletedAt  sql.NullTime
-	DeletedBy  uuid.NullUUID
-	LastActive sql.NullTime
-	Password   string
+	ID         uuid.UUID     `json:"id"`
+	CreatedAt  time.Time     `json:"created_at"`
+	UpdatedAt  time.Time     `json:"updated_at"`
+	Email      string        `json:"email"`
+	Role       string        `json:"role"`
+	IsVerified bool          `json:"is_verified"`
+	DeletedAt  sql.NullTime  `json:"deleted_at"`
+	DeletedBy  uuid.NullUUID `json:"deleted_by"`
+	LastActive sql.NullTime  `json:"last_active"`
+	Password   string        `json:"password"`
 }

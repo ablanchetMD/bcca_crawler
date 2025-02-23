@@ -26,11 +26,11 @@ RETURNING token, created_at, updated_at, expires_at, revoked_at, user_id
 `
 
 type CreateRefreshTokenParams struct {
-	Token     string
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	UserID    uuid.UUID
-	ExpiresAt time.Time
+	Token     string    `json:"token"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	UserID    uuid.UUID `json:"user_id"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error) {
@@ -67,11 +67,11 @@ RETURNING id, created_at, updated_at, email, role, is_verified, deleted_at, dele
 `
 
 type CreateUserParams struct {
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Email     string
-	Password  string
-	Role      string
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Email     string    `json:"email"`
+	Password  string    `json:"password"`
+	Role      string    `json:"role"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -124,13 +124,13 @@ WHERE rt.token = $1
 `
 
 type GetRefreshTokenRow struct {
-	Token     string
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	ExpiresAt time.Time
-	RevokedAt sql.NullTime
-	UserID    uuid.UUID
-	Role      string
+	Token     string       `json:"token"`
+	CreatedAt time.Time    `json:"created_at"`
+	UpdatedAt time.Time    `json:"updated_at"`
+	ExpiresAt time.Time    `json:"expires_at"`
+	RevokedAt sql.NullTime `json:"revoked_at"`
+	UserID    uuid.UUID    `json:"user_id"`
+	Role      string       `json:"role"`
 }
 
 func (q *Queries) GetRefreshToken(ctx context.Context, token string) (GetRefreshTokenRow, error) {
@@ -210,8 +210,8 @@ LIMIT $1 OFFSET $2
 `
 
 type GetUsersParams struct {
-	Limit  int32
-	Offset int32
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
 }
 
 func (q *Queries) GetUsers(ctx context.Context, arg GetUsersParams) ([]User, error) {
@@ -220,7 +220,7 @@ func (q *Queries) GetUsers(ctx context.Context, arg GetUsersParams) ([]User, err
 		return nil, err
 	}
 	defer rows.Close()
-	var items []User
+	items := []User{}
 	for rows.Next() {
 		var i User
 		if err := rows.Scan(
@@ -256,9 +256,9 @@ LIMIT $2 OFFSET $3
 `
 
 type GetUsersByRoleParams struct {
-	Role   string
-	Limit  int32
-	Offset int32
+	Role   string `json:"role"`
+	Limit  int32  `json:"limit"`
+	Offset int32  `json:"offset"`
 }
 
 func (q *Queries) GetUsersByRole(ctx context.Context, arg GetUsersByRoleParams) ([]User, error) {
@@ -267,7 +267,7 @@ func (q *Queries) GetUsersByRole(ctx context.Context, arg GetUsersByRoleParams) 
 		return nil, err
 	}
 	defer rows.Close()
-	var items []User
+	items := []User{}
 	for rows.Next() {
 		var i User
 		if err := rows.Scan(
@@ -329,7 +329,7 @@ func (q *Queries) RevokeRefreshTokenByUserId(ctx context.Context, userID uuid.UU
 		return nil, err
 	}
 	defer rows.Close()
-	var items []RefreshToken
+	items := []RefreshToken{}
 	for rows.Next() {
 		var i RefreshToken
 		if err := rows.Scan(
@@ -378,14 +378,14 @@ RETURNING id, created_at, updated_at, email, role, is_verified, deleted_at, dele
 `
 
 type UpdateUserParams struct {
-	ID         uuid.UUID
-	Email      string
-	Password   string
-	Role       string
-	IsVerified bool
-	DeletedAt  sql.NullTime
-	DeletedBy  uuid.NullUUID
-	LastActive sql.NullTime
+	ID         uuid.UUID     `json:"id"`
+	Email      string        `json:"email"`
+	Password   string        `json:"password"`
+	Role       string        `json:"role"`
+	IsVerified bool          `json:"is_verified"`
+	DeletedAt  sql.NullTime  `json:"deleted_at"`
+	DeletedBy  uuid.NullUUID `json:"deleted_by"`
+	LastActive sql.NullTime  `json:"last_active"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {

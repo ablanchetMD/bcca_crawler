@@ -13,7 +13,7 @@ CREATE TABLE toxicity_grades (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  grade TEXT NOT NULL,
+  grade grade_enum NOT NULL DEFAULT 'unknown',
   description TEXT NOT NULL,
   toxicity_id UUID NOT NULL REFERENCES toxicities(id) ON DELETE CASCADE,
   UNIQUE (grade, toxicity_id)

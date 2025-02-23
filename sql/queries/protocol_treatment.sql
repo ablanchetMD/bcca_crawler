@@ -16,6 +16,24 @@ SET
 WHERE id = $1
 RETURNING *;
 
+-- name: UpsertProtocolTreatment :one
+INSERT INTO protocol_treatment (id, medication, dose, route, frequency, duration, administration_guide)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (id) DO UPDATE
+SET
+    updated_at = NOW(),
+    medication = EXCLUDED.medication,
+    dose = EXCLUDED.dose,
+    route = EXCLUDED.route,
+    frequency = EXCLUDED.frequency,
+    duration = EXCLUDED.duration,
+    administration_guide = EXCLUDED.administration_guide
+RETURNING *;
+
+-- name: GetTreatments :many
+SELECT * FROM protocol_treatment
+ORDER BY medication ASC;
+
 -- name: GetProtocolTreatmentByData :one
 SELECT * FROM protocol_treatment
 WHERE medication = $1 AND dose = $2 AND route = $3 AND frequency = $4 AND duration = $5;
@@ -24,6 +42,18 @@ WHERE medication = $1 AND dose = $2 AND route = $3 AND frequency = $4 AND durati
 INSERT INTO protocol_cycles (protocol_id, cycle, cycle_duration)
 VALUES ($1, $2, $3)
 RETURNING *;
+
+-- name: UpsertCycleToProtocol :one
+INSERT INTO protocol_cycles (id, protocol_id, cycle, cycle_duration)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (id) DO UPDATE
+SET
+    updated_at = NOW(),
+    protocol_id = EXCLUDED.protocol_id,
+    cycle = EXCLUDED.cycle,
+    cycle_duration = EXCLUDED.cycle_duration
+RETURNING *;
+
 
 -- name: GetCycleByData :one
 SELECT * FROM protocol_cycles
@@ -43,6 +73,18 @@ WHERE id = $1;
 
 -- name: GetProtocolTreatmentByID :one
 SELECT * FROM protocol_treatment
+WHERE id = $1;
+
+-- name: GetCycles :many
+SELECT * FROM protocol_cycles
+ORDER BY cycle ASC;
+
+-- name: GetCycleByID :one
+SELECT * FROM protocol_cycles
+WHERE id = $1;
+
+-- name: RemoveCycleByID :exec
+DELETE FROM protocol_cycles
 WHERE id = $1;
 
 -- name: GetCyclesByProtocol :many

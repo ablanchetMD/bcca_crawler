@@ -25,10 +25,100 @@ var validTumorGroups = map[string]bool{
 	// Add more as needed
 }
 
+var validEligiblityCriteria = map[string]bool{
+	"inclusion": true,
+	"exclusion": true,
+	"notes": true,
+	"unknown": true,
+}
+
+var validTestProtocolCategories = map[string]bool{
+	"baseline": true,
+	"followup": true,
+	"unknown": true,
+}
+
+var validTestProtocolUrgency = map[string]bool{
+	"urgent": true,
+	"non_urgent": true,
+	"if_necessary": true,
+	"unknown": true,
+}
+
+var validProtocolPrescriptionCategory = map[string]bool{
+	"premed": true,
+	"support": true,
+	"unknown": true,
+}
+
+var validPrescriptionRoutes = map[string]bool{
+	"oral": true,
+	"iv": true,
+	"im": true,
+	"sc": true,
+	"topical": true,
+	"unknown": true,
+}
+
+var validGrades = map[string]bool{
+	"1": true,
+	"2": true,
+	"3": true,
+	"4": true,
+	"unknown": true,
+}
+
+var validPhysicianSites = map[string]bool{
+	"vancouver": true,
+	"victoria": true,
+	"abbotsford": true,
+	"kelowna": true,
+	"prince_george": true,
+	"nanaimo": true,
+	"surrey": true,
+	"unknown": true,
+}
+
+
 // Custom validation function
 func TumorGroupValidator(fl validator.FieldLevel) bool {
 	tumorGroup := strings.ToLower(fl.Field().String()) // Ensure case-insensitivity
 	return validTumorGroups[tumorGroup]
+}
+
+func GradeValidator(fl validator.FieldLevel) bool {
+	grade := strings.ToLower(fl.Field().String()) // Ensure case-insensitivity
+	return validGrades[grade]
+}
+
+func ProtocolPrescriptionCategoryValidator(fl validator.FieldLevel) bool {
+	prescription_category := strings.ToLower(fl.Field().String()) // Ensure case-insensitivity
+	return validProtocolPrescriptionCategory[prescription_category]
+}
+
+func EligibilityCriteriaValidator(fl validator.FieldLevel) bool {
+	eligibilityCriteria := strings.ToLower(fl.Field().String()) // Ensure case-insensitivity
+	return validEligiblityCriteria[eligibilityCriteria]
+}
+
+func PrescriptionRouteValidator(fl validator.FieldLevel) bool {
+	prescription_route := strings.ToLower(fl.Field().String()) // Ensure case-insensitivity
+	return validPrescriptionRoutes[prescription_route]
+}
+
+func TestCategoryValidator(fl validator.FieldLevel) bool {
+	testCategory := strings.ToLower(fl.Field().String()) // Ensure case-insensitivity
+	return validTestProtocolCategories[testCategory]
+}
+
+func TestUrgencyValidator(fl validator.FieldLevel) bool {
+	testUrgency := strings.ToLower(fl.Field().String()) // Ensure case-insensitivity
+	return validTestProtocolUrgency[testUrgency]
+}
+
+func PhysicianSiteValidator(fl validator.FieldLevel) bool {
+	physicianSite := strings.ToLower(fl.Field().String()) // Ensure case-insensitivity
+	return validPhysicianSites[physicianSite]
 }
 
 // PasswordStrengthValidator checks for strong passwords using bitwise operations.

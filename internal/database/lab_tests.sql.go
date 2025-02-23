@@ -7,116 +7,36 @@ package database
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 )
 
-const addBaselineTest = `-- name: AddBaselineTest :exec
-INSERT INTO protocol_baseline_tests (protocol_id, test_id)
-VALUES ($1, $2)
-`
-
-type AddBaselineTestParams struct {
-	ProtocolID uuid.UUID
-	TestID     uuid.UUID
-}
-
-func (q *Queries) AddBaselineTest(ctx context.Context, arg AddBaselineTestParams) error {
-	_, err := q.db.ExecContext(ctx, addBaselineTest, arg.ProtocolID, arg.TestID)
-	return err
-}
-
-const addFollowupIfNecessaryTest = `-- name: AddFollowupIfNecessaryTest :exec
-INSERT INTO protocol_followup_tests_if_necessary (protocol_id, test_id)
-VALUES ($1, $2)
-`
-
-type AddFollowupIfNecessaryTestParams struct {
-	ProtocolID uuid.UUID
-	TestID     uuid.UUID
-}
-
-func (q *Queries) AddFollowupIfNecessaryTest(ctx context.Context, arg AddFollowupIfNecessaryTestParams) error {
-	_, err := q.db.ExecContext(ctx, addFollowupIfNecessaryTest, arg.ProtocolID, arg.TestID)
-	return err
-}
-
-const addFollowupTest = `-- name: AddFollowupTest :exec
-INSERT INTO protocol_followup_tests (protocol_id, test_id)
-VALUES ($1, $2)
-`
-
-type AddFollowupTestParams struct {
-	ProtocolID uuid.UUID
-	TestID     uuid.UUID
-}
-
-func (q *Queries) AddFollowupTest(ctx context.Context, arg AddFollowupTestParams) error {
-	_, err := q.db.ExecContext(ctx, addFollowupTest, arg.ProtocolID, arg.TestID)
-	return err
-}
-
-const addIfNecessaryTest = `-- name: AddIfNecessaryTest :exec
-INSERT INTO protocol_baseline_tests_if_necessary (protocol_id, test_id)
-VALUES ($1, $2)
-`
-
-type AddIfNecessaryTestParams struct {
-	ProtocolID uuid.UUID
-	TestID     uuid.UUID
-}
-
-func (q *Queries) AddIfNecessaryTest(ctx context.Context, arg AddIfNecessaryTestParams) error {
-	_, err := q.db.ExecContext(ctx, addIfNecessaryTest, arg.ProtocolID, arg.TestID)
-	return err
-}
-
-const addManyTests = `-- name: AddManyTests :exec
-INSERT INTO tests (name, description)
-VALUES ($1::TEXT[], $2::TEXT[])
-ON CONFLICT (name) DO NOTHING
-`
-
-type AddManyTestsParams struct {
-	Column1 []string
-	Column2 []string
-}
-
-func (q *Queries) AddManyTests(ctx context.Context, arg AddManyTestsParams) error {
-	_, err := q.db.ExecContext(ctx, addManyTests, pq.Array(arg.Column1), pq.Array(arg.Column2))
-	return err
-}
-
-const addNonUrgentTest = `-- name: AddNonUrgentTest :exec
-INSERT INTO protocol_baseline_tests_non_urgent (protocol_id, test_id)
-VALUES ($1, $2)
-`
-
-type AddNonUrgentTestParams struct {
-	ProtocolID uuid.UUID
-	TestID     uuid.UUID
-}
-
-func (q *Queries) AddNonUrgentTest(ctx context.Context, arg AddNonUrgentTestParams) error {
-	_, err := q.db.ExecContext(ctx, addNonUrgentTest, arg.ProtocolID, arg.TestID)
-	return err
-}
-
 const addTest = `-- name: AddTest :one
-INSERT INTO tests (name, description)
-VALUES ($1, $2)
-RETURNING id, created_at, updated_at, name, description
+INSERT INTO tests (name, description, form_url, unit, lower_limit, upper_limit, test_category)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, created_at, updated_at, name, description, form_url, unit, lower_limit, upper_limit, test_category
 `
 
 type AddTestParams struct {
-	Name        string
-	Description sql.NullString
+	Name         string  `json:"name"`
+	Description  string  `json:"description"`
+	FormUrl      string  `json:"form_url"`
+	Unit         string  `json:"unit"`
+	LowerLimit   float64 `json:"lower_limit"`
+	UpperLimit   float64 `json:"upper_limit"`
+	TestCategory string  `json:"test_category"`
 }
 
 func (q *Queries) AddTest(ctx context.Context, arg AddTestParams) (Test, error) {
-	row := q.db.QueryRowContext(ctx, addTest, arg.Name, arg.Description)
+	row := q.db.QueryRowContext(ctx, addTest,
+		arg.Name,
+		arg.Description,
+		arg.FormUrl,
+		arg.Unit,
+		arg.LowerLimit,
+		arg.UpperLimit,
+		arg.TestCategory,
+	)
 	var i Test
 	err := row.Scan(
 		&i.ID,
@@ -124,192 +44,78 @@ func (q *Queries) AddTest(ctx context.Context, arg AddTestParams) (Test, error) 
 		&i.UpdatedAt,
 		&i.Name,
 		&i.Description,
+		&i.FormUrl,
+		&i.Unit,
+		&i.LowerLimit,
+		&i.UpperLimit,
+		&i.TestCategory,
 	)
 	return i, err
 }
 
-const getBaselineTestsByProtocol = `-- name: GetBaselineTestsByProtocol :many
-SELECT t.id, t.created_at, t.updated_at, t.name, t.description
-FROM tests t
-JOIN protocol_baseline_tests pb ON t.id = pb.test_id
-WHERE pb.protocol_id = $1
+const addTestToProtocolByCategoryAndUrgency = `-- name: AddTestToProtocolByCategoryAndUrgency :one
+INSERT INTO protocol_tests (protocol_id, test_id, category, urgency)
+VALUES ($1, $2, $3, $4)
+RETURNING protocol_id, test_id, category, urgency
 `
 
-func (q *Queries) GetBaselineTestsByProtocol(ctx context.Context, protocolID uuid.UUID) ([]Test, error) {
-	rows, err := q.db.QueryContext(ctx, getBaselineTestsByProtocol, protocolID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Test
-	for rows.Next() {
-		var i Test
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Name,
-			&i.Description,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+type AddTestToProtocolByCategoryAndUrgencyParams struct {
+	ProtocolID uuid.UUID    `json:"protocol_id"`
+	TestID     uuid.UUID    `json:"test_id"`
+	Category   CategoryEnum `json:"category"`
+	Urgency    UrgencyEnum  `json:"urgency"`
 }
 
-const getFollowupIfNecessaryTestsByProtocol = `-- name: GetFollowupIfNecessaryTestsByProtocol :many
-SELECT t.id, t.created_at, t.updated_at, t.name, t.description
-FROM tests t
-JOIN protocol_followup_tests_if_necessary pb ON t.id = pb.test_id
-WHERE pb.protocol_id = $1
-`
-
-func (q *Queries) GetFollowupIfNecessaryTestsByProtocol(ctx context.Context, protocolID uuid.UUID) ([]Test, error) {
-	rows, err := q.db.QueryContext(ctx, getFollowupIfNecessaryTestsByProtocol, protocolID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Test
-	for rows.Next() {
-		var i Test
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Name,
-			&i.Description,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) AddTestToProtocolByCategoryAndUrgency(ctx context.Context, arg AddTestToProtocolByCategoryAndUrgencyParams) (ProtocolTest, error) {
+	row := q.db.QueryRowContext(ctx, addTestToProtocolByCategoryAndUrgency,
+		arg.ProtocolID,
+		arg.TestID,
+		arg.Category,
+		arg.Urgency,
+	)
+	var i ProtocolTest
+	err := row.Scan(
+		&i.ProtocolID,
+		&i.TestID,
+		&i.Category,
+		&i.Urgency,
+	)
+	return i, err
 }
 
-const getFollowupTestsByProtocol = `-- name: GetFollowupTestsByProtocol :many
-SELECT t.id, t.created_at, t.updated_at, t.name, t.description
-FROM tests t
-JOIN protocol_followup_tests pb ON t.id = pb.test_id
-WHERE pb.protocol_id = $1
+const deleteTest = `-- name: DeleteTest :exec
+DELETE FROM tests WHERE id = $1
 `
 
-func (q *Queries) GetFollowupTestsByProtocol(ctx context.Context, protocolID uuid.UUID) ([]Test, error) {
-	rows, err := q.db.QueryContext(ctx, getFollowupTestsByProtocol, protocolID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Test
-	for rows.Next() {
-		var i Test
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Name,
-			&i.Description,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) DeleteTest(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deleteTest, id)
+	return err
 }
 
-const getIfNecessaryTestsByProtocol = `-- name: GetIfNecessaryTestsByProtocol :many
-SELECT t.id, t.created_at, t.updated_at, t.name, t.description
-FROM tests t
-JOIN protocol_baseline_tests_if_necessary pb ON t.id = pb.test_id
-WHERE pb.protocol_id = $1
+const getTestByID = `-- name: GetTestByID :one
+SELECT id, created_at, updated_at, name, description, form_url, unit, lower_limit, upper_limit, test_category FROM tests WHERE id = $1
 `
 
-func (q *Queries) GetIfNecessaryTestsByProtocol(ctx context.Context, protocolID uuid.UUID) ([]Test, error) {
-	rows, err := q.db.QueryContext(ctx, getIfNecessaryTestsByProtocol, protocolID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Test
-	for rows.Next() {
-		var i Test
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Name,
-			&i.Description,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getNonUrgentTestsByProtocol = `-- name: GetNonUrgentTestsByProtocol :many
-SELECT t.id, t.created_at, t.updated_at, t.name, t.description
-FROM tests t
-JOIN protocol_baseline_tests_non_urgent pb ON t.id = pb.test_id
-WHERE pb.protocol_id = $1
-`
-
-func (q *Queries) GetNonUrgentTestsByProtocol(ctx context.Context, protocolID uuid.UUID) ([]Test, error) {
-	rows, err := q.db.QueryContext(ctx, getNonUrgentTestsByProtocol, protocolID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Test
-	for rows.Next() {
-		var i Test
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Name,
-			&i.Description,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) GetTestByID(ctx context.Context, id uuid.UUID) (Test, error) {
+	row := q.db.QueryRowContext(ctx, getTestByID, id)
+	var i Test
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+		&i.Description,
+		&i.FormUrl,
+		&i.Unit,
+		&i.LowerLimit,
+		&i.UpperLimit,
+		&i.TestCategory,
+	)
+	return i, err
 }
 
 const getTestByName = `-- name: GetTestByName :one
-SELECT id, created_at, updated_at, name, description FROM tests WHERE name = $1
+SELECT id, created_at, updated_at, name, description, form_url, unit, lower_limit, upper_limit, test_category FROM tests WHERE name = $1
 `
 
 func (q *Queries) GetTestByName(ctx context.Context, name string) (Test, error) {
@@ -321,81 +127,253 @@ func (q *Queries) GetTestByName(ctx context.Context, name string) (Test, error) 
 		&i.UpdatedAt,
 		&i.Name,
 		&i.Description,
+		&i.FormUrl,
+		&i.Unit,
+		&i.LowerLimit,
+		&i.UpperLimit,
+		&i.TestCategory,
 	)
 	return i, err
 }
 
-const removeBaselineTest = `-- name: RemoveBaselineTest :exec
-DELETE FROM protocol_baseline_tests
-WHERE protocol_id = $1 AND test_id = $2
+const getTests = `-- name: GetTests :many
+SELECT id, created_at, updated_at, name, description, form_url, unit, lower_limit, upper_limit, test_category FROM tests
 `
 
-type RemoveBaselineTestParams struct {
-	ProtocolID uuid.UUID
-	TestID     uuid.UUID
+func (q *Queries) GetTests(ctx context.Context) ([]Test, error) {
+	rows, err := q.db.QueryContext(ctx, getTests)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Test{}
+	for rows.Next() {
+		var i Test
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Name,
+			&i.Description,
+			&i.FormUrl,
+			&i.Unit,
+			&i.LowerLimit,
+			&i.UpperLimit,
+			&i.TestCategory,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
-func (q *Queries) RemoveBaselineTest(ctx context.Context, arg RemoveBaselineTestParams) error {
-	_, err := q.db.ExecContext(ctx, removeBaselineTest, arg.ProtocolID, arg.TestID)
+const getTestsByCategory = `-- name: GetTestsByCategory :many
+SELECT id, created_at, updated_at, name, description, form_url, unit, lower_limit, upper_limit, test_category FROM tests WHERE test_category = $1
+`
+
+func (q *Queries) GetTestsByCategory(ctx context.Context, testCategory string) ([]Test, error) {
+	rows, err := q.db.QueryContext(ctx, getTestsByCategory, testCategory)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Test{}
+	for rows.Next() {
+		var i Test
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Name,
+			&i.Description,
+			&i.FormUrl,
+			&i.Unit,
+			&i.LowerLimit,
+			&i.UpperLimit,
+			&i.TestCategory,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTestsByProtocolByCategoryAndUrgency = `-- name: GetTestsByProtocolByCategoryAndUrgency :many
+SELECT t.id, t.created_at, t.updated_at, t.name, t.description, t.form_url, t.unit, t.lower_limit, t.upper_limit, t.test_category
+FROM tests t
+JOIN protocol_tests pt ON t.id = pt.test_id
+WHERE pt.protocol_id = $1 AND pt.category = $2 AND pt.urgency = $3
+`
+
+type GetTestsByProtocolByCategoryAndUrgencyParams struct {
+	ProtocolID uuid.UUID    `json:"protocol_id"`
+	Category   CategoryEnum `json:"category"`
+	Urgency    UrgencyEnum  `json:"urgency"`
+}
+
+func (q *Queries) GetTestsByProtocolByCategoryAndUrgency(ctx context.Context, arg GetTestsByProtocolByCategoryAndUrgencyParams) ([]Test, error) {
+	rows, err := q.db.QueryContext(ctx, getTestsByProtocolByCategoryAndUrgency, arg.ProtocolID, arg.Category, arg.Urgency)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Test{}
+	for rows.Next() {
+		var i Test
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Name,
+			&i.Description,
+			&i.FormUrl,
+			&i.Unit,
+			&i.LowerLimit,
+			&i.UpperLimit,
+			&i.TestCategory,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const removeTestFromProtocolByCategoryAndUrgency = `-- name: RemoveTestFromProtocolByCategoryAndUrgency :exec
+DELETE FROM protocol_tests WHERE protocol_id = $1 AND test_id = $2 AND category = $3 AND urgency = $4
+`
+
+type RemoveTestFromProtocolByCategoryAndUrgencyParams struct {
+	ProtocolID uuid.UUID    `json:"protocol_id"`
+	TestID     uuid.UUID    `json:"test_id"`
+	Category   CategoryEnum `json:"category"`
+	Urgency    UrgencyEnum  `json:"urgency"`
+}
+
+func (q *Queries) RemoveTestFromProtocolByCategoryAndUrgency(ctx context.Context, arg RemoveTestFromProtocolByCategoryAndUrgencyParams) error {
+	_, err := q.db.ExecContext(ctx, removeTestFromProtocolByCategoryAndUrgency,
+		arg.ProtocolID,
+		arg.TestID,
+		arg.Category,
+		arg.Urgency,
+	)
 	return err
 }
 
-const removeFollowupIfNecessaryTest = `-- name: RemoveFollowupIfNecessaryTest :exec
-DELETE FROM protocol_followup_tests_if_necessary
-WHERE protocol_id = $1 AND test_id = $2
+const updateTest = `-- name: UpdateTest :one
+UPDATE tests
+SET name = $2, description = $3, form_url = $4, unit = $5, lower_limit = $6, upper_limit = $7, test_category = $8
+WHERE id = $1
+RETURNING id, created_at, updated_at, name, description, form_url, unit, lower_limit, upper_limit, test_category
 `
 
-type RemoveFollowupIfNecessaryTestParams struct {
-	ProtocolID uuid.UUID
-	TestID     uuid.UUID
+type UpdateTestParams struct {
+	ID           uuid.UUID `json:"id"`
+	Name         string    `json:"name"`
+	Description  string    `json:"description"`
+	FormUrl      string    `json:"form_url"`
+	Unit         string    `json:"unit"`
+	LowerLimit   float64   `json:"lower_limit"`
+	UpperLimit   float64   `json:"upper_limit"`
+	TestCategory string    `json:"test_category"`
 }
 
-func (q *Queries) RemoveFollowupIfNecessaryTest(ctx context.Context, arg RemoveFollowupIfNecessaryTestParams) error {
-	_, err := q.db.ExecContext(ctx, removeFollowupIfNecessaryTest, arg.ProtocolID, arg.TestID)
-	return err
+func (q *Queries) UpdateTest(ctx context.Context, arg UpdateTestParams) (Test, error) {
+	row := q.db.QueryRowContext(ctx, updateTest,
+		arg.ID,
+		arg.Name,
+		arg.Description,
+		arg.FormUrl,
+		arg.Unit,
+		arg.LowerLimit,
+		arg.UpperLimit,
+		arg.TestCategory,
+	)
+	var i Test
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+		&i.Description,
+		&i.FormUrl,
+		&i.Unit,
+		&i.LowerLimit,
+		&i.UpperLimit,
+		&i.TestCategory,
+	)
+	return i, err
 }
 
-const removeFollowupTest = `-- name: RemoveFollowupTest :exec
-DELETE FROM protocol_followup_tests
-WHERE protocol_id = $1 AND test_id = $2
+const upsertTest = `-- name: UpsertTest :one
+INSERT INTO tests (id, name, description, form_url, unit, lower_limit, upper_limit, test_category, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+ON CONFLICT (id) DO UPDATE
+SET name = EXCLUDED.name,
+    description = EXCLUDED.description,
+    form_url = EXCLUDED.form_url,
+    unit = EXCLUDED.unit,
+    lower_limit = EXCLUDED.lower_limit,
+    upper_limit = EXCLUDED.upper_limit,
+    test_category = EXCLUDED.test_category,
+    updated_at = NOW()
+RETURNING id, created_at, updated_at, name, description, form_url, unit, lower_limit, upper_limit, test_category
 `
 
-type RemoveFollowupTestParams struct {
-	ProtocolID uuid.UUID
-	TestID     uuid.UUID
+type UpsertTestParams struct {
+	ID           uuid.UUID `json:"id"`
+	Name         string    `json:"name"`
+	Description  string    `json:"description"`
+	FormUrl      string    `json:"form_url"`
+	Unit         string    `json:"unit"`
+	LowerLimit   float64   `json:"lower_limit"`
+	UpperLimit   float64   `json:"upper_limit"`
+	TestCategory string    `json:"test_category"`
 }
 
-func (q *Queries) RemoveFollowupTest(ctx context.Context, arg RemoveFollowupTestParams) error {
-	_, err := q.db.ExecContext(ctx, removeFollowupTest, arg.ProtocolID, arg.TestID)
-	return err
-}
-
-const removeIfNecessaryTest = `-- name: RemoveIfNecessaryTest :exec
-DELETE FROM protocol_baseline_tests_if_necessary
-WHERE protocol_id = $1 AND test_id = $2
-`
-
-type RemoveIfNecessaryTestParams struct {
-	ProtocolID uuid.UUID
-	TestID     uuid.UUID
-}
-
-func (q *Queries) RemoveIfNecessaryTest(ctx context.Context, arg RemoveIfNecessaryTestParams) error {
-	_, err := q.db.ExecContext(ctx, removeIfNecessaryTest, arg.ProtocolID, arg.TestID)
-	return err
-}
-
-const removeNonUrgentTest = `-- name: RemoveNonUrgentTest :exec
-DELETE FROM protocol_baseline_tests_non_urgent
-WHERE protocol_id = $1 AND test_id = $2
-`
-
-type RemoveNonUrgentTestParams struct {
-	ProtocolID uuid.UUID
-	TestID     uuid.UUID
-}
-
-func (q *Queries) RemoveNonUrgentTest(ctx context.Context, arg RemoveNonUrgentTestParams) error {
-	_, err := q.db.ExecContext(ctx, removeNonUrgentTest, arg.ProtocolID, arg.TestID)
-	return err
+func (q *Queries) UpsertTest(ctx context.Context, arg UpsertTestParams) (Test, error) {
+	row := q.db.QueryRowContext(ctx, upsertTest,
+		arg.ID,
+		arg.Name,
+		arg.Description,
+		arg.FormUrl,
+		arg.Unit,
+		arg.LowerLimit,
+		arg.UpperLimit,
+		arg.TestCategory,
+	)
+	var i Test
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Name,
+		&i.Description,
+		&i.FormUrl,
+		&i.Unit,
+		&i.LowerLimit,
+		&i.UpperLimit,
+		&i.TestCategory,
+	)
+	return i, err
 }

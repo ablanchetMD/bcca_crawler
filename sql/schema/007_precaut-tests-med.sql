@@ -14,7 +14,12 @@ CREATE TABLE tests (
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
   name TEXT NOT NULL UNIQUE,
-  description TEXT
+  description TEXT NOT NULL DEFAULT '',
+  form_url TEXT NOT NULL DEFAULT '',
+  unit TEXT NOT NULL DEFAULT '',
+  lower_limit FLOAT NOT NULL DEFAULT 0,
+  upper_limit FLOAT NOT NULL DEFAULT 0,
+  test_category TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE protocol_ppos (

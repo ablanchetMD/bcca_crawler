@@ -13,8 +13,7 @@ import (
 	"bcca_crawler/internal/database"
 	"bcca_crawler/api"
 	"github.com/lib/pq"
-	"bcca_crawler/internal/config"
-	"database/sql"
+	"bcca_crawler/internal/config"	
 
 )
 
@@ -49,7 +48,7 @@ const ai_prompt = `You are an AI model tasked with analyzing a PDF document and 
       "Journal": "string",
       "Year": "string",
       "Pmid": "string",
-      "Joi": "string"
+      "Doi": "string"
     }
   ],
   "Medications": [
@@ -73,7 +72,7 @@ const ai_prompt = `You are an AI model tasked with analyzing a PDF document and 
       "LastName": "string"
     }
   ],
-  "ProtocolSummary":
+  "SummaryProtocol":
     {
       "TumorGroup": "string",
       "Code": "string",
@@ -130,9 +129,9 @@ const ai_prompt = `You are an AI model tasked with analyzing a PDF document and 
 	  "Category": "string", // Hematologic, Neurologic, Gastrointestinal, etc.
 	  "Modifications": [
 	  				{
-	  					"Grade": "string", // Grade 1, Grade 2, Grade 3, Grade 4
+	  					"Grade": "string", // ONLY the grade number (1,2,3 or 4)
 						"GradeDescription": "string", 
-						"Adjustement": "string"
+						"Adjustement": "string" // Dose reduction, Delay, Discontinuation
 					}
 				]     
     }
@@ -217,8 +216,8 @@ func GetAiData(s *config.Config,proto string) error {
 	 if err != nil {
 		return err
 	 }
-
-	fmt.Println("Payload: ", payload)
+	fmt.Println("Payload:")
+	api.PrintStruct(payload)
 	protocol,err := s.Db.CreateProtocolbyScraping(ctx, database.CreateProtocolbyScrapingParams{		
 		TumorGroup: payload.ProtocolSummary.TumorGroup,
 		Code: payload.ProtocolSummary.Code,
@@ -249,7 +248,7 @@ func GetAiData(s *config.Config,proto string) error {
 			Journal: article.Journal,
 			Year: article.Year,
 			Pmid: article.Pmid,
-			Joi: article.Joi,
+			Doi: article.Doi,
 		})
 		if err != nil {		
 			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
@@ -298,7 +297,7 @@ func GetAiData(s *config.Config,proto string) error {
 				_,err := s.Db.AddMedicationModification(ctx, database.AddMedicationModificationParams{
 					MedicationID: med.ID,
 					Category: mod.Category,
-					Description: modx.Description,
+					Subcategory: modx.Description,
 					Adjustment: modx.Adjustment,
 				})
 				if err != nil {
@@ -409,8 +408,7 @@ func GetAiData(s *config.Config,proto string) error {
 		caut,err := s.Db.CreateProtocolCaution(ctx, caution.Description)
 		if err != nil {
 			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
-				// Duplicate key value violation
-				fmt.Println("Caution Record already exists so retrieving from database.")
+				// Duplicate key value violation				
 				caut,err = s.Db.GetProtocolCautionByDescription(ctx, caution.Description)
 					
 				if err != nil {
@@ -433,7 +431,6 @@ func GetAiData(s *config.Config,proto string) error {
 	for _, test := range payload.Tests.Baseline.RequiredBeforeTreatment {
 		add,err := s.Db.AddTest(ctx, database.AddTestParams{
 			Name: test,
-			Description: sql.NullString{String: "", Valid: false},
 		})
 		if err != nil {
 			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
@@ -450,10 +447,13 @@ func GetAiData(s *config.Config,proto string) error {
 			}
 		}
 
-		_ = s.Db.AddBaselineTest(ctx, database.AddBaselineTestParams{
+		_,_ = s.Db.AddTestToProtocolByCategoryAndUrgency(ctx, database.AddTestToProtocolByCategoryAndUrgencyParams{
 			ProtocolID: protocol.ID,
 			TestID: add.ID,
+			Category: database.CategoryEnumBaseline,
+			Urgency: database.UrgencyEnumUrgent,
 		})
+
 
 	}	
 
@@ -462,7 +462,6 @@ func GetAiData(s *config.Config,proto string) error {
 	for _, test := range payload.Tests.Baseline.RequiredButCanProceed {
 		add,err := s.Db.AddTest(ctx, database.AddTestParams{
 			Name: test,
-			Description: sql.NullString{String: "", Valid: false},
 		})
 		if err != nil {
 			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
@@ -479,9 +478,11 @@ func GetAiData(s *config.Config,proto string) error {
 			}
 		}
 		
-		_ = s.Db.AddNonUrgentTest(ctx, database.AddNonUrgentTestParams{
+		_,_ = s.Db.AddTestToProtocolByCategoryAndUrgency(ctx, database.AddTestToProtocolByCategoryAndUrgencyParams{
 			ProtocolID: protocol.ID,
 			TestID: add.ID,
+			Category: database.CategoryEnumBaseline,
+			Urgency: database.UrgencyEnumNonUrgent,
 		})
 
 	}
@@ -492,7 +493,6 @@ func GetAiData(s *config.Config,proto string) error {
 	for _, test := range payload.Tests.Baseline.IfClinicallyIndicated {
 		add,err := s.Db.AddTest(ctx, database.AddTestParams{
 			Name: test,
-			Description: sql.NullString{String: "", Valid: false},
 		})
 		if err != nil {
 			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
@@ -509,9 +509,11 @@ func GetAiData(s *config.Config,proto string) error {
 			}
 		}
 		
-		_ = s.Db.AddIfNecessaryTest(ctx, database.AddIfNecessaryTestParams{
+		_,_ = s.Db.AddTestToProtocolByCategoryAndUrgency(ctx, database.AddTestToProtocolByCategoryAndUrgencyParams{
 			ProtocolID: protocol.ID,
 			TestID: add.ID,
+			Category: database.CategoryEnumBaseline,
+			Urgency: database.UrgencyEnumIfNecessary,
 		})
 
 	}	
@@ -521,7 +523,6 @@ func GetAiData(s *config.Config,proto string) error {
 	for _, test := range payload.Tests.FollowUp.Required {
 		add,err := s.Db.AddTest(ctx, database.AddTestParams{
 			Name: test,
-			Description: sql.NullString{String: "", Valid: false},
 		})
 		if err != nil {
 			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
@@ -538,9 +539,11 @@ func GetAiData(s *config.Config,proto string) error {
 			}
 		}
 		
-		_ = s.Db.AddFollowupTest(ctx, database.AddFollowupTestParams{
+		_,_ = s.Db.AddTestToProtocolByCategoryAndUrgency(ctx, database.AddTestToProtocolByCategoryAndUrgencyParams{
 			ProtocolID: protocol.ID,
 			TestID: add.ID,
+			Category: database.CategoryEnumFollowup,
+			Urgency: database.UrgencyEnumUrgent,
 		})
 
 	}
@@ -550,7 +553,6 @@ func GetAiData(s *config.Config,proto string) error {
 	for _, test := range payload.Tests.FollowUp.IfClinicallyIndicated {
 		add,err := s.Db.AddTest(ctx, database.AddTestParams{
 			Name: test,
-			Description: sql.NullString{String: "", Valid: false},
 		})
 		if err != nil {
 			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
@@ -567,9 +569,11 @@ func GetAiData(s *config.Config,proto string) error {
 			}
 		}
 		
-		_ = s.Db.AddFollowupIfNecessaryTest(ctx, database.AddFollowupIfNecessaryTestParams{
+		_,_ = s.Db.AddTestToProtocolByCategoryAndUrgency(ctx, database.AddTestToProtocolByCategoryAndUrgencyParams{
 			ProtocolID: protocol.ID,
 			TestID: add.ID,
+			Category: database.CategoryEnumFollowup,
+			Urgency: database.UrgencyEnumIfNecessary,
 		})
 		
 	}
@@ -602,24 +606,26 @@ func GetAiData(s *config.Config,proto string) error {
 
 		for _, mod := range tox.Modifications {
 			grade,err := s.Db.AddToxicityGrade(ctx, database.AddToxicityGradeParams{
-				Grade: mod.Grade,
+				Grade: database.GradeEnum(mod.Grade),
 				Description: mod.GradeDescription,
 				ToxicityID: toxicity.ID,
 			})
-			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
-				// Duplicate key value violation
-				grade,err = s.Db.GetToxicityGradeByGrade(ctx, database.GetToxicityGradeByGradeParams{
-					Grade: mod.Grade,
-					ToxicityID: toxicity.ID,
-				})
-					
-				if err != nil {
-					fmt.Println("Error getting grade: ", err)
+			if err != nil {
+				if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
+					// Duplicate key value violation
+					grade,err = s.Db.GetToxicityGradeByGrade(ctx, database.GetToxicityGradeByGradeParams{
+						Grade: database.GradeEnum(mod.Grade),
+						ToxicityID: toxicity.ID,
+					})
+						
+					if err != nil {
+						fmt.Println("Error getting grade: ", err)
+						return err
+					}
+				} else {
+					fmt.Println("Error creating grade: ", err)
 					return err
 				}
-			} else {
-				fmt.Println("Error creating grade: ", err)
-				return err
 			}
 
 			_,err = s.Db.AddToxicityModification(ctx, database.AddToxicityModificationParams{

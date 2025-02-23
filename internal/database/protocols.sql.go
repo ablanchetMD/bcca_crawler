@@ -19,11 +19,11 @@ RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes, prot
 `
 
 type CreateProtocolParams struct {
-	TumorGroup string
-	Code       string
-	Name       string
-	Tags       []string
-	Notes      string
+	TumorGroup string   `json:"tumor_group"`
+	Code       string   `json:"code"`
+	Name       string   `json:"name"`
+	Tags       []string `json:"tags"`
+	Notes      string   `json:"notes"`
 }
 
 func (q *Queries) CreateProtocol(ctx context.Context, arg CreateProtocolParams) (Protocol, error) {
@@ -59,13 +59,13 @@ RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes, prot
 `
 
 type CreateProtocolbyScrapingParams struct {
-	TumorGroup  string
-	Code        string
-	Name        string
-	Tags        []string
-	Notes       string
-	RevisedOn   string
-	ActivatedOn string
+	TumorGroup  string   `json:"tumor_group"`
+	Code        string   `json:"code"`
+	Name        string   `json:"name"`
+	Tags        []string `json:"tags"`
+	Notes       string   `json:"notes"`
+	RevisedOn   string   `json:"revised_on"`
+	ActivatedOn string   `json:"activated_on"`
 }
 
 func (q *Queries) CreateProtocolbyScraping(ctx context.Context, arg CreateProtocolbyScrapingParams) (Protocol, error) {
@@ -163,8 +163,8 @@ LIMIT $1 OFFSET $2
 `
 
 type GetProtocolsAscParams struct {
-	Limit  int32
-	Offset int32
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
 }
 
 func (q *Queries) GetProtocolsAsc(ctx context.Context, arg GetProtocolsAscParams) ([]Protocol, error) {
@@ -173,7 +173,7 @@ func (q *Queries) GetProtocolsAsc(ctx context.Context, arg GetProtocolsAscParams
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Protocol
+	items := []Protocol{}
 	for rows.Next() {
 		var i Protocol
 		if err := rows.Scan(
@@ -210,8 +210,8 @@ LIMIT $1 OFFSET $2
 `
 
 type GetProtocolsDescParams struct {
-	Limit  int32
-	Offset int32
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
 }
 
 func (q *Queries) GetProtocolsDesc(ctx context.Context, arg GetProtocolsDescParams) ([]Protocol, error) {
@@ -220,7 +220,7 @@ func (q *Queries) GetProtocolsDesc(ctx context.Context, arg GetProtocolsDescPara
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Protocol
+	items := []Protocol{}
 	for rows.Next() {
 		var i Protocol
 		if err := rows.Scan(
@@ -259,10 +259,10 @@ LIMIT $3 OFFSET $4
 `
 
 type GetProtocolsOnlyTumorGroupAndTagsAscParams struct {
-	TumorGroup string
-	Tags       []string
-	Limit      int32
-	Offset     int32
+	TumorGroup string   `json:"tumor_group"`
+	Tags       []string `json:"tags"`
+	Limit      int32    `json:"limit"`
+	Offset     int32    `json:"offset"`
 }
 
 func (q *Queries) GetProtocolsOnlyTumorGroupAndTagsAsc(ctx context.Context, arg GetProtocolsOnlyTumorGroupAndTagsAscParams) ([]Protocol, error) {
@@ -276,7 +276,7 @@ func (q *Queries) GetProtocolsOnlyTumorGroupAndTagsAsc(ctx context.Context, arg 
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Protocol
+	items := []Protocol{}
 	for rows.Next() {
 		var i Protocol
 		if err := rows.Scan(
@@ -315,10 +315,10 @@ LIMIT $3 OFFSET $4
 `
 
 type GetProtocolsOnlyTumorGroupAndTagsDescParams struct {
-	TumorGroup string
-	Tags       []string
-	Limit      int32
-	Offset     int32
+	TumorGroup string   `json:"tumor_group"`
+	Tags       []string `json:"tags"`
+	Limit      int32    `json:"limit"`
+	Offset     int32    `json:"offset"`
 }
 
 func (q *Queries) GetProtocolsOnlyTumorGroupAndTagsDesc(ctx context.Context, arg GetProtocolsOnlyTumorGroupAndTagsDescParams) ([]Protocol, error) {
@@ -332,7 +332,7 @@ func (q *Queries) GetProtocolsOnlyTumorGroupAndTagsDesc(ctx context.Context, arg
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Protocol
+	items := []Protocol{}
 	for rows.Next() {
 		var i Protocol
 		if err := rows.Scan(
@@ -370,9 +370,9 @@ LIMIT $2 OFFSET $3
 `
 
 type GetProtocolsOnlyTumorGroupAscParams struct {
-	TumorGroup string
-	Limit      int32
-	Offset     int32
+	TumorGroup string `json:"tumor_group"`
+	Limit      int32  `json:"limit"`
+	Offset     int32  `json:"offset"`
 }
 
 func (q *Queries) GetProtocolsOnlyTumorGroupAsc(ctx context.Context, arg GetProtocolsOnlyTumorGroupAscParams) ([]Protocol, error) {
@@ -381,7 +381,7 @@ func (q *Queries) GetProtocolsOnlyTumorGroupAsc(ctx context.Context, arg GetProt
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Protocol
+	items := []Protocol{}
 	for rows.Next() {
 		var i Protocol
 		if err := rows.Scan(
@@ -419,9 +419,9 @@ LIMIT $2 OFFSET $3
 `
 
 type GetProtocolsOnlyTumorGroupDescParams struct {
-	TumorGroup string
-	Limit      int32
-	Offset     int32
+	TumorGroup string `json:"tumor_group"`
+	Limit      int32  `json:"limit"`
+	Offset     int32  `json:"offset"`
 }
 
 func (q *Queries) GetProtocolsOnlyTumorGroupDesc(ctx context.Context, arg GetProtocolsOnlyTumorGroupDescParams) ([]Protocol, error) {
@@ -430,7 +430,7 @@ func (q *Queries) GetProtocolsOnlyTumorGroupDesc(ctx context.Context, arg GetPro
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Protocol
+	items := []Protocol{}
 	for rows.Next() {
 		var i Protocol
 		if err := rows.Scan(
@@ -468,18 +468,26 @@ SET
     code = $3,
     name = $4,
     tags = $5,
-    notes = $6
+    notes = $6,
+    protocol_url = $7,
+    patient_handout_url = $8,
+    revised_on = $9,
+    activated_on = $10
 WHERE id = $1
 RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url, revised_on, activated_on
 `
 
 type UpdateProtocolParams struct {
-	ID         uuid.UUID
-	TumorGroup string
-	Code       string
-	Name       string
-	Tags       []string
-	Notes      string
+	ID                uuid.UUID `json:"id"`
+	TumorGroup        string    `json:"tumor_group"`
+	Code              string    `json:"code"`
+	Name              string    `json:"name"`
+	Tags              []string  `json:"tags"`
+	Notes             string    `json:"notes"`
+	ProtocolUrl       string    `json:"protocol_url"`
+	PatientHandoutUrl string    `json:"patient_handout_url"`
+	RevisedOn         string    `json:"revised_on"`
+	ActivatedOn       string    `json:"activated_on"`
 }
 
 func (q *Queries) UpdateProtocol(ctx context.Context, arg UpdateProtocolParams) (Protocol, error) {
@@ -490,6 +498,10 @@ func (q *Queries) UpdateProtocol(ctx context.Context, arg UpdateProtocolParams) 
 		arg.Name,
 		pq.Array(arg.Tags),
 		arg.Notes,
+		arg.ProtocolUrl,
+		arg.PatientHandoutUrl,
+		arg.RevisedOn,
+		arg.ActivatedOn,
 	)
 	var i Protocol
 	err := row.Scan(

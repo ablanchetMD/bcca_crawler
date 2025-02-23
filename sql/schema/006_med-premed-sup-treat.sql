@@ -5,7 +5,7 @@ CREATE TABLE medications (
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
   name TEXT NOT NULL UNIQUE,
-  description TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
   category TEXT NOT NULL DEFAULT ''
 );
 
@@ -14,10 +14,10 @@ CREATE TABLE medication_prescription (
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
   medication UUID NOT NULL REFERENCES medications(id) ON DELETE CASCADE,
-  dose TEXT NOT NULL,
-  route TEXT NOT NULL,
-  frequency TEXT NOT NULL,
-  duration TEXT NOT NULL,
+  dose TEXT NOT NULL DEFAULT '',
+  route prescription_route_enum NOT NULL DEFAULT 'unknown',
+  frequency TEXT NOT NULL DEFAULT '',
+  duration TEXT NOT NULL DEFAULT '',
   instructions TEXT NOT NULL DEFAULT '',
   renewals INT NOT NULL DEFAULT 0,
   UNIQUE (medication, dose, route, frequency, duration, instructions)
@@ -41,10 +41,10 @@ CREATE TABLE medication_modifications (
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
   category TEXT NOT NULL, -- Hepatic Impairment, Renal Impairment, etc.
-  description TEXT NOT NULL,
+  subcategory TEXT NOT NULL,
   adjustment TEXT NOT NULL,
   medication_id UUID NOT NULL REFERENCES medications(id) ON DELETE CASCADE,
-  UNIQUE (category, description, adjustment, medication_id)
+  UNIQUE (category, subcategory, adjustment, medication_id)
 );
 
 -- +goose Down

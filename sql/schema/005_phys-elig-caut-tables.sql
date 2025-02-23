@@ -7,14 +7,14 @@ CREATE TABLE physicians (
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE,
-  site TEXT NOT NULL DEFAULT ''
+  site physician_site_enum NOT NULL DEFAULT 'unknown'
 );
 
 CREATE TABLE protocol_eligibility_criteria (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  type TEXT NOT NULL, -- Inclusion, Exclusion, or Notes
+  type eligibility_enum NOT NULL DEFAULT 'unknown',
   description TEXT NOT NULL UNIQUE
 );
 

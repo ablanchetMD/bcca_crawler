@@ -107,7 +107,8 @@ func handlerCheckDatabase(s *config.Config, cmd command) error {
 		fmt.Println("Error checking database: ", err)
 		return err
 	}
-	fmt.Println("Payload: ", payload)
+	fmt.Println("Payload: ")
+	api.PrintStruct(payload)
 	return nil
 }
 

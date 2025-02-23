@@ -60,7 +60,7 @@ func GetProtocolCautions(c *config.Config,ctx context.Context,protocolID uuid.UU
 
 	r_cautions := []ProtocolCaution{}
 	for _, c := range cautions {
-		r_cautions = append(r_cautions, mapCaution(c))
+		r_cautions = append(r_cautions, MapCaution(c))
 	}
 	return r_cautions, nil
 }
@@ -73,7 +73,7 @@ func GetProtocolPrecautions(c *config.Config,ctx context.Context,protocolID uuid
 
 	r_precautions := []ProtocolPrecaution{}
 	for _, p := range precautions {
-		r_precautions = append(r_precautions, mapPrecaution(p))
+		r_precautions = append(r_precautions, MapPrecaution(p))
 	}
 	return r_precautions, nil
 }
@@ -86,27 +86,39 @@ func GetProtocolEligibilityCriteria(c *config.Config,ctx context.Context,protoco
 
 	r_elig_criterias := []ProtocolEligibilityCriterion{}
 	for _, ec := range elig_criterias {		
-		r_elig_criterias = append(r_elig_criterias, mapEligibilityCriterion(ec))
+		r_elig_criterias = append(r_elig_criterias, MapEligibilityCriterion(ec))
 	}
 	return r_elig_criterias, nil
 }
 
 func GetBaselineTests(c *config.Config,ctx context.Context,protocolID uuid.UUID) (BaselineTests, error) {
-	baseline_tests,err := c.Db.GetBaselineTestsByProtocol(ctx,protocolID)
+	baseline_tests,err := c.Db.GetTestsByProtocolByCategoryAndUrgency(ctx,database.GetTestsByProtocolByCategoryAndUrgencyParams{
+		ProtocolID: protocolID,
+		Category: database.CategoryEnumBaseline,
+		Urgency: database.UrgencyEnumUrgent,
+	})
 	if err != nil {
 		return BaselineTests{}, err
 	}
 
 	r_baseline_tests := mapTest(baseline_tests)
 
-	nonurgent_tests,err := c.Db.GetNonUrgentTestsByProtocol(ctx,protocolID)
+	nonurgent_tests,err := c.Db.GetTestsByProtocolByCategoryAndUrgency(ctx,database.GetTestsByProtocolByCategoryAndUrgencyParams{
+		ProtocolID: protocolID,
+		Category: database.CategoryEnumBaseline,
+		Urgency: database.UrgencyEnumNonUrgent,
+	})
 	if err != nil {
 		return BaselineTests{}, err
 	}
 
 	r_nonurgent_tests := mapTest(nonurgent_tests)
 
-	ifnec_tests,err := c.Db.GetIfNecessaryTestsByProtocol(ctx,protocolID)
+	ifnec_tests,err := c.Db.GetTestsByProtocolByCategoryAndUrgency(ctx,database.GetTestsByProtocolByCategoryAndUrgencyParams{
+		ProtocolID: protocolID,
+		Category: database.CategoryEnumBaseline,
+		Urgency: database.UrgencyEnumIfNecessary,
+	})
 	if err != nil {
 		return BaselineTests{}, err
 	}
@@ -121,14 +133,22 @@ func GetBaselineTests(c *config.Config,ctx context.Context,protocolID uuid.UUID)
 }
 
 func GetFollowUpTests(c *config.Config,ctx context.Context,protocolID uuid.UUID) (FollowUpTests, error) {
-	followup_tests,err := c.Db.GetFollowupTestsByProtocol(ctx,protocolID)
+	followup_tests,err := c.Db.GetTestsByProtocolByCategoryAndUrgency(ctx,database.GetTestsByProtocolByCategoryAndUrgencyParams{
+		ProtocolID: protocolID,
+		Category: database.CategoryEnumFollowup,
+		Urgency: database.UrgencyEnumUrgent,
+	})
 	if err != nil {
 		return FollowUpTests{}, err
 	}
 
 	r_followup_tests := mapTest(followup_tests)
 
-	followup_ifnec_tests,err := c.Db.GetFollowupIfNecessaryTestsByProtocol(ctx,protocolID)
+	followup_ifnec_tests,err := c.Db.GetTestsByProtocolByCategoryAndUrgency(ctx,database.GetTestsByProtocolByCategoryAndUrgencyParams{
+		ProtocolID: protocolID,
+		Category: database.CategoryEnumFollowup,
+		Urgency: database.UrgencyEnumIfNecessary,
+	})
 	if err != nil {
 		return FollowUpTests{}, err
 	}
@@ -157,7 +177,7 @@ func GetProtocolModifications(c *config.Config,ctx context.Context,protocolID uu
 		return nil, err
 	}
 	
-	return mapToMedicationModifications(med_mod), nil
+	return MapToMedicationModifications(med_mod), nil
 }
 
 func GetProtocolCycles(c *config.Config,ctx context.Context,protocolID uuid.UUID) ([]ProtocolCycle, error) {
@@ -168,7 +188,7 @@ func GetProtocolCycles(c *config.Config,ctx context.Context,protocolID uuid.UUID
 
 	r_cycles := []ProtocolCycle{}
 	for _, cyc := range cycles {
-		r_cycle := mapCycle(cyc)
+		r_cycle := MapCycle(cyc)
 		treatments,err := c.Db.GetTreatmentsByCycle(ctx,cyc.ID)
 		if err != nil {
 			return nil, err
@@ -181,7 +201,7 @@ func GetProtocolCycles(c *config.Config,ctx context.Context,protocolID uuid.UUID
 				return nil, err
 			}
 			
-			r_treatment := mapTreatment(treat)
+			r_treatment := MapTreatment(treat)
 			r_treatment.MedicationName = med.Name			
 			
 			r_treatments = append(r_treatments, r_treatment)
