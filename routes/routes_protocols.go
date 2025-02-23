@@ -1,10 +1,10 @@
 package routes
 
 import (
-	"bcca_crawler/internal/config"
-	"net/http"
 	"bcca_crawler/api"
 	"bcca_crawler/api/protocols"
+	"bcca_crawler/internal/config"
+	"net/http"	
 )
 
 func RegisterProtocolRoutes(prefix string, mux *http.ServeMux, s *config.Config) {
@@ -44,20 +44,9 @@ func RegisterProtocolRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 		default:
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		}
-	})
+	})	
 
-	mux.HandleFunc(prefix +"/protocols/eligibility", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			protocols.HandleGetEligibilityCriteria(s, w, r)
-		case http.MethodPut:
-			protocols.HandleUpsertEligibilityCriteria(s, w, r)				
-		default:
-			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		}
-	})
-
-	mux.HandleFunc(prefix +"/protocols/eligibility/link/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/protocols/eligibility/{id}", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodDelete:
 			protocols.HandleRemoveEligibilityFromProtocol(s, w, r)
@@ -66,12 +55,87 @@ func RegisterProtocolRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 		default:
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		}
-	})
+	})		
 
-	mux.HandleFunc(prefix +"/protocols/eligibility/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/protocols/caution/{id}", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodDelete:
-			protocols.HandleDeleteEligibilityCriteriaByID(s, w, r)						
+			protocols.HandleRemoveCautionFromProtocol(s, w, r)
+		case http.MethodPost:
+			protocols.HandleAddCautionToProtocol(s, w, r)			
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})	
+	
+	mux.HandleFunc(prefix +"/protocols/precaution/{id}", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodDelete:
+			protocols.HandleRemovePrecautionFromProtocol(s, w, r)
+		case http.MethodPost:
+			protocols.HandleAddPrecautionToProtocol(s, w, r)			
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	mux.HandleFunc(prefix +"/protocols/labs", func(w http.ResponseWriter, r *http.Request) {
+		//queries : test_category, test_urgency, protocol_id
+		switch r.Method {
+		case http.MethodGet:
+			protocols.HandleGetLabsByProtocol(s, w, r)
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	
+	mux.HandleFunc(prefix +"/protocols/labs/{id}", func(w http.ResponseWriter, r *http.Request) {
+		//queries : test_category, test_urgency, protocol_id
+		switch r.Method {
+		case http.MethodDelete:
+			protocols.HandleRemoveLabFromProtocol(s, w, r)
+		case http.MethodPost:
+			protocols.HandleAddLabToProtocol(s, w, r)			
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	mux.HandleFunc(prefix +"/protocols/prescriptions", func(w http.ResponseWriter, r *http.Request) {
+		//queries : prescription_category, protocol_id
+		switch r.Method {
+		case http.MethodGet:
+			protocols.HandleGetPrescriptionsByCategory(s, w, r)
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	
+	mux.HandleFunc(prefix +"/protocols/prescriptions/{id}", func(w http.ResponseWriter, r *http.Request) {
+		//queries : prescription_category, protocol_id
+		switch r.Method {
+		case http.MethodDelete:
+			protocols.HandleRemovePrescriptionFromProtocolByCategory(s, w, r)
+		case http.MethodPost:
+			protocols.HandleAddPrescriptionToProtocolByCategory(s, w, r)			
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	mux.HandleFunc(prefix + "protocols/cycles/{id}", func(w http.ResponseWriter, r *http.Request) {		
+		switch r.Method {
+		case http.MethodGet:
+			protocols.HandleGetCyclesByProtocolID(s, w, r)
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	mux.HandleFunc(prefix +"/protocols/{id}/medication_modifications", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			protocols.HandleGetMedModificationsByProtocol(s, w, r)
 		default:
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		}

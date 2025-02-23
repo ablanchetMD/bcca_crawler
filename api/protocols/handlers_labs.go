@@ -178,12 +178,14 @@ func HandleAddLabToProtocol(c *config.Config, w http.ResponseWriter, r *http.Req
 func HandleGetLabsByProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	labs := []api.LabResp{}
+	
+	proto_id := r.URL.Query().Get("protocol_id")
 
-	parsed_id, err := api.ParseAndValidateID(r)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}	
+	parsed_id, err := uuid.Parse(proto_id)
+    if err != nil {
+		json_utils.RespondWithError(w, http.StatusBadRequest,"protocol_id is not a valid uuid")
+		return       
+    }	
 	
 	category := r.URL.Query().Get("test_category")
 

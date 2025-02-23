@@ -54,7 +54,7 @@ func HandleGetCautions(c *config.Config, w http.ResponseWriter, r *http.Request)
 }
 
 
-func HandleCautionsByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
+func HandleGetCautionsByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 

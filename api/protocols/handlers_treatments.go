@@ -287,13 +287,11 @@ func HandleGetCycles(c *config.Config, w http.ResponseWriter, r *http.Request) {
 func HandleGetCyclesByProtocolID(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	protocol_id := r.URL.Query().Get("protocol_id")
-
-	parsed_id, err := uuid.Parse(protocol_id)
+	parsed_id, err := api.ParseAndValidateID(r)
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest,"protocol_id is not a valid uuid")
-		return       
-	}	
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	
 	raw_cyc, err := c.Db.GetCyclesByProtocol(ctx, parsed_id)
 
