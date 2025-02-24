@@ -106,16 +106,16 @@ func HandleGetEligibilityCriteriaByID(c *config.Config, w http.ResponseWriter, r
 
 	ctx := r.Context()
 
-	parsed_id, err := api.ParseAndValidateID(r)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	elig, err := c.Db.GetEligibilityCriteriaByID(ctx, parsed_id)
+	elig, err := c.Db.GetEligibilityCriteriaByID(ctx, ids.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting eligibility criteria: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting eligibility criteria: %s", ids.ID.String()))
 		return
 	}
 	var eligibilityCriteria EligibilityCriterionResp
@@ -123,7 +123,7 @@ func HandleGetEligibilityCriteriaByID(c *config.Config, w http.ResponseWriter, r
 	linkedProtocols, err := api.ConvertTuplesToStructs[api.LinkedProtocols](elig.ProtocolIds)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting linked protocols: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting linked protocols: %s", ids.ID.String()))
 		return
 	}
 
@@ -141,16 +141,16 @@ func HandleDeleteEligibilityCriteriaByID(c *config.Config, w http.ResponseWriter
 
 	ctx := r.Context()
 
-	parsed_id, err := api.ParseAndValidateID(r)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	err = c.Db.DeleteEligibilityCriteria(ctx, parsed_id)
+	err = c.Db.DeleteEligibilityCriteria(ctx, ids.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting eligibility criteria: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting eligibility criteria: %s", ids.ID.String()))
 		return
 	}
 
@@ -218,28 +218,21 @@ func HandleUpsertEligibilityCriteria(c *config.Config, w http.ResponseWriter, r 
 func HandleAddEligibilityCriteriaToProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	parsed_id, err := api.ParseAndValidateID(r)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	proto_id := r.URL.Query().Get("protocol_id")
-
-	parsed_pid, err := uuid.Parse(proto_id)
-    if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest,"protocol_id is not a valid uuid")
-		return       
-    }	
 	
 	err = c.Db.LinkEligibilityToProtocol(ctx, database.LinkEligibilityToProtocolParams{
-		CriteriaID: parsed_id,
-		ProtocolID: parsed_pid,
+		CriteriaID: ids.ID,
+		ProtocolID: ids.ProtocolID,
 	})
 	
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding eligibility criteria to protocol: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding eligibility criteria to protocol: %s", ids.ID.String()))
 		return
 	}
 
@@ -250,27 +243,19 @@ func HandleAddEligibilityCriteriaToProtocol(c *config.Config, w http.ResponseWri
 func HandleRemoveEligibilityFromProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	parsed_id, err := api.ParseAndValidateID(r)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
-	}
-
-	proto_id := r.URL.Query().Get("protocol_id")
-
-	parsed_pid, err := uuid.Parse(proto_id)
-    if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest,"protocol_id is not a valid uuid")
-		return       
-    }	
+	}		
 	
 	err = c.Db.UnlinkEligibilityFromProtocol(ctx, database.UnlinkEligibilityFromProtocolParams{
-		CriteriaID: parsed_id,
-		ProtocolID: parsed_pid,
+		CriteriaID: ids.ID,
+		ProtocolID: ids.ProtocolID,
 	})
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error removing eligibility criteria from protocol: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error removing eligibility criteria from protocol: %s", ids.ID.String()))
 		return
 	}
 

@@ -58,10 +58,10 @@ func HandleGetTreatmentByID(c *config.Config, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	raw_treatment, err := c.Db.GetProtocolTreatmentByID(ctx, parsed_id)
+	raw_treatment, err := c.Db.GetProtocolTreatmentByID(ctx, parsed_id.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting treatment: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting treatment: %s", parsed_id.ID.String()))
 		return
 	}	
 
@@ -108,10 +108,10 @@ func HandleDeleteTreatmentByID(c *config.Config, w http.ResponseWriter, r *http.
 		return
 	}
 
-	err = c.Db.RemoveProtocolTreatment(ctx, parsed_id)
+	err = c.Db.RemoveProtocolTreatment(ctx, parsed_id.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting treatments: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting treatments: %s", parsed_id.ID.String()))
 		return
 	}
 
@@ -180,12 +180,12 @@ func HandleAddTreatmentToCycle(c *config.Config, w http.ResponseWriter, r *http.
     }	
 	
 	err = c.Db.AddTreatmentToCycle(ctx, database.AddTreatmentToCycleParams{
-		ProtocolTreatmentID: parsed_id,
+		ProtocolTreatmentID: parsed_id.ID,
 		ProtocolCyclesID: parsed_pid,
 	})	
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding treatment to cycle: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding treatment to cycle: %s", parsed_id.ID.String()))
 		return
 	}
 
@@ -211,12 +211,12 @@ func HandleRemoveTreatmentToCycle(c *config.Config, w http.ResponseWriter, r *ht
     }	
 
 	err = c.Db.RemoveTreatmentFromCycle(ctx, database.RemoveTreatmentFromCycleParams{
-		ProtocolTreatmentID: parsed_id,
+		ProtocolTreatmentID: parsed_id.ID,
 		ProtocolCyclesID: parsed_pid,
 	})
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error removing treatment from cycle: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error removing treatment from cycle: %s", parsed_id.ID.String()))
 		return
 	}
 
@@ -293,10 +293,10 @@ func HandleGetCyclesByProtocolID(c *config.Config, w http.ResponseWriter, r *htt
 		return
 	}
 	
-	raw_cyc, err := c.Db.GetCyclesByProtocol(ctx, parsed_id)
+	raw_cyc, err := c.Db.GetCyclesByProtocol(ctx, parsed_id.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting cycles for protocol: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting cycles for protocol: %s", parsed_id.ID.String()))
 		return
 	}
 	
@@ -320,10 +320,10 @@ func HandleGetCycleByID(c *config.Config, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	raw_cyc, err := c.Db.GetCycleByID(ctx, parsed_id)
+	raw_cyc, err := c.Db.GetCycleByID(ctx, parsed_id.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting cycle: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting cycle: %s", parsed_id.ID.String()))
 		return
 	}	
 
@@ -342,10 +342,10 @@ func HandleDeleteCycleByID(c *config.Config, w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	err = c.Db.RemoveCycleByID(ctx, parsed_id)
+	err = c.Db.RemoveCycleByID(ctx, parsed_id.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting cycle: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting cycle: %s", parsed_id.ID.String()))
 		return
 	}
 

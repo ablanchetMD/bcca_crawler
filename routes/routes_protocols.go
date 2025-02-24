@@ -46,7 +46,7 @@ func RegisterProtocolRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 		}
 	})	
 
-	mux.HandleFunc(prefix +"/protocols/eligibility/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/protocols/{protocol_id}/eligibility_criteria/{id}", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodDelete:
 			protocols.HandleRemoveEligibilityFromProtocol(s, w, r)
@@ -57,7 +57,7 @@ func RegisterProtocolRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 		}
 	})		
 
-	mux.HandleFunc(prefix +"/protocols/caution/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/protocols/{protocol_id}/cautions/{id}", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodDelete:
 			protocols.HandleRemoveCautionFromProtocol(s, w, r)
@@ -68,7 +68,7 @@ func RegisterProtocolRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 		}
 	})	
 	
-	mux.HandleFunc(prefix +"/protocols/precaution/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/protocols/{protocol_id}/precautions/{id}", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodDelete:
 			protocols.HandleRemovePrecautionFromProtocol(s, w, r)
@@ -79,8 +79,8 @@ func RegisterProtocolRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 		}
 	})
 
-	mux.HandleFunc(prefix +"/protocols/labs", func(w http.ResponseWriter, r *http.Request) {
-		//queries : test_category, test_urgency, protocol_id
+	mux.HandleFunc(prefix +"/protocols/{protocol_id}/labs", func(w http.ResponseWriter, r *http.Request) {
+		//queries : test_category, test_urgency
 		switch r.Method {
 		case http.MethodGet:
 			protocols.HandleGetLabsByProtocol(s, w, r)
@@ -89,7 +89,7 @@ func RegisterProtocolRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 		}
 	})
 	
-	mux.HandleFunc(prefix +"/protocols/labs/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/protocols/{protocol_id}/labs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		//queries : test_category, test_urgency, protocol_id
 		switch r.Method {
 		case http.MethodDelete:
@@ -101,7 +101,28 @@ func RegisterProtocolRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 		}
 	})
 
-	mux.HandleFunc(prefix +"/protocols/prescriptions", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/protocols/toxicity_adjustments/{id}", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodDelete:
+			protocols.HandleRemoveAdjustmentsToProtocol(s, w, r)							
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	mux.HandleFunc(prefix +"/protocols/{protocol_id}/toxicity_adjustments", func(w http.ResponseWriter, r *http.Request) {
+		//protocol_id
+		switch r.Method {
+		case http.MethodGet:
+			protocols.HandleGetToxicitiesWithAdjustmentsByProtocolID(s, w, r)
+		case http.MethodPut:
+			protocols.HandleUpsertAdjustmentsToProtocol(s, w, r)								
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})	
+
+	mux.HandleFunc(prefix +"/protocols/{protocol_id}/prescriptions", func(w http.ResponseWriter, r *http.Request) {
 		//queries : prescription_category, protocol_id
 		switch r.Method {
 		case http.MethodGet:
@@ -111,7 +132,7 @@ func RegisterProtocolRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 		}
 	})
 	
-	mux.HandleFunc(prefix +"/protocols/prescriptions/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/protocols/{protocol_id}/prescriptions/{id}", func(w http.ResponseWriter, r *http.Request) {
 		//queries : prescription_category, protocol_id
 		switch r.Method {
 		case http.MethodDelete:
@@ -123,7 +144,7 @@ func RegisterProtocolRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 		}
 	})
 
-	mux.HandleFunc(prefix + "protocols/cycles/{id}", func(w http.ResponseWriter, r *http.Request) {		
+	mux.HandleFunc(prefix + "protocols/{id}/cycles", func(w http.ResponseWriter, r *http.Request) {		
 		switch r.Method {
 		case http.MethodGet:
 			protocols.HandleGetCyclesByProtocolID(s, w, r)
@@ -141,7 +162,19 @@ func RegisterProtocolRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 		}
 	})
 
-	mux.HandleFunc(prefix +"/protocols/summary/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix + "/protocols/{id}/cycles", func(w http.ResponseWriter, r *http.Request) {
+		//query = protocol_id
+		switch r.Method {
+		case http.MethodGet:
+			protocols.HandleGetCycles(s, w, r)
+		case http.MethodPost:
+			protocols.HandleUpsertTreatmentCycle(s, w, r)
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	mux.HandleFunc(prefix +"/protocols/{id}/summary", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			api.HandleGetProtocolSummary(s, w, r)

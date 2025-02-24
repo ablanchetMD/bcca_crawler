@@ -67,7 +67,7 @@ func HandleGetToxicityByID(c *config.Config, w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	raw, err := c.Db.GetToxicityByID(ctx, parsed_id)
+	raw, err := c.Db.GetToxicityByID(ctx, parsed_id.ID)
 
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting toxicity by id")
@@ -128,10 +128,10 @@ func HandleDeleteToxicityByID(c *config.Config, w http.ResponseWriter, r *http.R
 		return
 	}
 
-	err = c.Db.RemoveToxicity(ctx, parsed_id)
+	err = c.Db.RemoveToxicity(ctx, parsed_id.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting toxicity: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting toxicity: %s", parsed_id.ID.String()))
 		return
 	}
 
@@ -253,10 +253,10 @@ func HandleRemoveAdjustmentsToProtocol(c *config.Config, w http.ResponseWriter, 
 		return
 	}
 	
-	err = c.Db.RemoveToxicityModification(ctx, id)
+	err = c.Db.RemoveToxicityModification(ctx, id.ID)
 		
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error removing toxicity adjustment from protocol: %s", id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error removing toxicity adjustment from protocol: %s", id.ID.String()))
 		return
 	}
 

@@ -46,16 +46,16 @@ func HandleGetLabByID(c *config.Config, w http.ResponseWriter, r *http.Request) 
 
 	ctx := r.Context()
 
-	parsed_id, err := api.ParseAndValidateID(r)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	raw_test, err := c.Db.GetTestByID(ctx, parsed_id)
+	raw_test, err := c.Db.GetTestByID(ctx, ids.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting test: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting test: %s", ids.ID.String()))
 		return
 	}		
 
@@ -68,16 +68,16 @@ func HandleDeleteLabByID(c *config.Config, w http.ResponseWriter, r *http.Reques
 
 	ctx := r.Context()
 
-	parsed_id, err := api.ParseAndValidateID(r)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	err = c.Db.DeleteTest(ctx, parsed_id)
+	err = c.Db.DeleteTest(ctx, ids.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting test: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting test: %s", ids.ID.String()))
 		return
 	}
 
@@ -127,19 +127,11 @@ func HandleUpsertLab(c *config.Config, w http.ResponseWriter, r *http.Request) {
 func HandleAddLabToProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	parsed_id, err := api.ParseAndValidateID(r)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-
-	proto_id := r.URL.Query().Get("protocol_id")
-
-	parsed_pid, err := uuid.Parse(proto_id)
-    if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest,"protocol_id is not a valid uuid")
-		return       
-    }
 	
 	category := r.URL.Query().Get("test_category")
 
@@ -160,14 +152,14 @@ func HandleAddLabToProtocol(c *config.Config, w http.ResponseWriter, r *http.Req
 	}
 	
 	_,err = c.Db.AddTestToProtocolByCategoryAndUrgency(ctx, database.AddTestToProtocolByCategoryAndUrgencyParams{
-		ProtocolID: parsed_pid,
-		TestID: parsed_id,
+		ProtocolID: ids.ProtocolID,
+		TestID: ids.ID,
 		Category: database.CategoryEnum(category),
 		Urgency: database.UrgencyEnum(urgency),
 	})	
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding test to protocol: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding test to protocol: %s", ids.ID.String()))
 		return
 	}
 
@@ -179,13 +171,11 @@ func HandleGetLabsByProtocol(c *config.Config, w http.ResponseWriter, r *http.Re
 	ctx := r.Context()
 	labs := []api.LabResp{}
 	
-	proto_id := r.URL.Query().Get("protocol_id")
-
-	parsed_id, err := uuid.Parse(proto_id)
-    if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest,"protocol_id is not a valid uuid")
-		return       
-    }	
+	ids, err := api.ParseAndValidateID(r)
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}	
 	
 	category := r.URL.Query().Get("test_category")
 
@@ -207,7 +197,7 @@ func HandleGetLabsByProtocol(c *config.Config, w http.ResponseWriter, r *http.Re
 
 	
 	raw_labs, err := c.Db.GetTestsByProtocolByCategoryAndUrgency(ctx, database.GetTestsByProtocolByCategoryAndUrgencyParams{
-		ProtocolID: parsed_id,
+		ProtocolID: ids.ProtocolID,
 		Category: database.CategoryEnum(category),
 		Urgency: database.UrgencyEnum(urgency),
 	})
@@ -227,19 +217,11 @@ func HandleGetLabsByProtocol(c *config.Config, w http.ResponseWriter, r *http.Re
 func HandleRemoveLabFromProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	parsed_id, err := api.ParseAndValidateID(r)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-
-	proto_id := r.URL.Query().Get("protocol_id")
-
-	parsed_proto_id, err := uuid.Parse(proto_id)
-    if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest,"protocol_id is not a valid uuid")
-		return       
-    }
 
 	category := r.URL.Query().Get("test_category")
 
@@ -261,14 +243,14 @@ func HandleRemoveLabFromProtocol(c *config.Config, w http.ResponseWriter, r *htt
 	
 	
 	err = c.Db.RemoveTestFromProtocolByCategoryAndUrgency(ctx, database.RemoveTestFromProtocolByCategoryAndUrgencyParams{
-		ProtocolID: parsed_proto_id,
-		TestID: parsed_id,
+		ProtocolID: ids.ProtocolID,
+		TestID: ids.ID,
 		Category: database.CategoryEnum(category),
 		Urgency: database.UrgencyEnum(urgency),
 	})
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error removing lab test from protocol: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error removing lab test from protocol: %s", ids.ID.String()))
 		return
 	}
 

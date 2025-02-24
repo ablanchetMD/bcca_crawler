@@ -95,10 +95,10 @@ func HandleGetCancerById(c *config.Config, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	cancer, err := c.Db.GetCancerByID(r.Context(), parsed_id)
+	cancer, err := c.Db.GetCancerByID(r.Context(), parsed_id.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting cancer: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting cancer: %s", parsed_id.ID.String()))
 		return
 	}
 	json_utils.RespondWithJSON(w, http.StatusOK, mapCancerStruct(cancer))
@@ -120,7 +120,7 @@ func HandleUpdateCancer(c *config.Config, w http.ResponseWriter, r *http.Request
 	}
 
 	cancer, err := c.Db.UpdateCancer(r.Context(), database.UpdateCancerParams{
-		ID:         parsed_id,
+		ID:         parsed_id.ID,
 		TumorGroup: req.TumorGroup,
 		Code:       ToNullString(req.Code),
 		Name:       ToNullString(req.Name),
@@ -129,7 +129,7 @@ func HandleUpdateCancer(c *config.Config, w http.ResponseWriter, r *http.Request
 	})
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error updating protocol: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error updating protocol: %s", parsed_id.ID.String()))
 		return
 	}
 	json_utils.RespondWithJSON(w, http.StatusOK, mapCancerStruct(cancer))
@@ -169,9 +169,9 @@ func HandleDeleteCancer(c *config.Config, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err = c.Db.DeleteCancer(r.Context(), parsed_id)
+	err = c.Db.DeleteCancer(r.Context(), parsed_id.ID)
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting cancer: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting cancer: %s", parsed_id.ID.String()))
 		return
 	}
 	json_utils.RespondWithJSON(w, http.StatusOK, nil)
@@ -185,9 +185,9 @@ func HandleGetProtocolsByCancerId(c *config.Config, w http.ResponseWriter, r *ht
 		return
 	}
 
-	protocols, err := c.Db.GetProtocolsForCancer(r.Context(), parsed_id)
+	protocols, err := c.Db.GetProtocolsForCancer(r.Context(), parsed_id.ID)
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting protocols for cancer: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting protocols for cancer: %s", parsed_id.ID.String()))
 		return
 	}
 

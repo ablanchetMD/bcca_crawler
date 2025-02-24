@@ -29,25 +29,6 @@ func RegisterToxicitiesRoutes(prefix string, mux *http.ServeMux, s *config.Confi
 		}
 	})
 
-	mux.HandleFunc(prefix +"/protocols/toxicities/{id}", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodDelete:
-			protocols.HandleRemoveAdjustmentsToProtocol(s, w, r)							
-		default:
-			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		}
-	})
-
-	mux.HandleFunc(prefix +"/protocols/toxicities", func(w http.ResponseWriter, r *http.Request) {
-		//protocol_id
-		switch r.Method {
-		case http.MethodGet:
-			protocols.HandleGetToxicitiesWithAdjustmentsByProtocolID(s, w, r)
-		case http.MethodPut:
-			protocols.HandleUpsertAdjustmentsToProtocol(s, w, r)								
-		default:
-			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		}
-	})	
+	
 
 }

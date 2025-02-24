@@ -8,7 +8,7 @@ import (
 )
 
 func RegisterCriteriaRoutes(prefix string, mux *http.ServeMux, s *config.Config) {
-	mux.HandleFunc(prefix +"/eligibility", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/eligibility_criteria", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			protocols.HandleGetEligibilityCriteria(s, w, r)
@@ -19,7 +19,7 @@ func RegisterCriteriaRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 		}
 	})
 
-	mux.HandleFunc(prefix +"/eligibility/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/eligibility_criteria/{id}", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			protocols.HandleGetEligibilityCriteriaByID(s, w, r)

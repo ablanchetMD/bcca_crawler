@@ -170,9 +170,9 @@ func HandleUpdateUser(c *config.Config, w http.ResponseWriter, r *http.Request) 
 	addUpdate("deleted_by", req.DeletedBy)
 	addUpdate("last_active", req.LastActive)
 
-	user, err := UpdateUserDynamic(c, parsed_id, updates, r)
+	user, err := UpdateUserDynamic(c, parsed_id.ID, updates, r)
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error updating user: %s with error:%s", parsed_id.String(), err.Error()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error updating user: %s with error:%s", parsed_id.ID.String(), err.Error()))
 		return
 	}
 
@@ -336,13 +336,13 @@ func HandleDeleteUserById(c *config.Config, w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	err = c.Db.DeleteUserByID(r.Context(), parsed_id)
+	err = c.Db.DeleteUserByID(r.Context(), parsed_id.ID)
 
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error deleting user")
 		return
 	}
-	json_utils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": fmt.Sprintf("User %s deleted", parsed_id.String())})
+	json_utils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": fmt.Sprintf("User %s deleted", parsed_id.ID.String())})
 }
 
 func HandleGetUserById(c *config.Config, w http.ResponseWriter, r *http.Request) {
@@ -353,10 +353,10 @@ func HandleGetUserById(c *config.Config, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	user, err := c.Db.GetUserByID(r.Context(), parsed_id)
+	user, err := c.Db.GetUserByID(r.Context(), parsed_id.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting user: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting user: %s", parsed_id.ID.String()))
 		return
 	}
 	json_utils.RespondWithJSON(w, http.StatusOK, mapUserStruct(user))

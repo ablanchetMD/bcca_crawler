@@ -135,17 +135,17 @@ func HandleGetArticleRefByID(c *config.Config, w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	raw_article, err := c.Db.GetArticleReferenceByIDWithProtocols(ctx, parsed_id)
+	raw_article, err := c.Db.GetArticleReferenceByIDWithProtocols(ctx, parsed_id.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting article: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting article: %s", parsed_id.ID.String()))
 		return
 	}
 	
 	linkedProtocols, err := ConvertTuplesToStructs[LinkedProtocols](raw_article.ProtocolIds)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting linked protocols: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting linked protocols: %s", parsed_id.ID.String()))
 		return
 	}
 
@@ -173,10 +173,10 @@ func HandleDeleteArticleRefByID(c *config.Config, w http.ResponseWriter, r *http
 		return
 	}
 
-	err = c.Db.DeleteArticleReference(ctx, parsed_id)
+	err = c.Db.DeleteArticleReference(ctx, parsed_id.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting article reference: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting article reference: %s", parsed_id.ID.String()))
 		return
 	}
 
@@ -201,12 +201,12 @@ func HandleAddArticleToProtocol(c *config.Config, w http.ResponseWriter, r *http
     }	
 
 	err = c.Db.AddArticleReferenceToProtocol(ctx, database.AddArticleReferenceToProtocolParams{
-		ReferenceID: parsed_id,
+		ReferenceID: parsed_id.ID,
 		ProtocolID: parsed_pid,
 	})
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding reference to protocol: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding reference to protocol: %s", parsed_id.ID.String()))
 		return
 	}
 
@@ -232,12 +232,12 @@ func HandleRemoveArticleFromProtocol(c *config.Config, w http.ResponseWriter, r 
     }	
 
 	err = c.Db.RemoveArticleReferenceFromProtocol(ctx, database.RemoveArticleReferenceFromProtocolParams{
-		ReferenceID: parsed_id,
+		ReferenceID: parsed_id.ID,
 		ProtocolID: parsed_pid,
 	})
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error removing reference from protocol: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error removing reference from protocol: %s", parsed_id.ID.String()))
 		return
 	}
 

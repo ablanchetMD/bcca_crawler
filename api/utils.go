@@ -40,17 +40,40 @@ type IPApiResponse struct {
 	AS string `json:"as"`
 }
 
-func ParseAndValidateID(r *http.Request) (uuid.UUID, error) {
-    id := r.PathValue("id")
-    if len(id) == 0 {
-        return uuid.Nil, fmt.Errorf("no id provided")
+type IDs struct {
+	ID uuid.UUID
+	ProtocolID uuid.UUID
+	CycleID uuid.UUID
+}
+
+func ParseAndValidateID(r *http.Request) (IDs, error) {
+	var ids IDs    
+	
+	if id := r.PathValue("id"); id != "" {
+		parsed_id, err := uuid.Parse(id)
+		if err != nil {
+			return ids, fmt.Errorf("id is not a valid uuid")
+		}
+		ids.ID = parsed_id
+	}
+
+	if protocol_id := r.PathValue("protocol_id"); protocol_id != "" {
+        pid, err := uuid.Parse(protocol_id)
+        if err != nil {
+            return ids, fmt.Errorf("protocol_id is not a valid uuid")
+        }
+        ids.ProtocolID = pid
     }
 
-    parsed_id, err := uuid.Parse(id)
-    if err != nil {
-        return uuid.Nil, fmt.Errorf("id is not a valid uuid")
-    }
-    return parsed_id, nil
+	if cycle_id := r.PathValue("cycle_id"); cycle_id != "" {
+		cid, err := uuid.Parse(cycle_id)
+		if err != nil {
+			return ids, fmt.Errorf("cycle_id is not a valid uuid")
+		}
+		ids.CycleID = cid
+	}
+    
+    return ids, nil
 }
 
 func UnmarshalAndValidatePayload(c *config.Config,r *http.Request, v interface{}) error {

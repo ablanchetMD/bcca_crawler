@@ -63,10 +63,10 @@ func HandleGetMedByID(c *config.Config, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	raw_med, err := c.Db.GetMedicationByID(ctx, parsed_id)
+	raw_med, err := c.Db.GetMedicationByID(ctx, parsed_id.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting Med: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting Med: %s", parsed_id.ID.String()))
 		return
 	}
 	
@@ -85,10 +85,10 @@ func HandleDeleteMedByID(c *config.Config, w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = c.Db.DeleteMedication(ctx, parsed_id)
+	err = c.Db.DeleteMedication(ctx, parsed_id.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting Med: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting Med: %s", parsed_id.ID.String()))
 		return
 	}
 
@@ -155,10 +155,10 @@ func HandleGetPrescriptionByID(c *config.Config, w http.ResponseWriter, r *http.
 		return
 	}
 
-	raw_prescription, err := c.Db.GetPrescriptionByID(ctx, parsed_id)
+	raw_prescription, err := c.Db.GetPrescriptionByID(ctx, parsed_id.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting Prescription: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting Prescription: %s", parsed_id.ID.String()))
 		return
 	}
 
@@ -177,10 +177,10 @@ func HandleDeletePrescriptionByID(c *config.Config, w http.ResponseWriter, r *ht
 		return
 	}
 
-	err = c.Db.RemovePrescription(ctx, parsed_id)
+	err = c.Db.RemovePrescription(ctx, parsed_id.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting Prescription: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting Prescription: %s", parsed_id.ID.String()))
 		return
 	}
 
@@ -278,12 +278,12 @@ func HandleAddPrescriptionToProtocolByCategory(c *config.Config, w http.Response
 
 	err = c.Db.AddPrescriptionToProtocolByCategory(ctx, database.AddPrescriptionToProtocolByCategoryParams{
 		ProtocolID: parsed_pid,
-		PrescriptionID: parsed_id,
+		PrescriptionID: parsed_id.ID,
 		Category: database.MedProtoCategoryEnum(strings.ToLower(category)),
 	})
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding prescription to protocol: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding prescription to protocol: %s", parsed_id.ID.String()))
 		return
 	}
 
@@ -318,12 +318,12 @@ func HandleRemovePrescriptionFromProtocolByCategory(c *config.Config, w http.Res
 
 	err = c.Db.RemovePrescriptionFromProtocolByCategory(ctx, database.RemovePrescriptionFromProtocolByCategoryParams{
 		ProtocolID: parsed_pid,
-		PrescriptionID: parsed_id,
+		PrescriptionID: parsed_id.ID,
 		Category: database.MedProtoCategoryEnum(strings.ToLower(category)),
 	})
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error removing prescription from protocol: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error removing prescription from protocol: %s", parsed_id.ID.String()))
 		return
 	}
 

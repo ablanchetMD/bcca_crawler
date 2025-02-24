@@ -30,7 +30,7 @@ func RegisterTreatmentRoutes(prefix string, mux *http.ServeMux, s *config.Config
 		}
 	})
 
-	mux.HandleFunc(prefix + "/cycles/treatments", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix + "/cycles/{cycle_id}/treatments", func(w http.ResponseWriter, r *http.Request) {
 		//query = cycle_id
 		switch r.Method {
 		case http.MethodGet:
@@ -40,7 +40,7 @@ func RegisterTreatmentRoutes(prefix string, mux *http.ServeMux, s *config.Config
 		}
 	})
 
-	mux.HandleFunc(prefix + "/cycles/treatments/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix + "/cycles/{cycle_id}/treatments/{id}", func(w http.ResponseWriter, r *http.Request) {
 		//query = cycle_id
 		switch r.Method {
 		case http.MethodPost:
@@ -50,19 +50,7 @@ func RegisterTreatmentRoutes(prefix string, mux *http.ServeMux, s *config.Config
 		default:
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		}
-	})
-
-	mux.HandleFunc(prefix + "/cycles", func(w http.ResponseWriter, r *http.Request) {
-		//query = protocol_id
-		switch r.Method {
-		case http.MethodGet:
-			protocols.HandleGetCycles(s, w, r)
-		case http.MethodPost:
-			protocols.HandleUpsertTreatmentCycle(s, w, r)
-		default:
-			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		}
-	})
+	})	
 
 	mux.HandleFunc(prefix + "/cycles/{id}", func(w http.ResponseWriter, r *http.Request) {		
 		switch r.Method {
