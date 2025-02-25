@@ -66,6 +66,17 @@ func RegisterProtocolRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 		default:
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		}
+	})
+	
+	mux.HandleFunc(prefix +"/protocols/{protocol_id}/references/{id}", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodDelete:
+			api.HandleRemoveArticleFromProtocol(s, w, r)
+		case http.MethodPost:
+			api.HandleAddArticleToProtocol(s, w, r)			
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
 	})	
 	
 	mux.HandleFunc(prefix +"/protocols/{protocol_id}/precautions/{id}", func(w http.ResponseWriter, r *http.Request) {

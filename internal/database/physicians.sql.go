@@ -303,3 +303,44 @@ func (q *Queries) UpdatePhysician(ctx context.Context, arg UpdatePhysicianParams
 	)
 	return i, err
 }
+
+const upsertPhysician = `-- name: UpsertPhysician :one
+INSERT INTO physicians (id, first_name, last_name, email, site)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (id) DO UPDATE
+SET first_name = EXCLUDED.first_name,
+    last_name = EXCLUDED.last_name,
+    email = EXCLUDED.email,
+    site = EXCLUDED.site,
+    updated_at = NOW()
+RETURNING id, created_at, updated_at, first_name, last_name, email, site
+`
+
+type UpsertPhysicianParams struct {
+	ID        uuid.UUID         `json:"id"`
+	FirstName string            `json:"first_name"`
+	LastName  string            `json:"last_name"`
+	Email     string            `json:"email"`
+	Site      PhysicianSiteEnum `json:"site"`
+}
+
+func (q *Queries) UpsertPhysician(ctx context.Context, arg UpsertPhysicianParams) (Physician, error) {
+	row := q.db.QueryRowContext(ctx, upsertPhysician,
+		arg.ID,
+		arg.FirstName,
+		arg.LastName,
+		arg.Email,
+		arg.Site,
+	)
+	var i Physician
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.FirstName,
+		&i.LastName,
+		&i.Email,
+		&i.Site,
+	)
+	return i, err
+}

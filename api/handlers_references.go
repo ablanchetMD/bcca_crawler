@@ -186,27 +186,19 @@ func HandleDeleteArticleRefByID(c *config.Config, w http.ResponseWriter, r *http
 func HandleAddArticleToProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	parsed_id, err := ParseAndValidateID(r)
+	ids, err := ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
-	}
-
-	proto_id := r.URL.Query().Get("protocol_id")
-
-	parsed_pid, err := uuid.Parse(proto_id)
-    if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest,"protocol_id is not a valid uuid")
-		return       
-    }	
+	}		
 
 	err = c.Db.AddArticleReferenceToProtocol(ctx, database.AddArticleReferenceToProtocolParams{
-		ReferenceID: parsed_id.ID,
-		ProtocolID: parsed_pid,
+		ReferenceID: ids.ID,
+		ProtocolID: ids.ProtocolID,
 	})
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding reference to protocol: %s", parsed_id.ID.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding reference to protocol: %s", ids.ID.String()))
 		return
 	}
 
@@ -217,27 +209,19 @@ func HandleAddArticleToProtocol(c *config.Config, w http.ResponseWriter, r *http
 func HandleRemoveArticleFromProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	parsed_id, err := ParseAndValidateID(r)
+	ids, err := ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
-	}
-
-	proto_id := r.URL.Query().Get("protocol_id")
-
-	parsed_pid, err := uuid.Parse(proto_id)
-    if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest,"protocol_id is not a valid uuid")
-		return       
-    }	
+	}		
 
 	err = c.Db.RemoveArticleReferenceFromProtocol(ctx, database.RemoveArticleReferenceFromProtocolParams{
-		ReferenceID: parsed_id.ID,
-		ProtocolID: parsed_pid,
+		ReferenceID: ids.ID,
+		ProtocolID: ids.ProtocolID,
 	})
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error removing reference from protocol: %s", parsed_id.ID.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error removing reference from protocol: %s", ids.ID.String()))
 		return
 	}
 

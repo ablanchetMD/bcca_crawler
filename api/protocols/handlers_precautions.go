@@ -61,23 +61,23 @@ func HandleGetPrecautionByID(c *config.Config, w http.ResponseWriter, r *http.Re
 
 	ctx := r.Context()
 
-	parsed_id, err := api.ParseAndValidateID(r)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	raw_caution, err := c.Db.GetPrecautionByIDWithProtocols(ctx, parsed_id.ID)
+	raw_caution, err := c.Db.GetPrecautionByIDWithProtocols(ctx, ids.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting cautions: %s", parsed_id.ID.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting cautions: %s", ids.ID.String()))
 		return
 	}
 	
 	linkedProtocols, err := api.ConvertTuplesToStructs[api.LinkedProtocols](raw_caution.ProtocolIds)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting linked protocols: %s", parsed_id.ID.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting linked protocols: %s", ids.ID.String()))
 		return
 	}
 
@@ -95,16 +95,16 @@ func HandleDeletePrecautionByID(c *config.Config, w http.ResponseWriter, r *http
 
 	ctx := r.Context()
 
-	parsed_id, err := api.ParseAndValidateID(r)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	err = c.Db.DeleteProtocolPrecaution(ctx, parsed_id.ID)
+	err = c.Db.DeleteProtocolPrecaution(ctx, ids.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting precaution: %s", parsed_id.ID.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting precaution: %s", ids.ID.String()))
 		return
 	}
 
@@ -160,27 +160,19 @@ func HandleUpsertPrecaution(c *config.Config, w http.ResponseWriter, r *http.Req
 func HandleAddPrecautionToProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	parsed_id, err := api.ParseAndValidateID(r)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
-	}
-
-	proto_id := r.URL.Query().Get("protocol_id")
-
-	parsed_pid, err := uuid.Parse(proto_id)
-    if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest,"protocol_id is not a valid uuid")
-		return       
-    }	
+	}	
 	
 	err = c.Db.AddProtocolPrecautionToProtocol(ctx, database.AddProtocolPrecautionToProtocolParams{
-		PrecautionID: parsed_id.ID,
-		ProtocolID: parsed_pid,
+		PrecautionID: ids.ID,
+		ProtocolID: ids.ProtocolID,
 	})	
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding precaution to protocol: %s", parsed_id.ID.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding precaution to protocol: %s", ids.ID.String()))
 		return
 	}
 
@@ -191,27 +183,19 @@ func HandleAddPrecautionToProtocol(c *config.Config, w http.ResponseWriter, r *h
 func HandleRemovePrecautionFromProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	parsed_id, err := api.ParseAndValidateID(r)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
-	}
-
-	proto_id := r.URL.Query().Get("protocol_id")
-
-	parsed_pid, err := uuid.Parse(proto_id)
-    if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest,"protocol_id is not a valid uuid")
-		return       
-    }	
+	}	
 	
 	err = c.Db.RemoveProtocolPrecautionFromProtocol(ctx, database.RemoveProtocolPrecautionFromProtocolParams{
-		PrecautionID: parsed_id.ID,
-		ProtocolID: parsed_pid,
+		PrecautionID: ids.ID,
+		ProtocolID: ids.ProtocolID,
 	})
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error removing eligibility criteria from protocol: %s", parsed_id.ID.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error removing eligibility criteria from protocol: %s", ids.ID.String()))
 		return
 	}
 

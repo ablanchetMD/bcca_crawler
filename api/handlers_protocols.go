@@ -96,33 +96,33 @@ func HandleGetProtocols(c *config.Config,q QueryParams, w http.ResponseWriter, r
 }
 
 func HandleDeleteProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	parsed_id, err := ParseAndValidateID(r)
+	ids, err := ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	err = c.Db.DeleteProtocol(r.Context(),parsed_id.ID)
+	err = c.Db.DeleteProtocol(r.Context(),ids.ID)
 		
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error deleting protocols")
 		return
 	}
-	json_utils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": fmt.Sprintf("Protocol %s deleted", parsed_id.ID.String())})
+	json_utils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": fmt.Sprintf("Protocol %s deleted", ids.ID.String())})
 }
 
 func HandleGetProtocolById(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	
-	parsed_id, err := ParseAndValidateID(r)
+	ids, err := ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	protocol,err := c.Db.GetProtocolByID(r.Context(),parsed_id.ID)
+	protocol,err := c.Db.GetProtocolByID(r.Context(),ids.ID)
 		
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting protocol: %s", parsed_id.ID.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting protocol: %s", ids.ID.String()))
 		return
 	}
 	json_utils.RespondWithJSON(w, http.StatusOK, mapProtocolStruct(protocol))
@@ -130,7 +130,7 @@ func HandleGetProtocolById(c *config.Config, w http.ResponseWriter, r *http.Requ
 
 func HandleUpdateProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
 
-	parsed_id, err := ParseAndValidateID(r)
+	ids, err := ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
@@ -144,7 +144,7 @@ func HandleUpdateProtocol(c *config.Config, w http.ResponseWriter, r *http.Reque
 	}
 
 	protocol,err := c.Db.UpdateProtocol(r.Context(),database.UpdateProtocolParams{
-		ID: parsed_id.ID,		
+		ID: ids.ID,		
 		TumorGroup: req.TumorGroup,
 		Code: req.Code,
 		Name: req.Name,
@@ -157,7 +157,7 @@ func HandleUpdateProtocol(c *config.Config, w http.ResponseWriter, r *http.Reque
 	})
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error updating protocol: %s", parsed_id.ID.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error updating protocol: %s", ids.ID.String()))
 		return
 	}
 	json_utils.RespondWithJSON(w, http.StatusOK, mapProtocolStruct(protocol))
@@ -165,15 +165,15 @@ func HandleUpdateProtocol(c *config.Config, w http.ResponseWriter, r *http.Reque
 
 func HandleGetProtocolSummary(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	
-	parsed_id, err := ParseAndValidateID(r)
+	ids, err := ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	response,err := CMD_GetProtocolBy(c,r.Context(),"id",parsed_id.ID.String())
+	response,err := CMD_GetProtocolBy(c,r.Context(),"id",ids.ID.String())
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting protocol: %s", parsed_id.ID.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting protocol: %s", ids.ID.String()))
 		return
 	}
 	

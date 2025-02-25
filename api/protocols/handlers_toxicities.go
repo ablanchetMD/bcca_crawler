@@ -61,13 +61,13 @@ func HandleGetToxicities(c *config.Config, w http.ResponseWriter, r *http.Reques
 func HandleGetToxicityByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()	
 
-	parsed_id, err := api.ParseAndValidateID(r)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	raw, err := c.Db.GetToxicityByID(ctx, parsed_id.ID)
+	raw, err := c.Db.GetToxicityByID(ctx, ids.ID)
 
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting toxicity by id")
@@ -87,18 +87,16 @@ func HandleGetToxicitiesWithAdjustmentsByProtocolID(c *config.Config, w http.Res
 	
 	ctx := r.Context()
 
-	protocol_id := r.URL.Query().Get("protocol_id")
-
-	parsed_id, err := uuid.Parse(protocol_id)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest,"protocol_id is not a valid uuid")
-		return       
-	}	
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	
-	raw, err := c.Db.GetToxicitiesWithGradesAndAdjustments(ctx, parsed_id)
+	raw, err := c.Db.GetToxicitiesWithGradesAndAdjustments(ctx, ids.ProtocolID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting toxicities for the protocol: %s", parsed_id.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting toxicities for the protocol: %s", ids.ProtocolID.String()))
 		return
 	}
 	
@@ -122,16 +120,16 @@ func HandleDeleteToxicityByID(c *config.Config, w http.ResponseWriter, r *http.R
 
 	ctx := r.Context()
 
-	parsed_id, err := api.ParseAndValidateID(r)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	err = c.Db.RemoveToxicity(ctx, parsed_id.ID)
+	err = c.Db.RemoveToxicity(ctx, ids.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting toxicity: %s", parsed_id.ID.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting toxicity: %s", ids.ID.String()))
 		return
 	}
 

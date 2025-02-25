@@ -23,13 +23,13 @@ type MedModReq struct {
 func HandleGetMedModificationsByProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()	
 
-	parsed_id, err := api.ParseAndValidateID(r)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	raw_med_modifications, err := c.Db.GetMedicationModificationsByProtocol(ctx, parsed_id.ID)
+	raw_med_modifications, err := c.Db.GetMedicationModificationsByProtocol(ctx, ids.ID)
 
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting Med Modifications")
@@ -43,13 +43,13 @@ func HandleGetMedModificationsByProtocol(c *config.Config, w http.ResponseWriter
 func HandleGetMedModificationsByMedication(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	parsed_id, err := api.ParseAndValidateID(r)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	raw_med_modifications, err := c.Db.GetMedicationModificationsByMedication(ctx, parsed_id.ID)
+	raw_med_modifications, err := c.Db.GetMedicationModificationsByMedication(ctx, ids.ID)
 
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting Med Modifications")
@@ -73,16 +73,16 @@ func HandleGetMedModByID(c *config.Config, w http.ResponseWriter, r *http.Reques
 
 	ctx := r.Context()
 
-	parsed_id, err := api.ParseAndValidateID(r)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	raw_med_mod, err := c.Db.GetMedicationModificationByID(ctx, parsed_id.ID)
+	raw_med_mod, err := c.Db.GetMedicationModificationByID(ctx, ids.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting Med Mod: %s", parsed_id.ID.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting Med Mod: %s", ids.ID.String()))
 		return
 	}
 	
@@ -95,16 +95,16 @@ func HandleDeleteMedModByID(c *config.Config, w http.ResponseWriter, r *http.Req
 	
 	ctx := r.Context()
 
-	parsed_id, err := api.ParseAndValidateID(r)
+	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	err = c.Db.RemoveMedicationModification(ctx, parsed_id.ID)
+	err = c.Db.RemoveMedicationModification(ctx, ids.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting Med Mod: %s", parsed_id.ID.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting Med Mod: %s", ids.ID.String()))
 		return
 	}
 

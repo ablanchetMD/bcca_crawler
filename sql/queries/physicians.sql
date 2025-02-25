@@ -19,6 +19,17 @@ SET
 WHERE id = $1
 returning *;
 
+-- name: UpsertPhysician :one
+INSERT INTO physicians (id, first_name, last_name, email, site)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (id) DO UPDATE
+SET first_name = EXCLUDED.first_name,
+    last_name = EXCLUDED.last_name,
+    email = EXCLUDED.email,
+    site = EXCLUDED.site,
+    updated_at = NOW()
+RETURNING *;
+
 -- name: DeletePhysician :exec
 DELETE FROM physicians
 WHERE id = $1;
