@@ -17,18 +17,32 @@ WHERE id = $1
 RETURNING *;
 
 -- name: UpsertArticleReference :one
-INSERT INTO article_references (id, title, authors, journal, year, doi, pmid, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+WITH input_values(id, title, authors, journal, year, doi, pmid) AS (
+  VALUES (
+    CASE 
+      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      THEN gen_random_uuid() 
+      ELSE $1 
+    END,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7
+  )
+)
+INSERT INTO article_references (id, title, authors, journal, year, doi, pmid)
+SELECT id, title, authors, journal, year, doi, pmid FROM input_values
 ON CONFLICT (id) DO UPDATE
 SET title = EXCLUDED.title,
     authors = EXCLUDED.authors,
     journal = EXCLUDED.journal,
     year = EXCLUDED.year,
     doi = EXCLUDED.doi,
-    pmid = EXCLUDED.pmid,    
+    pmid = EXCLUDED.pmid,
     updated_at = NOW()
 RETURNING *;
-
 
 -- name: DeleteArticleReference :exec
 DELETE FROM article_references
@@ -46,6 +60,9 @@ JOIN protocols p ON arpv.protocol_id = p.id
 WHERE ar.id = $1
 GROUP BY ar.id;
 
+-- name: GetALLArticles :many
+SELECT * FROM article_references
+ORDER BY year DESC;
 
 -- name: GetArticleReferencesByProtocol :many
 SELECT article_references.*
@@ -59,8 +76,24 @@ SELECT * FROM article_references
 WHERE title = $1 AND authors = $2 AND journal = $3 AND year = $4;
 
 -- name: GetArticleReferences :many
-SELECT * FROM article_references
-ORDER BY year DESC;
+SELECT 
+    art.*, 
+    COALESCE(
+        (
+            SELECT json_agg(
+            json_build_object(
+                'id', pecv.protocol_id, 
+                'code', p.code
+            )
+        )
+        FROM protocol_references_value pecv
+        JOIN protocols p ON pecv.protocol_id = p.id
+        WHERE pecv.reference_id = art.id
+        ),
+        '[]'
+    ) AS protocol_ids
+FROM 
+    article_references art;
 
 -- name: GetArticleReferencesWithProtocols :many
 SELECT ar.*, ARRAY_AGG(ROW(arpv.protocol_id,p.code)) AS protocol_ids

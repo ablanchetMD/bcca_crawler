@@ -17,11 +17,14 @@ var validTumorGroups = map[string]bool{
 	"gastrointestinal": true,
 	"genitourinary": true,
 	"gynecology": true,
-	"head&neck": true,
+	"head_and_neck": true,
 	"lung": true,
-	"melanoma": true,
+	"skin": true,
 	"neuro-oncology": true,
-	"sarcoma": true,	
+	"sarcoma": true,
+	"ocular": true,
+	"unknown": true,
+	"unknown_primary": true,
 	// Add more as needed
 }
 

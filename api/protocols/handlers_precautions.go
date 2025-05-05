@@ -7,7 +7,8 @@ import (
 	"bcca_crawler/api"
 	"fmt"
 	"net/http"
-	"github.com/google/uuid"	
+	"github.com/google/uuid"
+	"encoding/json"	
 
 )
 
@@ -20,18 +21,24 @@ type PrecautionReq struct {
 }
 
 
-type PrecausionResp struct {
+type PrecautionResp struct {
 	ID 			string `json:"id"`
 	Title 		string `json:"title"`
-	Description string `json:"description"`	
+	Description string `json:"description"`
+	CreateAt 	string `json:"created_at"`
+	UpdateAt 	string `json:"updated_at"`	
 	LinkedProtocols []api.LinkedProtocols `json:"linked_protocols"`
+}
+
+type PrecautionUpdateReq struct {
+	SelectedProtocolIDs []string `json:"protocol_ids"`
 }
 
 
 
 func HandleGetPrecautions(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	precautions := []PrecausionResp{}
+	precautions := []PrecautionResp{}
 	raw_cautions, err := c.Db.GetPrecautionWithProtocols(ctx)
 
 	if err != nil {
@@ -40,12 +47,21 @@ func HandleGetPrecautions(c *config.Config, w http.ResponseWriter, r *http.Reque
 	}
 	
 	for _, a := range raw_cautions {
-		linkedProtocols, err := api.ConvertTuplesToStructs[api.LinkedProtocols](a.ProtocolIds)
-		if err != nil {
-			fmt.Println("Error:", err)
+		var linkedProtocols []api.LinkedProtocols	
+	
+		protocolIdsBytes, ok := a.ProtocolIds.([]byte)
+		if !ok {
+			json_utils.RespondWithError(w, http.StatusInternalServerError, "Error asserting protocol IDs to []byte")
 			return
-		}	
-		precautions = append(precautions, PrecausionResp{
+		}
+
+		err = json.Unmarshal(protocolIdsBytes, &linkedProtocols)
+		if err != nil {
+			json_utils.RespondWithError(w, http.StatusInternalServerError, 
+				fmt.Sprintf("Error parsing protocol data: %s", err.Error()))
+			return
+		}		
+		precautions = append(precautions, PrecautionResp{
 			ID:          a.ID.String(),
 			Title:       a.Title,			
 			Description:     a.Description,			
@@ -74,17 +90,27 @@ func HandleGetPrecautionByID(c *config.Config, w http.ResponseWriter, r *http.Re
 		return
 	}
 	
-	linkedProtocols, err := api.ConvertTuplesToStructs[api.LinkedProtocols](raw_caution.ProtocolIds)
-
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting linked protocols: %s", ids.ID.String()))
+	var linkedProtocols []api.LinkedProtocols	
+	
+	protocolIdsBytes, ok := raw_caution.ProtocolIds.([]byte)
+	if !ok {
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error asserting protocol IDs to []byte")
 		return
 	}
 
-	Precaution := PrecausionResp{
+	err = json.Unmarshal(protocolIdsBytes, &linkedProtocols)
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusInternalServerError, 
+			fmt.Sprintf("Error parsing protocol data: %s", err.Error()))
+		return
+	}	
+
+	Precaution := PrecautionResp{
 		ID: raw_caution.ID.String(),
 		Title: raw_caution.Title,
 		Description: raw_caution.Description,
+		CreateAt: raw_caution.CreatedAt.String(),
+		UpdateAt: raw_caution.UpdatedAt.String(),
 		LinkedProtocols: linkedProtocols,
 	}
 	
@@ -129,15 +155,20 @@ func HandleUpsertPrecaution(c *config.Config, w http.ResponseWriter, r *http.Req
 	}		
 	
 	caution,err := c.Db.UpsertPrecaution(ctx,database.UpsertPrecautionParams{
-		ID: pid,
-		Title: req.Title,		
-		Description: req.Description,		
+		Column1: pid,
+		Column2: req.Title,		
+		Column3: req.Description,		
 	})
 
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error upserting precaution: %s", req.ID))
 		return		
 	}
+
+	if req.ProtocolID == "" {
+		json_utils.RespondWithJSON(w, http.StatusOK, api.MapPrecaution(caution))
+		return
+	}	
 
 	proto_id, err:= uuid.Parse(req.ProtocolID)
 	if err != nil {
@@ -201,4 +232,42 @@ func HandleRemovePrecautionFromProtocol(c *config.Config, w http.ResponseWriter,
 
 	json_utils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "caution removed from protocol"})
 
+}
+
+func HandleUpdatePrecautionsToProtocols(c *config.Config, w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	ids, err := api.ParseAndValidateID(r)
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	
+	var req PrecautionUpdateReq
+	err = api.UnmarshalAndValidatePayload(c, r, &req)
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	var selectedUUIDs []uuid.UUID
+	for _, id := range req.SelectedProtocolIDs {
+		uid, err := uuid.Parse(id)
+		if err != nil {
+			json_utils.RespondWithError(w, http.StatusBadRequest, fmt.Sprintf("Invalid UUID: %s", id))
+			return
+		}
+		selectedUUIDs = append(selectedUUIDs, uid)
+	}
+
+	err = c.Db.UpdatePrecautionProtocols(ctx, database.UpdatePrecautionProtocolsParams{		
+		PrecautionID: ids.ID,
+		Column2: selectedUUIDs,
+	})
+
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error updating precautions for protocol: %s", ids.ProtocolID))
+		return
+	}
+
+	json_utils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "precautions updated for protocol"})
 }

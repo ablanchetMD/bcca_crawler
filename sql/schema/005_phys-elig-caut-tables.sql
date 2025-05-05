@@ -15,7 +15,8 @@ CREATE TABLE protocol_eligibility_criteria (
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
   type eligibility_enum NOT NULL DEFAULT 'unknown',
-  description TEXT NOT NULL UNIQUE
+  description TEXT NOT NULL,
+  unique (type, description)
 );
 
 CREATE TABLE protocol_cautions (

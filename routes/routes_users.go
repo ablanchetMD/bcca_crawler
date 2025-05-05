@@ -2,11 +2,12 @@ package routes
 
 import (
 	"bcca_crawler/internal/config"
+	"github.com/gorilla/mux"
 	"net/http"
 	"bcca_crawler/api"
 )
 
-func RegisterUserRoutes(prefix string, mux *http.ServeMux, s *config.Config) {
+func RegisterUserRoutes(prefix string, mux *mux.Router, s *config.Config) {
 	mux.HandleFunc(prefix +"/users", func(w http.ResponseWriter, r *http.Request) {
 
 		switch r.Method {

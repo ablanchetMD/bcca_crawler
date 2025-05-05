@@ -13,34 +13,6 @@ import (
 	"github.com/lib/pq"
 )
 
-const addManyProtocolCautionToProtocol = `-- name: AddManyProtocolCautionToProtocol :exec
-INSERT INTO protocol_cautions_values (protocol_id, caution_id) VALUES ($1::UUID[], $2::UUID[]) ON CONFLICT DO NOTHING
-`
-
-type AddManyProtocolCautionToProtocolParams struct {
-	Column1 []uuid.UUID `json:"column_1"`
-	Column2 []uuid.UUID `json:"column_2"`
-}
-
-func (q *Queries) AddManyProtocolCautionToProtocol(ctx context.Context, arg AddManyProtocolCautionToProtocolParams) error {
-	_, err := q.db.ExecContext(ctx, addManyProtocolCautionToProtocol, pq.Array(arg.Column1), pq.Array(arg.Column2))
-	return err
-}
-
-const addManyProtocolPrecautionToProtocol = `-- name: AddManyProtocolPrecautionToProtocol :exec
-INSERT INTO protocol_precautions_values (protocol_id, precaution_id) VALUES ($1::UUID[], $2::UUID[]) ON CONFLICT DO NOTHING
-`
-
-type AddManyProtocolPrecautionToProtocolParams struct {
-	Column1 []uuid.UUID `json:"column_1"`
-	Column2 []uuid.UUID `json:"column_2"`
-}
-
-func (q *Queries) AddManyProtocolPrecautionToProtocol(ctx context.Context, arg AddManyProtocolPrecautionToProtocolParams) error {
-	_, err := q.db.ExecContext(ctx, addManyProtocolPrecautionToProtocol, pq.Array(arg.Column1), pq.Array(arg.Column2))
-	return err
-}
-
 const addProtocolCautionToProtocol = `-- name: AddProtocolCautionToProtocol :exec
 INSERT INTO protocol_cautions_values (protocol_id, caution_id) VALUES ($1, $2)
 `
@@ -130,11 +102,26 @@ func (q *Queries) DeleteProtocolPrecaution(ctx context.Context, id uuid.UUID) er
 }
 
 const getCautionByIDWithProtocols = `-- name: GetCautionByIDWithProtocols :one
-SELECT pec.id, pec.created_at, pec.updated_at, pec.description, ARRAY_AGG(ROW(pecv.protocol_id,p.code)) AS protocol_ids
-FROM protocol_cautions pec
-JOIN protocol_cautions_values pecv ON pec.id = pecv.caution_id
-JOIN protocols p ON pecv.protocol_id = p.id
-WHERE pec.id = $1
+SELECT 
+    pec.id, pec.created_at, pec.updated_at, pec.description, 
+    COALESCE(
+        (
+            SELECT json_agg(
+            json_build_object(
+                'id', pecv.protocol_id, 
+                'code', p.code
+            )
+        )
+        FROM protocol_cautions_values pecv
+        JOIN protocols p ON pecv.protocol_id = p.id
+        WHERE pecv.caution_id = pec.id
+        ),
+        '[]'
+    ) AS protocol_ids
+FROM 
+    protocol_cautions pec
+WHERE
+    pec.id = $1
 `
 
 type GetCautionByIDWithProtocolsRow struct {
@@ -159,11 +146,24 @@ func (q *Queries) GetCautionByIDWithProtocols(ctx context.Context, id uuid.UUID)
 }
 
 const getCautionWithProtocols = `-- name: GetCautionWithProtocols :many
-SELECT pec.id, pec.created_at, pec.updated_at, pec.description, ARRAY_AGG(ROW(pecv.protocol_id,p.code)) AS protocol_ids
-FROM protocol_cautions pec
-JOIN protocol_cautions_values pecv ON pec.id = pecv.caution_id
-JOIN protocols p ON pecv.protocol_id = p.id
-GROUP BY pec.id
+SELECT 
+    pec.id, pec.created_at, pec.updated_at, pec.description, 
+    COALESCE(
+        (
+            SELECT json_agg(
+            json_build_object(
+                'id', pecv.protocol_id, 
+                'code', p.code
+            )
+        )
+        FROM protocol_cautions_values pecv
+        JOIN protocols p ON pecv.protocol_id = p.id
+        WHERE pecv.caution_id = pec.id
+        ),
+        '[]'
+    ) AS protocol_ids
+FROM 
+    protocol_cautions pec
 `
 
 type GetCautionWithProtocolsRow struct {
@@ -204,11 +204,26 @@ func (q *Queries) GetCautionWithProtocols(ctx context.Context) ([]GetCautionWith
 }
 
 const getPrecautionByIDWithProtocols = `-- name: GetPrecautionByIDWithProtocols :one
-SELECT pec.id, pec.created_at, pec.updated_at, pec.title, pec.description, ARRAY_AGG(ROW(pecv.protocol_id,p.code)) AS protocol_ids
-FROM protocol_precautions pec
-JOIN protocol_precautions_values pecv ON pec.id = pecv.precaution_id
-JOIN protocols p ON pecv.protocol_id = p.id
-WHERE pec.id = $1
+SELECT 
+    pec.id, pec.created_at, pec.updated_at, pec.title, pec.description, 
+    COALESCE(
+        (
+            SELECT json_agg(
+            json_build_object(
+                'id', pecv.protocol_id, 
+                'code', p.code
+            )
+        )
+        FROM protocol_precautions_values pecv
+        JOIN protocols p ON pecv.protocol_id = p.id
+        WHERE pecv.precaution_id = pec.id
+        ),
+        '[]'
+    ) AS protocol_ids
+FROM 
+    protocol_precautions pec
+WHERE
+    pec.id = $1
 `
 
 type GetPrecautionByIDWithProtocolsRow struct {
@@ -235,11 +250,24 @@ func (q *Queries) GetPrecautionByIDWithProtocols(ctx context.Context, id uuid.UU
 }
 
 const getPrecautionWithProtocols = `-- name: GetPrecautionWithProtocols :many
-SELECT pec.id, pec.created_at, pec.updated_at, pec.title, pec.description, ARRAY_AGG(ROW(pecv.protocol_id,p.code)) AS protocol_ids
-FROM protocol_precautions pec
-JOIN protocol_precautions_values pecv ON pec.id = pecv.precaution_id
-JOIN protocols p ON pecv.protocol_id = p.id
-GROUP BY pec.id
+SELECT 
+    pec.id, pec.created_at, pec.updated_at, pec.title, pec.description, 
+    COALESCE(
+        (
+            SELECT json_agg(
+            json_build_object(
+                'id', pecv.protocol_id, 
+                'code', p.code
+            )
+        )
+        FROM protocol_precautions_values pecv
+        JOIN protocols p ON pecv.protocol_id = p.id
+        WHERE pecv.precaution_id = pec.id
+        ),
+        '[]'
+    ) AS protocol_ids
+FROM 
+    protocol_precautions pec
 `
 
 type GetPrecautionWithProtocolsRow struct {
@@ -445,6 +473,74 @@ func (q *Queries) RemoveProtocolPrecautionFromProtocol(ctx context.Context, arg 
 	return err
 }
 
+const updateCautionProtocols = `-- name: UpdateCautionProtocols :exec
+WITH current_protocols AS (
+    SELECT pcv.protocol_id 
+    FROM protocol_cautions_values pcv 
+    WHERE pcv.caution_id = $1
+),
+to_remove AS (
+    DELETE FROM protocol_cautions_values pcv
+    WHERE pcv.caution_id = $1
+    AND pcv.protocol_id NOT IN (SELECT unnest($2::uuid[]))
+    RETURNING pcv.protocol_id
+),
+to_add AS (
+    INSERT INTO protocol_cautions_values (caution_id, protocol_id)
+    SELECT $1, new_protocol
+    FROM unnest($2::uuid[]) AS new_protocol
+    WHERE new_protocol NOT IN (SELECT cp.protocol_id FROM current_protocols cp)
+    RETURNING protocol_id
+)
+SELECT 
+    (SELECT COUNT(*) FROM to_remove) AS removed, 
+    (SELECT COUNT(*) FROM to_add) AS added
+`
+
+type UpdateCautionProtocolsParams struct {
+	CautionID uuid.UUID   `json:"caution_id"`
+	Column2   []uuid.UUID `json:"column_2"`
+}
+
+func (q *Queries) UpdateCautionProtocols(ctx context.Context, arg UpdateCautionProtocolsParams) error {
+	_, err := q.db.ExecContext(ctx, updateCautionProtocols, arg.CautionID, pq.Array(arg.Column2))
+	return err
+}
+
+const updatePrecautionProtocols = `-- name: UpdatePrecautionProtocols :exec
+WITH current_protocols AS (
+    SELECT pcv.protocol_id 
+    FROM protocol_precautions_values pcv 
+    WHERE pcv.precaution_id = $1
+),
+to_remove AS (
+    DELETE FROM protocol_precautions_values pcv
+    WHERE pcv.precaution_id = $1
+    AND pcv.protocol_id NOT IN (SELECT unnest($2::uuid[]))
+    RETURNING pcv.protocol_id
+),
+to_add AS (
+    INSERT INTO protocol_precautions_values (precaution_id, protocol_id)
+    SELECT $1, new_protocol
+    FROM unnest($2::uuid[]) AS new_protocol
+    WHERE new_protocol NOT IN (SELECT cp.protocol_id FROM current_protocols cp)
+    RETURNING protocol_id
+)
+SELECT 
+    (SELECT COUNT(*) FROM to_remove) AS removed, 
+    (SELECT COUNT(*) FROM to_add) AS added
+`
+
+type UpdatePrecautionProtocolsParams struct {
+	PrecautionID uuid.UUID   `json:"precaution_id"`
+	Column2      []uuid.UUID `json:"column_2"`
+}
+
+func (q *Queries) UpdatePrecautionProtocols(ctx context.Context, arg UpdatePrecautionProtocolsParams) error {
+	_, err := q.db.ExecContext(ctx, updatePrecautionProtocols, arg.PrecautionID, pq.Array(arg.Column2))
+	return err
+}
+
 const updateProtocolCaution = `-- name: UpdateProtocolCaution :one
 UPDATE protocol_cautions SET description = $2 WHERE id = $1 RETURNING id, created_at, updated_at, description
 `
@@ -490,8 +586,18 @@ func (q *Queries) UpdateProtocolPrecaution(ctx context.Context, arg UpdateProtoc
 }
 
 const upsertCaution = `-- name: UpsertCaution :one
+WITH input_values(id, description) AS (
+  VALUES (
+    CASE 
+      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      THEN gen_random_uuid() 
+      ELSE $1 
+    END,
+    $2
+  )
+)
 INSERT INTO protocol_cautions (id, description)
-VALUES ($1, $2)
+SELECT id, description FROM input_values
 ON CONFLICT (id) DO UPDATE
 SET description = EXCLUDED.description,
     updated_at = NOW()
@@ -499,12 +605,12 @@ RETURNING id, created_at, updated_at, description
 `
 
 type UpsertCautionParams struct {
-	ID          uuid.UUID `json:"id"`
-	Description string    `json:"description"`
+	Column1 interface{} `json:"column_1"`
+	Column2 interface{} `json:"column_2"`
 }
 
 func (q *Queries) UpsertCaution(ctx context.Context, arg UpsertCautionParams) (ProtocolCaution, error) {
-	row := q.db.QueryRowContext(ctx, upsertCaution, arg.ID, arg.Description)
+	row := q.db.QueryRowContext(ctx, upsertCaution, arg.Column1, arg.Column2)
 	var i ProtocolCaution
 	err := row.Scan(
 		&i.ID,
@@ -516,8 +622,19 @@ func (q *Queries) UpsertCaution(ctx context.Context, arg UpsertCautionParams) (P
 }
 
 const upsertPrecaution = `-- name: UpsertPrecaution :one
+WITH input_values(id,title, description) AS (
+  VALUES (
+    CASE 
+      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      THEN gen_random_uuid() 
+      ELSE $1 
+    END,
+    $2,
+    $3
+  )
+)
 INSERT INTO protocol_precautions (id,title, description)
-VALUES ($1, $2, $3)
+SELECT id,title, description FROM input_values
 ON CONFLICT (id) DO UPDATE
 SET description = EXCLUDED.description,
     title = EXCLUDED.title,
@@ -526,13 +643,13 @@ RETURNING id, created_at, updated_at, title, description
 `
 
 type UpsertPrecautionParams struct {
-	ID          uuid.UUID `json:"id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
+	Column1 interface{} `json:"column_1"`
+	Column2 interface{} `json:"column_2"`
+	Column3 interface{} `json:"column_3"`
 }
 
 func (q *Queries) UpsertPrecaution(ctx context.Context, arg UpsertPrecautionParams) (ProtocolPrecaution, error) {
-	row := q.db.QueryRowContext(ctx, upsertPrecaution, arg.ID, arg.Title, arg.Description)
+	row := q.db.QueryRowContext(ctx, upsertPrecaution, arg.Column1, arg.Column2, arg.Column3)
 	var i ProtocolPrecaution
 	err := row.Scan(
 		&i.ID,

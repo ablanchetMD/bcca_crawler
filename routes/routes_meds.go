@@ -3,10 +3,11 @@ package routes
 import (	
 	"bcca_crawler/api/protocols"
 	"bcca_crawler/internal/config"
+	"github.com/gorilla/mux"
 	"net/http"	
 )
 
-func RegisterMedRoutes(prefix string, mux *http.ServeMux, s *config.Config) {
+func RegisterMedRoutes(prefix string, mux *mux.Router, s *config.Config) {
 	mux.HandleFunc(prefix +"/medications", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:

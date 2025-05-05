@@ -3,11 +3,11 @@ package routes
 import (
 	"bcca_crawler/internal/config"
 	"net/http"
-
+	"github.com/gorilla/mux"
 	"bcca_crawler/api/protocols"
 )
 
-func RegisterCriteriaRoutes(prefix string, mux *http.ServeMux, s *config.Config) {
+func RegisterCriteriaRoutes(prefix string, mux *mux.Router, s *config.Config) {
 	mux.HandleFunc(prefix +"/eligibility_criteria", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -23,6 +23,8 @@ func RegisterCriteriaRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 		switch r.Method {
 		case http.MethodGet:
 			protocols.HandleGetEligibilityCriteriaByID(s, w, r)
+		case http.MethodPut:
+			protocols.HandleUpdateEligibilityToProtocols(s, w, r)
 		case http.MethodDelete:
 			protocols.HandleDeleteEligibilityCriteriaByID(s, w, r)						
 		default:
@@ -30,7 +32,7 @@ func RegisterCriteriaRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 		}
 	})
 
-	mux.HandleFunc(prefix +"/caution", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/cautions", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			protocols.HandleGetCautions(s, w, r)
@@ -41,10 +43,12 @@ func RegisterCriteriaRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 		}
 	})
 	
-	mux.HandleFunc(prefix +"/caution/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/cautions/{id}", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			protocols.HandleGetCautionsByID(s, w, r)
+		case http.MethodPut:
+			protocols.HandleUpdateCautionsToProtocols(s, w, r)
 		case http.MethodDelete:
 			protocols.HandleDeleteCautionByID(s, w, r)						
 		default:
@@ -52,7 +56,7 @@ func RegisterCriteriaRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 		}
 	})
 
-	mux.HandleFunc(prefix +"/precaution", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/precautions", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			protocols.HandleGetPrecautions(s, w, r)
@@ -63,10 +67,12 @@ func RegisterCriteriaRoutes(prefix string, mux *http.ServeMux, s *config.Config)
 		}
 	})	
 
-	mux.HandleFunc(prefix +"/precaution/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/precautions/{id}", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			protocols.HandleGetPrecautionByID(s, w, r)
+		case http.MethodPut:
+			protocols.HandleUpdatePrecautionsToProtocols(s, w, r)
 		case http.MethodDelete:
 			protocols.HandleDeletePrecautionByID(s, w, r)						
 		default:

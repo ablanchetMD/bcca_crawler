@@ -24,6 +24,41 @@ SET
 WHERE id = $1
 RETURNING *;
 
+-- name: UpsertProtocol :one
+WITH input_values(id, tumor_group, code,name,tags,notes,protocol_url,patient_handout_url,revised_on,activated_on) AS (
+    VALUES
+    (
+        CASE
+            WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+            THEN gen_random_uuid() 
+            ELSE $1 
+        END,        
+        $2::tumor_group_enum,
+        $3,
+        $4,
+        $5::TEXT[],
+        $6,
+        $7,
+        $8,
+        $9,
+        $10        
+    )
+)
+INSERT INTO protocols (id, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url, revised_on, activated_on)
+SELECT id, tumor_group,code,name,tags,notes,protocol_url,patient_handout_url,revised_on,activated_on FROM input_values
+ON CONFLICT (id) DO UPDATE
+SET tumor_group = EXCLUDED.tumor_group::tumor_group_enum,
+    code = EXCLUDED.code,
+    name = EXCLUDED.name,
+    tags = EXCLUDED.tags,
+    notes = EXCLUDED.notes,
+    protocol_url = EXCLUDED.protocol_url,
+    patient_handout_url = EXCLUDED.patient_handout_url,
+    revised_on = EXCLUDED.revised_on,
+    activated_on = EXCLUDED.activated_on,    
+    updated_at = NOW()
+RETURNING *;
+
 -- name: DeleteProtocol :exec
 DELETE FROM protocols
 WHERE id = $1;

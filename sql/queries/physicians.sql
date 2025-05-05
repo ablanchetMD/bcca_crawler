@@ -20,8 +20,21 @@ WHERE id = $1
 returning *;
 
 -- name: UpsertPhysician :one
+WITH input_values(id, first_name, last_name, email, site)AS (
+  VALUES (
+    CASE 
+      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      THEN gen_random_uuid() 
+      ELSE $1 
+    END,
+    $2,
+    $3,
+    $4,
+    $5::physician_site_enum
+  )
+)
 INSERT INTO physicians (id, first_name, last_name, email, site)
-VALUES ($1, $2, $3, $4, $5)
+SELECT id,first_name,last_name,email,site FROM input_values
 ON CONFLICT (id) DO UPDATE
 SET first_name = EXCLUDED.first_name,
     last_name = EXCLUDED.last_name,

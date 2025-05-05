@@ -520,3 +520,83 @@ func (q *Queries) UpdateProtocol(ctx context.Context, arg UpdateProtocolParams) 
 	)
 	return i, err
 }
+
+const upsertProtocol = `-- name: UpsertProtocol :one
+WITH input_values(id, tumor_group, code,name,tags,notes,protocol_url,patient_handout_url,revised_on,activated_on) AS (
+    VALUES
+    (
+        CASE
+            WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+            THEN gen_random_uuid() 
+            ELSE $1 
+        END,        
+        $2::tumor_group_enum,
+        $3,
+        $4,
+        $5::TEXT[],
+        $6,
+        $7,
+        $8,
+        $9,
+        $10        
+    )
+)
+INSERT INTO protocols (id, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url, revised_on, activated_on)
+SELECT id, tumor_group,code,name,tags,notes,protocol_url,patient_handout_url,revised_on,activated_on FROM input_values
+ON CONFLICT (id) DO UPDATE
+SET tumor_group = EXCLUDED.tumor_group::tumor_group_enum,
+    code = EXCLUDED.code,
+    name = EXCLUDED.name,
+    tags = EXCLUDED.tags,
+    notes = EXCLUDED.notes,
+    protocol_url = EXCLUDED.protocol_url,
+    patient_handout_url = EXCLUDED.patient_handout_url,
+    revised_on = EXCLUDED.revised_on,
+    activated_on = EXCLUDED.activated_on,    
+    updated_at = NOW()
+RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url, revised_on, activated_on
+`
+
+type UpsertProtocolParams struct {
+	Column1  interface{}    `json:"column_1"`
+	Column2  TumorGroupEnum `json:"column_2"`
+	Column3  interface{}    `json:"column_3"`
+	Column4  interface{}    `json:"column_4"`
+	Column5  []string       `json:"column_5"`
+	Column6  interface{}    `json:"column_6"`
+	Column7  interface{}    `json:"column_7"`
+	Column8  interface{}    `json:"column_8"`
+	Column9  interface{}    `json:"column_9"`
+	Column10 interface{}    `json:"column_10"`
+}
+
+func (q *Queries) UpsertProtocol(ctx context.Context, arg UpsertProtocolParams) (Protocol, error) {
+	row := q.db.QueryRowContext(ctx, upsertProtocol,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		pq.Array(arg.Column5),
+		arg.Column6,
+		arg.Column7,
+		arg.Column8,
+		arg.Column9,
+		arg.Column10,
+	)
+	var i Protocol
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.TumorGroup,
+		&i.Code,
+		&i.Name,
+		pq.Array(&i.Tags),
+		&i.Notes,
+		&i.ProtocolUrl,
+		&i.PatientHandoutUrl,
+		&i.RevisedOn,
+		&i.ActivatedOn,
+	)
+	return i, err
+}

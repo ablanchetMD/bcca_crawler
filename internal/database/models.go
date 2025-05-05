@@ -283,6 +283,62 @@ func (ns NullPrescriptionRouteEnum) Value() (driver.Value, error) {
 	return string(ns.PrescriptionRouteEnum), nil
 }
 
+type TumorGroupEnum string
+
+const (
+	TumorGroupEnumBreast           TumorGroupEnum = "breast"
+	TumorGroupEnumLung             TumorGroupEnum = "lung"
+	TumorGroupEnumGastrointestinal TumorGroupEnum = "gastrointestinal"
+	TumorGroupEnumGenitourinary    TumorGroupEnum = "genitourinary"
+	TumorGroupEnumHeadAndNeck      TumorGroupEnum = "head_and_neck"
+	TumorGroupEnumGynecology       TumorGroupEnum = "gynecology"
+	TumorGroupEnumSarcoma          TumorGroupEnum = "sarcoma"
+	TumorGroupEnumLeukemia         TumorGroupEnum = "leukemia"
+	TumorGroupEnumBmt              TumorGroupEnum = "bmt"
+	TumorGroupEnumNeuroOncology    TumorGroupEnum = "neuro-oncology"
+	TumorGroupEnumOcular           TumorGroupEnum = "ocular"
+	TumorGroupEnumSkin             TumorGroupEnum = "skin"
+	TumorGroupEnumUnknownPrimary   TumorGroupEnum = "unknown_primary"
+	TumorGroupEnumLymphoma         TumorGroupEnum = "lymphoma"
+	TumorGroupEnumMyeloma          TumorGroupEnum = "myeloma"
+	TumorGroupEnumUnknown          TumorGroupEnum = "unknown"
+)
+
+func (e *TumorGroupEnum) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TumorGroupEnum(s)
+	case string:
+		*e = TumorGroupEnum(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TumorGroupEnum: %T", src)
+	}
+	return nil
+}
+
+type NullTumorGroupEnum struct {
+	TumorGroupEnum TumorGroupEnum `json:"tumor_group_enum"`
+	Valid          bool           `json:"valid"` // Valid is true if TumorGroupEnum is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTumorGroupEnum) Scan(value interface{}) error {
+	if value == nil {
+		ns.TumorGroupEnum, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TumorGroupEnum.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTumorGroupEnum) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TumorGroupEnum), nil
+}
+
 type UrgencyEnum string
 
 const (
@@ -366,12 +422,13 @@ type Log struct {
 }
 
 type Medication struct {
-	ID          uuid.UUID `json:"id"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Category    string    `json:"category"`
+	ID             uuid.UUID `json:"id"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+	Name           string    `json:"name"`
+	Description    string    `json:"description"`
+	AlternateNames []string  `json:"alternate_names"`
+	Category       string    `json:"category"`
 }
 
 type MedicationModification struct {

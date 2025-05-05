@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 const addEligibilityToProtocol = `-- name: AddEligibilityToProtocol :exec
@@ -39,11 +40,24 @@ func (q *Queries) DeleteEligibilityCriteria(ctx context.Context, id uuid.UUID) e
 }
 
 const getElibilityCriteria = `-- name: GetElibilityCriteria :many
-SELECT pec.id, pec.created_at, pec.updated_at, pec.type, pec.description, ARRAY_AGG(ROW(pecv.protocol_id,p.code)) AS protocol_ids
-FROM protocol_eligibility_criteria pec
-JOIN protocol_eligibility_criteria_values pecv ON pec.id = pecv.criteria_id
-JOIN protocols p ON pecv.protocol_id = p.id
-GROUP BY pec.id
+SELECT 
+    pec.id, pec.created_at, pec.updated_at, pec.type, pec.description, 
+    COALESCE(
+        (
+            SELECT json_agg(
+            json_build_object(
+                'id', pecv.protocol_id, 
+                'code', p.code
+            )
+        )
+        FROM protocol_eligibility_criteria_values pecv
+        JOIN protocols p ON pecv.protocol_id = p.id
+        WHERE pecv.criteria_id = pec.id
+        ),
+        '[]'
+    ) AS protocol_ids
+FROM 
+    protocol_eligibility_criteria pec
 `
 
 type GetElibilityCriteriaRow struct {
@@ -140,11 +154,26 @@ func (q *Queries) GetEligibilityByProtocol(ctx context.Context, protocolID uuid.
 }
 
 const getEligibilityCriteriaByID = `-- name: GetEligibilityCriteriaByID :one
-SELECT pec.id, pec.created_at, pec.updated_at, pec.type, pec.description, ARRAY_AGG(ROW(pecv.protocol_id,p.code)) AS protocol_ids
-FROM protocol_eligibility_criteria pec
-JOIN protocol_eligibility_criteria_values pecv ON pec.id = pecv.criteria_id
-JOIN protocols p ON pecv.protocol_id = p.id
-WHERE pec.id = $1
+SELECT 
+    pec.id, pec.created_at, pec.updated_at, pec.type, pec.description, 
+    COALESCE(
+        (
+            SELECT json_agg(
+            json_build_object(
+                'id', pecv.protocol_id, 
+                'code', p.code
+            )
+        )
+        FROM protocol_eligibility_criteria_values pecv
+        JOIN protocols p ON pecv.protocol_id = p.id
+        WHERE pecv.criteria_id = pec.id
+        ),
+        '[]'
+    ) AS protocol_ids
+FROM 
+    protocol_eligibility_criteria pec
+WHERE
+    pec.id = $1
 `
 
 type GetEligibilityCriteriaByIDRow struct {
@@ -171,12 +200,26 @@ func (q *Queries) GetEligibilityCriteriaByID(ctx context.Context, id uuid.UUID) 
 }
 
 const getEligibilityCriteriaByType = `-- name: GetEligibilityCriteriaByType :many
-SELECT pec.id, pec.created_at, pec.updated_at, pec.type, pec.description, ARRAY_AGG(ROW(pecv.protocol_id,p.code)) AS protocol_ids
-FROM protocol_eligibility_criteria pec
-JOIN protocol_eligibility_criteria_values pecv ON pec.id = pecv.criteria_id
-JOIN protocols p ON pecv.protocol_id = p.id
-WHERE LOWER(pec.type) = LOWER($1)
-GROUP BY pec.id
+SELECT 
+    pec.id, pec.created_at, pec.updated_at, pec.type, pec.description, 
+    COALESCE(
+        (
+            SELECT json_agg(
+            json_build_object(
+                'id', pecv.protocol_id, 
+                'code', p.code
+            )
+        )
+        FROM protocol_eligibility_criteria_values pecv
+        JOIN protocols p ON pecv.protocol_id = p.id
+        WHERE pecv.criteria_id = pec.id
+        ),
+        '[]'
+    ) AS protocol_ids
+FROM 
+    protocol_eligibility_criteria pec
+WHERE 
+    LOWER(pec.type) = LOWER($1)
 `
 
 type GetEligibilityCriteriaByTypeRow struct {
@@ -301,24 +344,70 @@ func (q *Queries) UpdateEligibilityCriteria(ctx context.Context, arg UpdateEligi
 	return i, err
 }
 
+const updateEligibilityProtocols = `-- name: UpdateEligibilityProtocols :exec
+WITH current_protocols AS (
+    SELECT pcv.protocol_id 
+    FROM protocol_eligibility_criteria_values pcv 
+    WHERE pcv.criteria_id = $1
+),
+to_remove AS (
+    DELETE FROM protocol_eligibility_criteria_values pcv
+    WHERE pcv.criteria_id = $1
+    AND pcv.protocol_id NOT IN (SELECT unnest($2::uuid[]))
+    RETURNING pcv.protocol_id
+),
+to_add AS (
+    INSERT INTO protocol_eligibility_criteria_values (criteria_id, protocol_id)
+    SELECT $1, new_protocol
+    FROM unnest($2::uuid[]) AS new_protocol
+    WHERE new_protocol NOT IN (SELECT cp.protocol_id FROM current_protocols cp)
+    RETURNING protocol_id
+)
+SELECT 
+    (SELECT COUNT(*) FROM to_remove) AS removed, 
+    (SELECT COUNT(*) FROM to_add) AS added
+`
+
+type UpdateEligibilityProtocolsParams struct {
+	CriteriaID uuid.UUID   `json:"criteria_id"`
+	Column2    []uuid.UUID `json:"column_2"`
+}
+
+func (q *Queries) UpdateEligibilityProtocols(ctx context.Context, arg UpdateEligibilityProtocolsParams) error {
+	_, err := q.db.ExecContext(ctx, updateEligibilityProtocols, arg.CriteriaID, pq.Array(arg.Column2))
+	return err
+}
+
 const upsertEligibilityCriteria = `-- name: UpsertEligibilityCriteria :one
-INSERT INTO protocol_eligibility_criteria (id, type, description, updated_at)
-VALUES ($1, $2, $3, NOW())
+WITH input_values(id, type, description) AS (
+    VALUES
+    (
+        CASE
+            WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+            THEN gen_random_uuid() 
+            ELSE $1 
+        END,        
+        $2::eligibility_enum,
+        $3
+    )
+)
+INSERT INTO protocol_eligibility_criteria (id, type, description)
+SELECT id, type, description FROM input_values
 ON CONFLICT (id) DO UPDATE
-SET type = EXCLUDED.type,
+SET type = EXCLUDED.type::eligibility_enum,
     description = EXCLUDED.description,
     updated_at = NOW()
 RETURNING id, created_at, updated_at, type, description
 `
 
 type UpsertEligibilityCriteriaParams struct {
-	ID          uuid.UUID       `json:"id"`
-	Type        EligibilityEnum `json:"type"`
-	Description string          `json:"description"`
+	Column1 interface{}     `json:"column_1"`
+	Column2 EligibilityEnum `json:"column_2"`
+	Column3 interface{}     `json:"column_3"`
 }
 
 func (q *Queries) UpsertEligibilityCriteria(ctx context.Context, arg UpsertEligibilityCriteriaParams) (ProtocolEligibilityCriterium, error) {
-	row := q.db.QueryRowContext(ctx, upsertEligibilityCriteria, arg.ID, arg.Type, arg.Description)
+	row := q.db.QueryRowContext(ctx, upsertEligibilityCriteria, arg.Column1, arg.Column2, arg.Column3)
 	var i ProtocolEligibilityCriterium
 	err := row.Scan(
 		&i.ID,

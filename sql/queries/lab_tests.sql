@@ -10,8 +10,24 @@ WHERE id = $1
 RETURNING *;
 
 -- name: UpsertTest :one
-INSERT INTO tests (id, name, description, form_url, unit, lower_limit, upper_limit, test_category, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+WITH input_values(id, name, description, form_url, unit, lower_limit, upper_limit, test_category) AS (
+  VALUES (
+    CASE 
+      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      THEN gen_random_uuid() 
+      ELSE $1 
+    END,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8::test_category_enum
+  )
+)
+INSERT INTO tests (id, name, description, form_url, unit, lower_limit, upper_limit, test_category)
+SELECT id, name, description, form_url, unit, lower_limit, upper_limit, test_category FROM input_values
 ON CONFLICT (id) DO UPDATE
 SET name = EXCLUDED.name,
     description = EXCLUDED.description,

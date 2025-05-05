@@ -3,10 +3,11 @@ package routes
 import (	
 	"bcca_crawler/api/protocols"
 	"bcca_crawler/internal/config"
+	"github.com/gorilla/mux"
 	"net/http"	
 )
 
-func RegisterToxicitiesRoutes(prefix string, mux *http.ServeMux, s *config.Config) {
+func RegisterToxicitiesRoutes(prefix string, mux *mux.Router, s *config.Config) {
 	mux.HandleFunc(prefix +"/toxicities", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:

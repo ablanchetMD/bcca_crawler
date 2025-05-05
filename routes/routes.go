@@ -3,6 +3,7 @@ package routes
 import (
 	"bcca_crawler/api" 
 	"bcca_crawler/internal/config"
+	"github.com/gorilla/mux"
 	"net/http"
 	"strings"
 	"strconv"
@@ -82,12 +83,19 @@ func ParseQueryParams(r *http.Request, v QueryValidation) (*api.QueryParams, err
 	return params, nil
 }
 
-func RegisterRoutes(mux *http.ServeMux, s *config.Config) {
+func RegisterRoutes(router *mux.Router, s *config.Config) {
 	pre := "/api/v1"
 	// Register all routes
-	RegisterProtocolRoutes(pre, mux, s)
-	RegisterUserRoutes(pre, mux, s)
-	RegisterCancerRoutes(pre, mux, s)
+	RegisterProtocolRoutes(pre, router, s)
+	RegisterUserRoutes(pre, router, s)
+	RegisterCancerRoutes(pre, router, s)
+	RegisterCriteriaRoutes(pre, router, s)
+	RegisterLabRoutes(pre, router, s)
+	RegisterMedRoutes(pre, router, s)
+	RegisterReferencesRoute(pre, router, s)
+	RegisterPhysicianRoutes(pre, router, s)
+	RegisterToxicitiesRoutes(pre, router, s)
+	RegisterTreatmentRoutes(pre, router, s)
 
 }
 

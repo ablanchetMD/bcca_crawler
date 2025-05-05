@@ -2,11 +2,13 @@ package main
 
 import (
 	"bcca_crawler/ai_helper"
+	"github.com/gorilla/mux"
 	"bcca_crawler/api"
 	"bcca_crawler/crawler"
-	"bcca_crawler/internal/config"
-	"bcca_crawler/internal/middleware"
+	"bcca_crawler/internal/config"	
+	"bcca_crawler/internal/auth"
 	"bcca_crawler/routes"
+	"time"
 	"context"
 	"errors"
 	"fmt"
@@ -160,16 +162,22 @@ func handlerCrawl(s *config.Config, cmd command) error {
 func handlerStartServer(s *config.Config, cmd command) error {
 	// Start the server
 	// Create a new instance of the server
-	mux := http.NewServeMux()
+	router := mux.NewRouter()
+	routes.RegisterRoutes(router, s)
+	// mux := http.NewServeMux()
 
-	routes.RegisterRoutes(mux, s)
+	// routes.RegisterRoutes(mux, s)
+	// Apply CORS middleware to the router
+    corsRouter := auth.CORSMiddleware(router)
 	
-	// Start the server//
-	wrappedMux := middleware.MiddlewareAuth(s,mux)
+	// // Start the server//
+	// wrappedMux := middleware.MiddlewareAuth(s,mux)
 	// portString := "8080"
 	srv := &http.Server{
 		Addr:    ":" + s.ServerPort,
-		Handler: wrappedMux,
+		Handler: corsRouter,
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
 	}
 	log.Printf("Server listening on port %s", s.ServerPort)
 	err := srv.ListenAndServe()

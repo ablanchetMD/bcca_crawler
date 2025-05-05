@@ -2,11 +2,14 @@ package routes
 
 import (
 	"bcca_crawler/internal/config"
+
+	"bcca_crawler/api"
 	"net/http"
-	"bcca_crawler/api"	
+
+	"github.com/gorilla/mux"
 )
 
-func RegisterCancerRoutes(prefix string, mux *http.ServeMux, s *config.Config) {
+func RegisterCancerRoutes(prefix string, mux *mux.Router, s *config.Config) {
 	mux.HandleFunc(prefix +"/cancers", func(w http.ResponseWriter, r *http.Request) {
 
 		switch r.Method {

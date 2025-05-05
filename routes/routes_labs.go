@@ -4,9 +4,10 @@ import (
 	"bcca_crawler/internal/config"
 	"net/http"	
 	"bcca_crawler/api/protocols"
+	"github.com/gorilla/mux"
 )
 
-func RegisterLabRoutes(prefix string, mux *http.ServeMux, s *config.Config) {
+func RegisterLabRoutes(prefix string, mux *mux.Router, s *config.Config) {
 	mux.HandleFunc(prefix +"/labs", func(w http.ResponseWriter, r *http.Request) {
 
 		switch r.Method {

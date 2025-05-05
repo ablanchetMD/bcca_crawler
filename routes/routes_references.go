@@ -4,9 +4,10 @@ import (
 	"bcca_crawler/internal/config"
 	"net/http"
 	"bcca_crawler/api"
+	"github.com/gorilla/mux"
 )
 
-func RegisterReferencesRoute(prefix string, mux *http.ServeMux, s *config.Config) {
+func RegisterReferencesRoute(prefix string, mux *mux.Router, s *config.Config) {
 	mux.HandleFunc(prefix +"/references", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:

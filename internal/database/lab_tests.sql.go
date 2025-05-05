@@ -326,8 +326,24 @@ func (q *Queries) UpdateTest(ctx context.Context, arg UpdateTestParams) (Test, e
 }
 
 const upsertTest = `-- name: UpsertTest :one
-INSERT INTO tests (id, name, description, form_url, unit, lower_limit, upper_limit, test_category, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+WITH input_values(id, name, description, form_url, unit, lower_limit, upper_limit, test_category) AS (
+  VALUES (
+    CASE 
+      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      THEN gen_random_uuid() 
+      ELSE $1 
+    END,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8::test_category_enum
+  )
+)
+INSERT INTO tests (id, name, description, form_url, unit, lower_limit, upper_limit, test_category)
+SELECT id, name, description, form_url, unit, lower_limit, upper_limit, test_category FROM input_values
 ON CONFLICT (id) DO UPDATE
 SET name = EXCLUDED.name,
     description = EXCLUDED.description,
@@ -341,26 +357,26 @@ RETURNING id, created_at, updated_at, name, description, form_url, unit, lower_l
 `
 
 type UpsertTestParams struct {
-	ID           uuid.UUID `json:"id"`
-	Name         string    `json:"name"`
-	Description  string    `json:"description"`
-	FormUrl      string    `json:"form_url"`
-	Unit         string    `json:"unit"`
-	LowerLimit   float64   `json:"lower_limit"`
-	UpperLimit   float64   `json:"upper_limit"`
-	TestCategory string    `json:"test_category"`
+	Column1 interface{} `json:"column_1"`
+	Column2 interface{} `json:"column_2"`
+	Column3 interface{} `json:"column_3"`
+	Column4 interface{} `json:"column_4"`
+	Column5 interface{} `json:"column_5"`
+	Column6 interface{} `json:"column_6"`
+	Column7 interface{} `json:"column_7"`
+	Column8 interface{} `json:"column_8"`
 }
 
 func (q *Queries) UpsertTest(ctx context.Context, arg UpsertTestParams) (Test, error) {
 	row := q.db.QueryRowContext(ctx, upsertTest,
-		arg.ID,
-		arg.Name,
-		arg.Description,
-		arg.FormUrl,
-		arg.Unit,
-		arg.LowerLimit,
-		arg.UpperLimit,
-		arg.TestCategory,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+		arg.Column6,
+		arg.Column7,
+		arg.Column8,
 	)
 	var i Test
 	err := row.Scan(

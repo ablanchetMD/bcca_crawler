@@ -7,24 +7,32 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 const addMedication = `-- name: AddMedication :one
-INSERT INTO medications (name, description, category)
-VALUES ($1, $2, $3)
-RETURNING id, created_at, updated_at, name, description, category
+INSERT INTO medications (name, description, category,alternate_names)
+VALUES ($1, $2, $3, $4)
+RETURNING id, created_at, updated_at, name, description, alternate_names, category
 `
 
 type AddMedicationParams struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Category    string `json:"category"`
+	Name           string   `json:"name"`
+	Description    string   `json:"description"`
+	Category       string   `json:"category"`
+	AlternateNames []string `json:"alternate_names"`
 }
 
 func (q *Queries) AddMedication(ctx context.Context, arg AddMedicationParams) (Medication, error) {
-	row := q.db.QueryRowContext(ctx, addMedication, arg.Name, arg.Description, arg.Category)
+	row := q.db.QueryRowContext(ctx, addMedication,
+		arg.Name,
+		arg.Description,
+		arg.Category,
+		pq.Array(arg.AlternateNames),
+	)
 	var i Medication
 	err := row.Scan(
 		&i.ID,
@@ -32,6 +40,7 @@ func (q *Queries) AddMedication(ctx context.Context, arg AddMedicationParams) (M
 		&i.UpdatedAt,
 		&i.Name,
 		&i.Description,
+		pq.Array(&i.AlternateNames),
 		&i.Category,
 	)
 	return i, err
@@ -140,7 +149,7 @@ func (q *Queries) DeleteMedication(ctx context.Context, id uuid.UUID) error {
 }
 
 const getMedicationByID = `-- name: GetMedicationByID :one
-SELECT id, created_at, updated_at, name, description, category FROM medications
+SELECT id, created_at, updated_at, name, description, alternate_names, category FROM medications
 WHERE id = $1
 `
 
@@ -153,13 +162,14 @@ func (q *Queries) GetMedicationByID(ctx context.Context, id uuid.UUID) (Medicati
 		&i.UpdatedAt,
 		&i.Name,
 		&i.Description,
+		pq.Array(&i.AlternateNames),
 		&i.Category,
 	)
 	return i, err
 }
 
 const getMedicationByName = `-- name: GetMedicationByName :one
-SELECT id, created_at, updated_at, name, description, category FROM medications
+SELECT id, created_at, updated_at, name, description, alternate_names, category FROM medications
 WHERE name = $1
 `
 
@@ -172,6 +182,7 @@ func (q *Queries) GetMedicationByName(ctx context.Context, name string) (Medicat
 		&i.UpdatedAt,
 		&i.Name,
 		&i.Description,
+		pq.Array(&i.AlternateNames),
 		&i.Category,
 	)
 	return i, err
@@ -242,7 +253,7 @@ func (q *Queries) GetMedicationModificationsByMedication(ctx context.Context, id
 }
 
 const getMedicationModificationsByProtocol = `-- name: GetMedicationModificationsByProtocol :many
-SELECT m.id as medication_id, m.name, m.description, m.category, mod.id as modification_id, mod.category as modification_category, mod.subcategory as modification_subcategory, mod.adjustment
+SELECT m.id as medication_id, m.name, m.description, m.category,m.alternate_names, mod.id as modification_id, mod.category as modification_category, mod.subcategory as modification_subcategory, mod.adjustment
 FROM medication_modifications mod
 JOIN medications m ON mod.medication_id = m.id
 JOIN protocol_treatment pt ON m.id = pt.medication
@@ -256,6 +267,7 @@ type GetMedicationModificationsByProtocolRow struct {
 	Name                    string    `json:"name"`
 	Description             string    `json:"description"`
 	Category                string    `json:"category"`
+	AlternateNames          []string  `json:"alternate_names"`
 	ModificationID          uuid.UUID `json:"modification_id"`
 	ModificationCategory    string    `json:"modification_category"`
 	ModificationSubcategory string    `json:"modification_subcategory"`
@@ -276,6 +288,7 @@ func (q *Queries) GetMedicationModificationsByProtocol(ctx context.Context, prot
 			&i.Name,
 			&i.Description,
 			&i.Category,
+			pq.Array(&i.AlternateNames),
 			&i.ModificationID,
 			&i.ModificationCategory,
 			&i.ModificationSubcategory,
@@ -295,7 +308,7 @@ func (q *Queries) GetMedicationModificationsByProtocol(ctx context.Context, prot
 }
 
 const getMedications = `-- name: GetMedications :many
-SELECT id, created_at, updated_at, name, description, category FROM medications
+SELECT id, created_at, updated_at, name, description, alternate_names, category FROM medications
 ORDER BY name ASC
 `
 
@@ -314,6 +327,7 @@ func (q *Queries) GetMedications(ctx context.Context) ([]Medication, error) {
 			&i.UpdatedAt,
 			&i.Name,
 			&i.Description,
+			pq.Array(&i.AlternateNames),
 			&i.Category,
 		); err != nil {
 			return nil, err
@@ -330,7 +344,7 @@ func (q *Queries) GetMedications(ctx context.Context) ([]Medication, error) {
 }
 
 const getMedicationsByCategory = `-- name: GetMedicationsByCategory :many
-SELECT id, created_at, updated_at, name, description, category FROM medications
+SELECT id, created_at, updated_at, name, description, alternate_names, category FROM medications
 WHERE category = $1
 ORDER BY name ASC
 `
@@ -350,6 +364,7 @@ func (q *Queries) GetMedicationsByCategory(ctx context.Context, category string)
 			&i.UpdatedAt,
 			&i.Name,
 			&i.Description,
+			pq.Array(&i.AlternateNames),
 			&i.Category,
 		); err != nil {
 			return nil, err
@@ -402,7 +417,7 @@ func (q *Queries) GetModificationsByMedication(ctx context.Context, medicationID
 }
 
 const getPrescriptionByID = `-- name: GetPrescriptionByID :one
-SELECT m.id as medication_id, m.name, m.description, m.category, p.id as medication_prescription_id, p.dose, p.route, p.frequency, p.duration, p.instructions, p.renewals
+SELECT m.id as medication_id, m.name, m.description, m.category,m.alternate_names, p.id as medication_prescription_id, p.dose,p.created_at,p.updated_at, p.route, p.frequency, p.duration, p.instructions, p.renewals
 FROM medications m
 JOIN medication_prescription p ON m.id = p.medication
 WHERE p.id = $1
@@ -413,8 +428,11 @@ type GetPrescriptionByIDRow struct {
 	Name                     string                `json:"name"`
 	Description              string                `json:"description"`
 	Category                 string                `json:"category"`
+	AlternateNames           []string              `json:"alternate_names"`
 	MedicationPrescriptionID uuid.UUID             `json:"medication_prescription_id"`
 	Dose                     string                `json:"dose"`
+	CreatedAt                time.Time             `json:"created_at"`
+	UpdatedAt                time.Time             `json:"updated_at"`
 	Route                    PrescriptionRouteEnum `json:"route"`
 	Frequency                string                `json:"frequency"`
 	Duration                 string                `json:"duration"`
@@ -430,8 +448,11 @@ func (q *Queries) GetPrescriptionByID(ctx context.Context, id uuid.UUID) (GetPre
 		&i.Name,
 		&i.Description,
 		&i.Category,
+		pq.Array(&i.AlternateNames),
 		&i.MedicationPrescriptionID,
 		&i.Dose,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 		&i.Route,
 		&i.Frequency,
 		&i.Duration,
@@ -442,7 +463,7 @@ func (q *Queries) GetPrescriptionByID(ctx context.Context, id uuid.UUID) (GetPre
 }
 
 const getPrescriptions = `-- name: GetPrescriptions :many
-SELECT m.id as medication_id, m.name, m.description, m.category, p.id as medication_prescription_id, p.dose, p.route, p.frequency, p.duration, p.instructions, p.renewals
+SELECT m.id as medication_id, m.name, m.description, m.category,m.alternate_names, p.id as medication_prescription_id, p.dose, p.created_at,p.updated_at, p.route, p.frequency, p.duration, p.instructions, p.renewals
 FROM medications m
 JOIN medication_prescription p ON m.id = p.medication
 ORDER BY m.name ASC
@@ -453,8 +474,11 @@ type GetPrescriptionsRow struct {
 	Name                     string                `json:"name"`
 	Description              string                `json:"description"`
 	Category                 string                `json:"category"`
+	AlternateNames           []string              `json:"alternate_names"`
 	MedicationPrescriptionID uuid.UUID             `json:"medication_prescription_id"`
 	Dose                     string                `json:"dose"`
+	CreatedAt                time.Time             `json:"created_at"`
+	UpdatedAt                time.Time             `json:"updated_at"`
 	Route                    PrescriptionRouteEnum `json:"route"`
 	Frequency                string                `json:"frequency"`
 	Duration                 string                `json:"duration"`
@@ -476,8 +500,73 @@ func (q *Queries) GetPrescriptions(ctx context.Context) ([]GetPrescriptionsRow, 
 			&i.Name,
 			&i.Description,
 			&i.Category,
+			pq.Array(&i.AlternateNames),
 			&i.MedicationPrescriptionID,
 			&i.Dose,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Route,
+			&i.Frequency,
+			&i.Duration,
+			&i.Instructions,
+			&i.Renewals,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPrescriptionsByMed = `-- name: GetPrescriptionsByMed :many
+SELECT m.id as medication_id, m.name, m.description, m.category,m.alternate_names, p.id as medication_prescription_id, p.dose, p.created_at,p.updated_at, p.route, p.frequency, p.duration, p.instructions, p.renewals
+FROM medications m
+JOIN medication_prescription p ON m.id = p.medication
+WHERE m.id = $1
+`
+
+type GetPrescriptionsByMedRow struct {
+	MedicationID             uuid.UUID             `json:"medication_id"`
+	Name                     string                `json:"name"`
+	Description              string                `json:"description"`
+	Category                 string                `json:"category"`
+	AlternateNames           []string              `json:"alternate_names"`
+	MedicationPrescriptionID uuid.UUID             `json:"medication_prescription_id"`
+	Dose                     string                `json:"dose"`
+	CreatedAt                time.Time             `json:"created_at"`
+	UpdatedAt                time.Time             `json:"updated_at"`
+	Route                    PrescriptionRouteEnum `json:"route"`
+	Frequency                string                `json:"frequency"`
+	Duration                 string                `json:"duration"`
+	Instructions             string                `json:"instructions"`
+	Renewals                 int32                 `json:"renewals"`
+}
+
+func (q *Queries) GetPrescriptionsByMed(ctx context.Context, id uuid.UUID) ([]GetPrescriptionsByMedRow, error) {
+	rows, err := q.db.QueryContext(ctx, getPrescriptionsByMed, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPrescriptionsByMedRow{}
+	for rows.Next() {
+		var i GetPrescriptionsByMedRow
+		if err := rows.Scan(
+			&i.MedicationID,
+			&i.Name,
+			&i.Description,
+			&i.Category,
+			pq.Array(&i.AlternateNames),
+			&i.MedicationPrescriptionID,
+			&i.Dose,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 			&i.Route,
 			&i.Frequency,
 			&i.Duration,
@@ -498,7 +587,7 @@ func (q *Queries) GetPrescriptions(ctx context.Context) ([]GetPrescriptionsRow, 
 }
 
 const getPrescriptionsByProtocolByCategory = `-- name: GetPrescriptionsByProtocolByCategory :many
-SELECT m.id as medication_id, m.name, m.description, m.category, p.id as medication_prescription_id, p.dose, p.route, p.frequency, p.duration, p.instructions, p.renewals
+SELECT m.id as medication_id, m.name, m.description, m.category,m.alternate_names, p.id as medication_prescription_id, p.dose, p.created_at,p.updated_at, p.route, p.frequency, p.duration, p.instructions, p.renewals
 FROM medications m
 JOIN medication_prescription p ON m.id = p.medication
 JOIN protocol_meds pm ON p.id = pm.prescription_id
@@ -515,8 +604,11 @@ type GetPrescriptionsByProtocolByCategoryRow struct {
 	Name                     string                `json:"name"`
 	Description              string                `json:"description"`
 	Category                 string                `json:"category"`
+	AlternateNames           []string              `json:"alternate_names"`
 	MedicationPrescriptionID uuid.UUID             `json:"medication_prescription_id"`
 	Dose                     string                `json:"dose"`
+	CreatedAt                time.Time             `json:"created_at"`
+	UpdatedAt                time.Time             `json:"updated_at"`
 	Route                    PrescriptionRouteEnum `json:"route"`
 	Frequency                string                `json:"frequency"`
 	Duration                 string                `json:"duration"`
@@ -538,8 +630,11 @@ func (q *Queries) GetPrescriptionsByProtocolByCategory(ctx context.Context, arg 
 			&i.Name,
 			&i.Description,
 			&i.Category,
+			pq.Array(&i.AlternateNames),
 			&i.MedicationPrescriptionID,
 			&i.Dose,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 			&i.Route,
 			&i.Frequency,
 			&i.Duration,
@@ -637,29 +732,45 @@ func (q *Queries) UpdateMedicationModification(ctx context.Context, arg UpdateMe
 }
 
 const upsertMedication = `-- name: UpsertMedication :one
-INSERT INTO medications (id, name, description, category)
-VALUES ($1, $2, $3, $4)
+WITH input_values(id, name, description, category,alternate_names) AS (
+  VALUES (
+    CASE 
+      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      THEN gen_random_uuid() 
+      ELSE $1 
+    END,
+    $2,
+    $3,
+    $4::medication_category_enum,
+    $5::TEXT[]
+  )
+)
+INSERT INTO medications (id, name, description, category,alternate_names)
+SELECT id, name, description, category FROM input_values
 ON CONFLICT (id) DO UPDATE
 SET name = EXCLUDED.name,
     description = EXCLUDED.description,
     category = EXCLUDED.category,
+    alternate_names = EXCLUDED.alternate_names,
     updated_at = NOW()
-RETURNING id, created_at, updated_at, name, description, category
+RETURNING id, created_at, updated_at, name, description, alternate_names, category
 `
 
 type UpsertMedicationParams struct {
-	ID          uuid.UUID `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Category    string    `json:"category"`
+	Column1 interface{} `json:"column_1"`
+	Column2 interface{} `json:"column_2"`
+	Column3 interface{} `json:"column_3"`
+	Column4 interface{} `json:"column_4"`
+	Column5 []string    `json:"column_5"`
 }
 
 func (q *Queries) UpsertMedication(ctx context.Context, arg UpsertMedicationParams) (Medication, error) {
 	row := q.db.QueryRowContext(ctx, upsertMedication,
-		arg.ID,
-		arg.Name,
-		arg.Description,
-		arg.Category,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		pq.Array(arg.Column5),
 	)
 	var i Medication
 	err := row.Scan(
@@ -668,6 +779,7 @@ func (q *Queries) UpsertMedication(ctx context.Context, arg UpsertMedicationPara
 		&i.UpdatedAt,
 		&i.Name,
 		&i.Description,
+		pq.Array(&i.AlternateNames),
 		&i.Category,
 	)
 	return i, err
@@ -715,8 +827,25 @@ func (q *Queries) UpsertMedicationModification(ctx context.Context, arg UpsertMe
 }
 
 const upsertPrescription = `-- name: UpsertPrescription :one
-INSERT INTO medication_prescription (id, medication, dose, route, frequency, duration, instructions, renewals, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+WITH input_values(id, medication, dose, route, frequency, duration, instructions, renewals) AS (
+  VALUES (
+    CASE 
+      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      THEN gen_random_uuid() 
+      ELSE $1 
+    END,
+    $2,
+    $3,
+    $4::medication_route_enum,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9
+  )
+)
+INSERT INTO medication_prescription (id, medication, dose, route, frequency, duration, instructions, renewals)
+SELECT id, medication, dose, route, frequency, duration, instructions, renewals FROM input_values
 ON CONFLICT (id) DO UPDATE
 SET medication = EXCLUDED.medication,
     dose = EXCLUDED.dose,
@@ -730,26 +859,28 @@ RETURNING id, created_at, updated_at, medication, dose, route, frequency, durati
 `
 
 type UpsertPrescriptionParams struct {
-	ID           uuid.UUID             `json:"id"`
-	Medication   uuid.UUID             `json:"medication"`
-	Dose         string                `json:"dose"`
-	Route        PrescriptionRouteEnum `json:"route"`
-	Frequency    string                `json:"frequency"`
-	Duration     string                `json:"duration"`
-	Instructions string                `json:"instructions"`
-	Renewals     int32                 `json:"renewals"`
+	Column1 interface{} `json:"column_1"`
+	Column2 interface{} `json:"column_2"`
+	Column3 interface{} `json:"column_3"`
+	Column4 interface{} `json:"column_4"`
+	Column5 interface{} `json:"column_5"`
+	Column6 interface{} `json:"column_6"`
+	Column7 interface{} `json:"column_7"`
+	Column8 interface{} `json:"column_8"`
+	Column9 interface{} `json:"column_9"`
 }
 
 func (q *Queries) UpsertPrescription(ctx context.Context, arg UpsertPrescriptionParams) (MedicationPrescription, error) {
 	row := q.db.QueryRowContext(ctx, upsertPrescription,
-		arg.ID,
-		arg.Medication,
-		arg.Dose,
-		arg.Route,
-		arg.Frequency,
-		arg.Duration,
-		arg.Instructions,
-		arg.Renewals,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+		arg.Column6,
+		arg.Column7,
+		arg.Column8,
+		arg.Column9,
 	)
 	var i MedicationPrescription
 	err := row.Scan(

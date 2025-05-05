@@ -6,6 +6,7 @@ CREATE TABLE medications (
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
   name TEXT NOT NULL UNIQUE,
   description TEXT NOT NULL DEFAULT '',
+  alternate_names TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
   category TEXT NOT NULL DEFAULT ''
 );
 

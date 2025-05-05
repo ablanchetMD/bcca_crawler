@@ -53,7 +53,7 @@ const ai_prompt = `You are an AI model tasked with analyzing a PDF document and 
   ],
   "Medications": [
     {      
-      "Name": "string",
+      "Name": "string", //This should be a single word
       "Description": "string",
       "Category": "string" // Antibiotic, Antiemetic, etc.
 	  "MedicationModifications": [
@@ -83,7 +83,7 @@ const ai_prompt = `You are an AI model tasked with analyzing a PDF document and 
   ,
   "ProtocolEligibilityCriteria": [
     {
-      "Type": "string", // Inclusion, Exclusion or Other, Split each line as a separate object
+      "Type": "string", // inclusion, exclusion or unknown, Split each line as a separate object
       "Description": "string"
     }
   ],
@@ -104,7 +104,7 @@ const ai_prompt = `You are an AI model tasked with analyzing a PDF document and 
 	"Treatments": [{
 		"Medication": "string",
 		"Dose": "string",
-		"Route": "string", // IV, PO, SC, IM, etc.
+		"Route": "string", // iv, oral, sc, im, topical, inhalation, other.
 		"Frequency": "string", 
 		"Duration": "string", 
 		"AdministrationGuide": "string"
@@ -316,7 +316,7 @@ func GetAiData(s *config.Config,proto string) error {
 			FirstName: physician.FirstName,
 			LastName: physician.LastName,
 			Email: processedEmail,
-			Site: "Vancouver Centre",
+			Site: "vancouver",
 		})
 		if err != nil {
 			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {

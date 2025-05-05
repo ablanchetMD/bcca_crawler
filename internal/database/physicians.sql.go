@@ -305,8 +305,21 @@ func (q *Queries) UpdatePhysician(ctx context.Context, arg UpdatePhysicianParams
 }
 
 const upsertPhysician = `-- name: UpsertPhysician :one
+WITH input_values(id, first_name, last_name, email, site)AS (
+  VALUES (
+    CASE 
+      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      THEN gen_random_uuid() 
+      ELSE $1 
+    END,
+    $2,
+    $3,
+    $4,
+    $5::physician_site_enum
+  )
+)
 INSERT INTO physicians (id, first_name, last_name, email, site)
-VALUES ($1, $2, $3, $4, $5)
+SELECT id,first_name,last_name,email,site FROM input_values
 ON CONFLICT (id) DO UPDATE
 SET first_name = EXCLUDED.first_name,
     last_name = EXCLUDED.last_name,
@@ -317,20 +330,20 @@ RETURNING id, created_at, updated_at, first_name, last_name, email, site
 `
 
 type UpsertPhysicianParams struct {
-	ID        uuid.UUID         `json:"id"`
-	FirstName string            `json:"first_name"`
-	LastName  string            `json:"last_name"`
-	Email     string            `json:"email"`
-	Site      PhysicianSiteEnum `json:"site"`
+	Column1 interface{}       `json:"column_1"`
+	Column2 interface{}       `json:"column_2"`
+	Column3 interface{}       `json:"column_3"`
+	Column4 interface{}       `json:"column_4"`
+	Column5 PhysicianSiteEnum `json:"column_5"`
 }
 
 func (q *Queries) UpsertPhysician(ctx context.Context, arg UpsertPhysicianParams) (Physician, error) {
 	row := q.db.QueryRowContext(ctx, upsertPhysician,
-		arg.ID,
-		arg.FirstName,
-		arg.LastName,
-		arg.Email,
-		arg.Site,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
 	)
 	var i Physician
 	err := row.Scan(

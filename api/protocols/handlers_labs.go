@@ -27,20 +27,35 @@ type LabReq struct {
 func HandleGetLabs(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	labs := []api.LabResp{}
-	raw_labs, err := c.Db.GetTests(ctx)
 
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting labs")
-		return
-	}
+	category := r.URL.Query().Get("test_category")
+
+	var test_labs []database.Test
+
+	switch category {
+		case "":
+			raw_labs, err := c.Db.GetTests(ctx)
+			if err != nil {
+				json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting labs")
+				return
+			}
+			test_labs = raw_labs
+		default:
+			raw_labs, err := c.Db.GetTestsByCategory(ctx, category)
+			if err != nil {
+				json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting labs")
+				return
+			}
+			test_labs = raw_labs
+		}	
 	
-	for _, a := range raw_labs {		
-		labs = append(labs, api.MapLab(a))		
+	for _, a := range test_labs {		
+		labs = append(labs, api.MapLab(a))	
 	}
 
 	json_utils.RespondWithJSON(w, http.StatusOK, labs)
 }
-
+	
 
 func HandleGetLabByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
 
@@ -89,8 +104,8 @@ func HandleUpsertLab(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	var req LabReq	
 	err := api.UnmarshalAndValidatePayload(c,r, &req)
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		println(err.Error())
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())		
 		return
 	}
 
@@ -98,19 +113,18 @@ func HandleUpsertLab(c *config.Config, w http.ResponseWriter, r *http.Request) {
 
 	pid, err:= uuid.Parse(req.ID)
 	if err != nil {
-		pid = uuid.New()
+		pid = uuid.Nil
 	}		
 	
 	test,err := c.Db.UpsertTest(ctx,database.UpsertTestParams{
-		ID: pid,
-		Name: req.Name,
-		Description: req.Description,
-		FormUrl: req.FormUrl,
-		Unit: req.Unit,
-		LowerLimit: req.LowerLimit,
-		UpperLimit: req.UpperLimit,
-		TestCategory: req.TestCategory,
-		
+		Column1: pid,
+		Column2: req.Name,
+		Column3: req.Description,
+		Column4: req.FormUrl,
+		Column5: req.Unit,
+		Column6: req.LowerLimit,
+		Column7: req.UpperLimit,
+		Column8: req.TestCategory,
 	})	
 
 	if err != nil {

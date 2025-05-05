@@ -243,21 +243,28 @@ type MedicationResp struct {
 	ID 			string `json:"id"`
 	Name 		string `json:"name"`
 	Description string `json:"description"`
+	CreatedAt 	string `json:"created_at"`
+	UpdatedAt 	string `json:"updated_at"`
 	Category 	string `json:"category"`
+	AlternateNames []string `json:"alternate_names"`
 }
 
 func MapMedication(src database.Medication) MedicationResp {
 	return MedicationResp{
 		ID:          src.ID.String(),
 		Name:        src.Name,
+		CreatedAt:   src.CreatedAt.Format("2006-01-02"),
+		UpdatedAt:   src.UpdatedAt.Format("2006-01-02"),
 		Description: src.Description,
 		Category:    src.Category,
+		AlternateNames: src.AlternateNames,
 	}
 }
 
 type MedModificationResp struct {
 	ID 			string `json:"id"`
 	MedicationID string `json:"medication_id"`
+
 	Category 	string `json:"category"`
 	Subcategory string `json:"subcategory"`
 	Adjustment 	string `json:"adjustment"`
@@ -277,6 +284,8 @@ type PrescriptionResp struct {
 	ID 			string `json:"id"`
 	MedicationID string `json:"medication_id"`
 	MedicationName string `json:"medication_name"`
+	CreatedAt 	string `json:"created_at"`
+	UpdatedAt 	string `json:"updated_at"`
 	Dose 		string `json:"dose"`
 	Route 		string `json:"route"`
 	Frequency 	string `json:"frequency"`
@@ -290,6 +299,8 @@ func MapPrescriptionByProtByCat(src database.GetPrescriptionsByProtocolByCategor
 		ID:            src.MedicationPrescriptionID.String(),
 		MedicationID:  src.MedicationID.String(),
 		MedicationName: src.Name,
+		CreatedAt:   src.CreatedAt.Format("2006-01-02"),
+		UpdatedAt:   src.UpdatedAt.Format("2006-01-02"),
 		Dose:          src.Dose,
 		Route:         string(src.Route),
 		Frequency:     src.Frequency,
@@ -304,6 +315,8 @@ func MapPrescriptionsByID(src database.GetPrescriptionByIDRow) PrescriptionResp 
 		ID:            src.MedicationPrescriptionID.String(),
 		MedicationID:  src.MedicationID.String(),
 		MedicationName: src.Name,
+		CreatedAt:   src.CreatedAt.Format("2006-01-02"),
+		UpdatedAt:   src.UpdatedAt.Format("2006-01-02"),
 		Dose:          src.Dose,
 		Route:         string(src.Route),
 		Frequency:     src.Frequency,
@@ -318,6 +331,8 @@ func MapPrescription(src database.GetPrescriptionsRow) PrescriptionResp {
 		ID:            src.MedicationPrescriptionID.String(),
 		MedicationID:  src.MedicationID.String(),
 		MedicationName: src.Name,
+		CreatedAt:   src.CreatedAt.Format("2006-01-02"),
+		UpdatedAt:   src.UpdatedAt.Format("2006-01-02"),
 		Dose:          src.Dose,
 		Route:         string(src.Route),
 		Frequency:     src.Frequency,
@@ -364,6 +379,8 @@ func mapSummaryProtocol(src database.Protocol) SummaryProtocol {
 type LabResp struct {
 	ID 			string `json:"id"`
 	Name 		string `json:"name"`
+	CreatedAt 	string `json:"created_at"`
+	UpdatedAt 	string `json:"updated_at"`
 	Description string `json:"description"`
 	FormUrl 	string `json:"form_url"`
 	Unit 		string `json:"unit"`
@@ -376,6 +393,8 @@ func MapLab(src database.Test) LabResp {
 	return LabResp{
 		ID:          src.ID.String(),
 		Name:       src.Name,
+		CreatedAt:   src.CreatedAt.Format("2006-01-02"),
+		UpdatedAt:   src.UpdatedAt.Format("2006-01-02"),
 		Description: src.Description,
 		FormUrl:     src.FormUrl,
 		Unit:        src.Unit,

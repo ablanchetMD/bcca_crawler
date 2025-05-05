@@ -4,10 +4,22 @@ VALUES ($1, $2)
 RETURNING *;
 
 -- name: UpsertEligibilityCriteria :one
-INSERT INTO protocol_eligibility_criteria (id, type, description, updated_at)
-VALUES ($1, $2, $3, NOW())
+WITH input_values(id, type, description) AS (
+    VALUES
+    (
+        CASE
+            WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+            THEN gen_random_uuid() 
+            ELSE $1 
+        END,        
+        $2::eligibility_enum,
+        $3
+    )
+)
+INSERT INTO protocol_eligibility_criteria (id, type, description)
+SELECT id, type, description FROM input_values
 ON CONFLICT (id) DO UPDATE
-SET type = EXCLUDED.type,
+SET type = EXCLUDED.type::eligibility_enum,
     description = EXCLUDED.description,
     updated_at = NOW()
 RETURNING *;
@@ -40,11 +52,68 @@ INSERT INTO protocol_eligibility_criteria_values (protocol_id, criteria_id)
 VALUES ($1, $2);
 
 -- name: GetElibilityCriteria :many
-SELECT pec.*, ARRAY_AGG(ROW(pecv.protocol_id,p.code)) AS protocol_ids
-FROM protocol_eligibility_criteria pec
-JOIN protocol_eligibility_criteria_values pecv ON pec.id = pecv.criteria_id
-JOIN protocols p ON pecv.protocol_id = p.id
-GROUP BY pec.id;
+SELECT 
+    pec.*, 
+    COALESCE(
+        (
+            SELECT json_agg(
+            json_build_object(
+                'id', pecv.protocol_id, 
+                'code', p.code
+            )
+        )
+        FROM protocol_eligibility_criteria_values pecv
+        JOIN protocols p ON pecv.protocol_id = p.id
+        WHERE pecv.criteria_id = pec.id
+        ),
+        '[]'
+    ) AS protocol_ids
+FROM 
+    protocol_eligibility_criteria pec;
+
+-- name: GetEligibilityCriteriaByID :one
+SELECT 
+    pec.*, 
+    COALESCE(
+        (
+            SELECT json_agg(
+            json_build_object(
+                'id', pecv.protocol_id, 
+                'code', p.code
+            )
+        )
+        FROM protocol_eligibility_criteria_values pecv
+        JOIN protocols p ON pecv.protocol_id = p.id
+        WHERE pecv.criteria_id = pec.id
+        ),
+        '[]'
+    ) AS protocol_ids
+FROM 
+    protocol_eligibility_criteria pec
+WHERE
+    pec.id = $1;
+
+-- name: GetEligibilityCriteriaByType :many
+SELECT 
+    pec.*, 
+    COALESCE(
+        (
+            SELECT json_agg(
+            json_build_object(
+                'id', pecv.protocol_id, 
+                'code', p.code
+            )
+        )
+        FROM protocol_eligibility_criteria_values pecv
+        JOIN protocols p ON pecv.protocol_id = p.id
+        WHERE pecv.criteria_id = pec.id
+        ),
+        '[]'
+    ) AS protocol_ids
+FROM 
+    protocol_eligibility_criteria pec
+WHERE 
+    LOWER(pec.type) = LOWER($1);
 
 -- name: UnlinkEligibilityFromProtocol :exec
 DELETE FROM protocol_eligibility_criteria_values
@@ -54,23 +123,31 @@ WHERE protocol_id = $1 AND criteria_id = $2;
 SELECT * FROM protocol_eligibility_criteria_values
 WHERE protocol_id = $1 AND criteria_id = $2;
 
--- name: GetEligibilityCriteriaByID :one
-SELECT pec.*, ARRAY_AGG(ROW(pecv.protocol_id,p.code)) AS protocol_ids
-FROM protocol_eligibility_criteria pec
-JOIN protocol_eligibility_criteria_values pecv ON pec.id = pecv.criteria_id
-JOIN protocols p ON pecv.protocol_id = p.id
-WHERE pec.id = $1;
-
--- name: GetEligibilityCriteriaByType :many
-SELECT pec.*, ARRAY_AGG(ROW(pecv.protocol_id,p.code)) AS protocol_ids
-FROM protocol_eligibility_criteria pec
-JOIN protocol_eligibility_criteria_values pecv ON pec.id = pecv.criteria_id
-JOIN protocols p ON pecv.protocol_id = p.id
-WHERE LOWER(pec.type) = LOWER($1)
-GROUP BY pec.id;
-
 -- name: GetEligibilityByProtocol :many
 SELECT c.*
 FROM protocol_eligibility_criteria c
 JOIN protocol_eligibility_criteria_values v ON c.id = v.criteria_id
 WHERE v.protocol_id = $1;
+
+-- name: UpdateEligibilityProtocols :exec
+WITH current_protocols AS (
+    SELECT pcv.protocol_id 
+    FROM protocol_eligibility_criteria_values pcv 
+    WHERE pcv.criteria_id = $1
+),
+to_remove AS (
+    DELETE FROM protocol_eligibility_criteria_values pcv
+    WHERE pcv.criteria_id = $1
+    AND pcv.protocol_id NOT IN (SELECT unnest($2::uuid[]))
+    RETURNING pcv.protocol_id
+),
+to_add AS (
+    INSERT INTO protocol_eligibility_criteria_values (criteria_id, protocol_id)
+    SELECT $1, new_protocol
+    FROM unnest($2::uuid[]) AS new_protocol
+    WHERE new_protocol NOT IN (SELECT cp.protocol_id FROM current_protocols cp)
+    RETURNING protocol_id
+)
+SELECT 
+    (SELECT COUNT(*) FROM to_remove) AS removed, 
+    (SELECT COUNT(*) FROM to_add) AS added;

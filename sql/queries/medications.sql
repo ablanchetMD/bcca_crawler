@@ -1,6 +1,6 @@
 -- name: AddMedication :one
-INSERT INTO medications (name, description, category)
-VALUES ($1, $2, $3)
+INSERT INTO medications (name, description, category,alternate_names)
+VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- name: AddPrescription :one
@@ -9,18 +9,49 @@ VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 
 -- name: UpsertMedication :one
-INSERT INTO medications (id, name, description, category)
-VALUES ($1, $2, $3, $4)
+WITH input_values(id, name, description, category,alternate_names) AS (
+  VALUES (
+    CASE 
+      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      THEN gen_random_uuid() 
+      ELSE $1 
+    END,
+    $2,
+    $3,
+    $4::medication_category_enum,
+    $5::TEXT[]
+  )
+)
+INSERT INTO medications (id, name, description, category,alternate_names)
+SELECT id, name, description, category FROM input_values
 ON CONFLICT (id) DO UPDATE
 SET name = EXCLUDED.name,
     description = EXCLUDED.description,
     category = EXCLUDED.category,
+    alternate_names = EXCLUDED.alternate_names,
     updated_at = NOW()
 RETURNING *;
 
 -- name: UpsertPrescription :one
-INSERT INTO medication_prescription (id, medication, dose, route, frequency, duration, instructions, renewals, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+WITH input_values(id, medication, dose, route, frequency, duration, instructions, renewals) AS (
+  VALUES (
+    CASE 
+      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      THEN gen_random_uuid() 
+      ELSE $1 
+    END,
+    $2,
+    $3,
+    $4::medication_route_enum,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9
+  )
+)
+INSERT INTO medication_prescription (id, medication, dose, route, frequency, duration, instructions, renewals)
+SELECT id, medication, dose, route, frequency, duration, instructions, renewals FROM input_values
 ON CONFLICT (id) DO UPDATE
 SET medication = EXCLUDED.medication,
     dose = EXCLUDED.dose,
@@ -33,13 +64,19 @@ SET medication = EXCLUDED.medication,
 RETURNING *;
 
 -- name: GetPrescriptions :many
-SELECT m.id as medication_id, m.name, m.description, m.category, p.id as medication_prescription_id, p.dose, p.route, p.frequency, p.duration, p.instructions, p.renewals
+SELECT m.id as medication_id, m.name, m.description, m.category,m.alternate_names, p.id as medication_prescription_id, p.dose, p.created_at,p.updated_at, p.route, p.frequency, p.duration, p.instructions, p.renewals
 FROM medications m
 JOIN medication_prescription p ON m.id = p.medication
 ORDER BY m.name ASC;
 
+-- name: GetPrescriptionsByMed :many
+SELECT m.id as medication_id, m.name, m.description, m.category,m.alternate_names, p.id as medication_prescription_id, p.dose, p.created_at,p.updated_at, p.route, p.frequency, p.duration, p.instructions, p.renewals
+FROM medications m
+JOIN medication_prescription p ON m.id = p.medication
+WHERE m.id = $1;
+
 -- name: GetPrescriptionByID :one
-SELECT m.id as medication_id, m.name, m.description, m.category, p.id as medication_prescription_id, p.dose, p.route, p.frequency, p.duration, p.instructions, p.renewals
+SELECT m.id as medication_id, m.name, m.description, m.category,m.alternate_names, p.id as medication_prescription_id, p.dose,p.created_at,p.updated_at, p.route, p.frequency, p.duration, p.instructions, p.renewals
 FROM medications m
 JOIN medication_prescription p ON m.id = p.medication
 WHERE p.id = $1;
@@ -58,7 +95,7 @@ DELETE FROM protocol_meds
 WHERE protocol_id = $1 AND prescription_id = $2 AND category = $3;
 
 -- name: GetPrescriptionsByProtocolByCategory :many
-SELECT m.id as medication_id, m.name, m.description, m.category, p.id as medication_prescription_id, p.dose, p.route, p.frequency, p.duration, p.instructions, p.renewals
+SELECT m.id as medication_id, m.name, m.description, m.category,m.alternate_names, p.id as medication_prescription_id, p.dose, p.created_at,p.updated_at, p.route, p.frequency, p.duration, p.instructions, p.renewals
 FROM medications m
 JOIN medication_prescription p ON m.id = p.medication
 JOIN protocol_meds pm ON p.id = pm.prescription_id
@@ -100,7 +137,7 @@ SELECT * FROM medication_modifications
 WHERE medication_id = $1;
 
 -- name: GetMedicationModificationsByProtocol :many
-SELECT m.id as medication_id, m.name, m.description, m.category, mod.id as modification_id, mod.category as modification_category, mod.subcategory as modification_subcategory, mod.adjustment
+SELECT m.id as medication_id, m.name, m.description, m.category,m.alternate_names, mod.id as modification_id, mod.category as modification_category, mod.subcategory as modification_subcategory, mod.adjustment
 FROM medication_modifications mod
 JOIN medications m ON mod.medication_id = m.id
 JOIN protocol_treatment pt ON m.id = pt.medication

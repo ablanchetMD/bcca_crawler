@@ -3,6 +3,7 @@ package api
 import (
 	"bcca_crawler/internal/config"
 	"github.com/go-playground/validator/v10"
+	"github.com/gorilla/mux"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -48,8 +49,8 @@ type IDs struct {
 
 func ParseAndValidateID(r *http.Request) (IDs, error) {
 	var ids IDs    
-	
-	if id := r.PathValue("id"); id != "" {
+	vars := mux.Vars(r)
+	if id := vars["id"]; id != "" {
 		parsed_id, err := uuid.Parse(id)
 		if err != nil {
 			return ids, fmt.Errorf("id is not a valid uuid")
@@ -57,7 +58,7 @@ func ParseAndValidateID(r *http.Request) (IDs, error) {
 		ids.ID = parsed_id
 	}
 
-	if protocol_id := r.PathValue("protocol_id"); protocol_id != "" {
+	if protocol_id := vars["protocol_id"]; protocol_id != "" {
         pid, err := uuid.Parse(protocol_id)
         if err != nil {
             return ids, fmt.Errorf("protocol_id is not a valid uuid")
@@ -65,7 +66,7 @@ func ParseAndValidateID(r *http.Request) (IDs, error) {
         ids.ProtocolID = pid
     }
 
-	if cycle_id := r.PathValue("cycle_id"); cycle_id != "" {
+	if cycle_id := vars["cycle_id"]; cycle_id != "" {
 		cid, err := uuid.Parse(cycle_id)
 		if err != nil {
 			return ids, fmt.Errorf("cycle_id is not a valid uuid")

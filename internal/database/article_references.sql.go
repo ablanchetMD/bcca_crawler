@@ -76,6 +76,44 @@ func (q *Queries) DeleteArticleReference(ctx context.Context, id uuid.UUID) erro
 	return err
 }
 
+const getALLArticles = `-- name: GetALLArticles :many
+SELECT id, created_at, updated_at, title, authors, journal, year, pmid, doi FROM article_references
+ORDER BY year DESC
+`
+
+func (q *Queries) GetALLArticles(ctx context.Context) ([]ArticleReference, error) {
+	rows, err := q.db.QueryContext(ctx, getALLArticles)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ArticleReference{}
+	for rows.Next() {
+		var i ArticleReference
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Title,
+			&i.Authors,
+			&i.Journal,
+			&i.Year,
+			&i.Pmid,
+			&i.Doi,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getArticleReferenceByData = `-- name: GetArticleReferenceByData :one
 SELECT id, created_at, updated_at, title, authors, journal, year, pmid, doi FROM article_references
 WHERE title = $1 AND authors = $2 AND journal = $3 AND year = $4
@@ -173,19 +211,48 @@ func (q *Queries) GetArticleReferenceByIDWithProtocols(ctx context.Context, id u
 }
 
 const getArticleReferences = `-- name: GetArticleReferences :many
-SELECT id, created_at, updated_at, title, authors, journal, year, pmid, doi FROM article_references
-ORDER BY year DESC
+SELECT 
+    art.id, art.created_at, art.updated_at, art.title, art.authors, art.journal, art.year, art.pmid, art.doi, 
+    COALESCE(
+        (
+            SELECT json_agg(
+            json_build_object(
+                'id', pecv.protocol_id, 
+                'code', p.code
+            )
+        )
+        FROM protocol_references_value pecv
+        JOIN protocols p ON pecv.protocol_id = p.id
+        WHERE pecv.reference_id = art.id
+        ),
+        '[]'
+    ) AS protocol_ids
+FROM 
+    article_references art
 `
 
-func (q *Queries) GetArticleReferences(ctx context.Context) ([]ArticleReference, error) {
+type GetArticleReferencesRow struct {
+	ID          uuid.UUID   `json:"id"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
+	Title       string      `json:"title"`
+	Authors     string      `json:"authors"`
+	Journal     string      `json:"journal"`
+	Year        string      `json:"year"`
+	Pmid        string      `json:"pmid"`
+	Doi         string      `json:"doi"`
+	ProtocolIds interface{} `json:"protocol_ids"`
+}
+
+func (q *Queries) GetArticleReferences(ctx context.Context) ([]GetArticleReferencesRow, error) {
 	rows, err := q.db.QueryContext(ctx, getArticleReferences)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ArticleReference{}
+	items := []GetArticleReferencesRow{}
 	for rows.Next() {
-		var i ArticleReference
+		var i GetArticleReferencesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.CreatedAt,
@@ -196,6 +263,7 @@ func (q *Queries) GetArticleReferences(ctx context.Context) ([]ArticleReference,
 			&i.Year,
 			&i.Pmid,
 			&i.Doi,
+			&i.ProtocolIds,
 		); err != nil {
 			return nil, err
 		}
@@ -371,38 +439,53 @@ func (q *Queries) UpdateArticleReference(ctx context.Context, arg UpdateArticleR
 }
 
 const upsertArticleReference = `-- name: UpsertArticleReference :one
-INSERT INTO article_references (id, title, authors, journal, year, doi, pmid, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+WITH input_values(id, title, authors, journal, year, doi, pmid) AS (
+  VALUES (
+    CASE 
+      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      THEN gen_random_uuid() 
+      ELSE $1 
+    END,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7
+  )
+)
+INSERT INTO article_references (id, title, authors, journal, year, doi, pmid)
+SELECT id, title, authors, journal, year, doi, pmid FROM input_values
 ON CONFLICT (id) DO UPDATE
 SET title = EXCLUDED.title,
     authors = EXCLUDED.authors,
     journal = EXCLUDED.journal,
     year = EXCLUDED.year,
     doi = EXCLUDED.doi,
-    pmid = EXCLUDED.pmid,    
+    pmid = EXCLUDED.pmid,
     updated_at = NOW()
 RETURNING id, created_at, updated_at, title, authors, journal, year, pmid, doi
 `
 
 type UpsertArticleReferenceParams struct {
-	ID      uuid.UUID `json:"id"`
-	Title   string    `json:"title"`
-	Authors string    `json:"authors"`
-	Journal string    `json:"journal"`
-	Year    string    `json:"year"`
-	Doi     string    `json:"doi"`
-	Pmid    string    `json:"pmid"`
+	Column1 interface{} `json:"column_1"`
+	Column2 interface{} `json:"column_2"`
+	Column3 interface{} `json:"column_3"`
+	Column4 interface{} `json:"column_4"`
+	Column5 interface{} `json:"column_5"`
+	Column6 interface{} `json:"column_6"`
+	Column7 interface{} `json:"column_7"`
 }
 
 func (q *Queries) UpsertArticleReference(ctx context.Context, arg UpsertArticleReferenceParams) (ArticleReference, error) {
 	row := q.db.QueryRowContext(ctx, upsertArticleReference,
-		arg.ID,
-		arg.Title,
-		arg.Authors,
-		arg.Journal,
-		arg.Year,
-		arg.Doi,
-		arg.Pmid,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+		arg.Column6,
+		arg.Column7,
 	)
 	var i ArticleReference
 	err := row.Scan(

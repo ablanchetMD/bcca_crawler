@@ -22,14 +22,19 @@ type Protocol struct {
 	Name    string `json:"name"`
 	Tags    []string `json:"tags"`
 	Notes   string `json:"notes"`
+	ProtocolUrl string `json:"protocol_url"`
+	PatientHandoutUrl string `json:"patient_handout_url"`
+	RevisedOn string `json:"revised_on"`
+	ActivatedOn string `json:"activated_on"`
 }
 
 type ProtocolRequest struct {
+	ID 				string `json:"id" validate:"omitempty,uuid"`
 	TumorGroup      string `json:"tumor_group" validate:"required,tumorgroup"`
-	Code    string `json:"code" validate:"required,min=1,max=10"`
-	Name    string `json:"name" validate:"required,min=1,max=250"`
-	Tags    []string `json:"tags" validate:"omitempty,max=10,dive,min=1,max=50"`
-	Notes   string `json:"notes" validate:"omitempty,max=500"`
+	Code    		string `json:"code" validate:"required,min=1,max=10"`
+	Name    		string `json:"name" validate:"required,min=1,max=250"`
+	Tags    		[]string `json:"tags" validate:"omitempty,max=10,dive,min=1,max=50"`
+	Notes  			 string `json:"notes" validate:"omitempty,max=500"`
 	ProtocolUrl string `json:"protocol_url" validate:"omitempty,max=250"`
 	PatientHandoutUrl string `json:"patient_handout_url" validate:"omitempty,max=250"`
 	RevisedOn string `json:"revised_on" validate:"omitempty,max=25"`
@@ -52,6 +57,10 @@ func mapProtocolStruct(src database.Protocol) Protocol {
 		Name:    src.Name,
 		Tags:    src.Tags,
 		Notes:   src.Notes,
+		ProtocolUrl: src.ProtocolUrl,
+		PatientHandoutUrl: src.PatientHandoutUrl,
+		RevisedOn: src.RevisedOn,
+		ActivatedOn: src.ActivatedOn,
 	}
 }
 
@@ -128,36 +137,39 @@ func HandleGetProtocolById(c *config.Config, w http.ResponseWriter, r *http.Requ
 	json_utils.RespondWithJSON(w, http.StatusOK, mapProtocolStruct(protocol))
 }
 
-func HandleUpdateProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
-
-	ids, err := ParseAndValidateID(r)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}
+func HandleUpsertProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
 
 	var req ProtocolRequest
-	err = UnmarshalAndValidatePayload(c,r, &req)
+	err := UnmarshalAndValidatePayload(c,r, &req)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	protocol,err := c.Db.UpdateProtocol(r.Context(),database.UpdateProtocolParams{
-		ID: ids.ID,		
-		TumorGroup: req.TumorGroup,
-		Code: req.Code,
-		Name: req.Name,
-		Tags: req.Tags,
-		Notes: req.Notes,
-		ProtocolUrl: req.ProtocolUrl,
-		PatientHandoutUrl: req.PatientHandoutUrl,
-		RevisedOn: req.RevisedOn,
-		ActivatedOn: req.ActivatedOn,
+	ctx := r.Context()	
+
+	pid, err:= uuid.Parse(req.ID)
+	if err != nil || req.ID == "" {
+		fmt.Println("Error parsing UUID: ", err)
+		pid = uuid.Nil
+	}
+
+	protocol,err := c.Db.UpsertProtocol(ctx,database.UpsertProtocolParams{
+		Column1: pid,
+		Column2: database.TumorGroupEnum(req.TumorGroup),
+		Column3: req.Code,
+		Column4: req.Name,
+		Column5: pq.StringArray(req.Tags),
+		Column6: req.Notes,
+		Column7: req.ProtocolUrl,
+		Column8: req.PatientHandoutUrl,
+		Column9: req.RevisedOn,
+		Column10: req.ActivatedOn,
 	})
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error updating protocol: %s", ids.ID.String()))
+		fmt.Println("Error:", err.Error())
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error updating protocol: %s", pid.String()))
 		return
 	}
 	json_utils.RespondWithJSON(w, http.StatusOK, mapProtocolStruct(protocol))

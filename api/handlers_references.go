@@ -8,11 +8,14 @@ import (
 	"net/http"		
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+	"encoding/json"
 )
 
 
 type ArticleReferenceResponse struct {
 	Id      uuid.UUID   `json:"Id"`
+	CreatedAt string     `json:"CreatedAt"`
+	UpdatedAt string     `json:"UpdatedAt"`
 	Title   string `json:"Title"`
 	Authors string `json:"Authors"`
 	Journal string `json:"Journal"`
@@ -34,28 +37,55 @@ type ArticleRefReq struct {
 }
 
 func HandleGetArticleReferences(c *config.Config, w http.ResponseWriter, r *http.Request){
+	
+
+	ctx := r.Context()	
 	articles := []ArticleReferenceResponse{}
-	articleReferences, err := c.Db.GetArticleReferencesWithProtocols(r.Context())
+	articleReferences, err := c.Db.GetArticleReferencesWithProtocols(ctx)
+
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting article references")
 		return
 	}
+
+	all_articles, err := c.Db.GetALLArticles(ctx)
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting all articles")
+		return
+	}
+	println("All articles:", all_articles)
+	println("Array length:", len(all_articles))
+	
 	
 	for _, a := range articleReferences {
-		linkedProtocols, err := ConvertTuplesToStructs[LinkedProtocols](a.ProtocolIds)
+		println("Article references:", a.ID.String())
+		println("Article references:", a.Title)
+		var linkedProtocols []LinkedProtocols	
+	
+		protocolIdsBytes, ok := a.ProtocolIds.([]byte)
+		if !ok {
+			json_utils.RespondWithError(w, http.StatusInternalServerError, "Error asserting protocol IDs to []byte")
+			return
+		}
+
+		err = json.Unmarshal(protocolIdsBytes, &linkedProtocols)
 		if err != nil {
-			fmt.Println("Error:", err)
+			json_utils.RespondWithError(w, http.StatusInternalServerError, 
+				fmt.Sprintf("Error parsing protocol data: %s", err.Error()))
 			return
 		}	
 		articles = append(articles, ArticleReferenceResponse{
 			Id:          a.ID,
+			CreatedAt:   a.CreatedAt.String(),
+			UpdatedAt:   a.UpdatedAt.String(),
 			Title:       a.Title,
 			Authors:     a.Authors,
 			Journal:     a.Journal,
 			Year:        a.Year,
 			Pmid:        a.Pmid,
 			Doi:         a.Doi,
-			LinkedProtocols: linkedProtocols,		
+			LinkedProtocols: linkedProtocols,	
+				
 		})
 	}
 
@@ -69,6 +99,7 @@ func HandleUpsertReference(c *config.Config, w http.ResponseWriter, r *http.Requ
 
 	err := UnmarshalAndValidatePayload(c,r, &req)
 	if err != nil {
+		println("Error:", err.Error())
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -79,14 +110,14 @@ func HandleUpsertReference(c *config.Config, w http.ResponseWriter, r *http.Requ
 	}	
 	
 	article, err := c.Db.UpsertArticleReference(r.Context(), database.UpsertArticleReferenceParams{
-		ID:      pid,
-		Title:   req.Title,
-		Authors: req.Authors,
-		Journal: req.Journal,
-		Year:    req.Year,
-		Pmid:    req.Pmid,
-		Doi:     req.Doi,		
-	})
+		Column1: pid,
+		Column2: req.Title,
+		Column3: req.Authors,
+		Column4: req.Journal,
+		Column5: req.Year,
+		Column6: req.Pmid,
+		Column7: req.Doi,
+	})		
 
 	if err != nil {		
 		if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
@@ -94,10 +125,22 @@ func HandleUpsertReference(c *config.Config, w http.ResponseWriter, r *http.Requ
 			json_utils.RespondWithError(w, http.StatusInternalServerError, "Record already exists")
 			return			
 		}
-		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error creating protocol")
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error creating reference")
 		return
 	}
-
+	return_article := ArticleRefReq{
+		ID: article.ID.String(),
+		Title: article.Title,
+		Authors: article.Authors,
+		Journal: article.Journal,
+		Year: article.Year,
+		Pmid: article.Pmid,
+		Doi: article.Doi,		
+	}
+	if req.ProtocolID == "" {
+		json_utils.RespondWithJSON(w, http.StatusOK, return_article)
+		return
+	}
 	proto_id, err := uuid.Parse(req.ProtocolID)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding article reference to protocol (invalid UUID): %s", req.ProtocolID))		
@@ -110,19 +153,9 @@ func HandleUpsertReference(c *config.Config, w http.ResponseWriter, r *http.Requ
 			json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding article reference to protocol: %s", req.ProtocolID))
 		}
 	}
-
-	req = ArticleRefReq{
-		ID: article.ID.String(),
-		Title: article.Title,
-		Authors: article.Authors,
-		Journal: article.Journal,
-		Year: article.Year,
-		Pmid: article.Pmid,
-		Doi: article.Doi,
-		ProtocolID: req.ProtocolID,
-	}		
+	return_article.ProtocolID = req.ProtocolID	
 	
-	json_utils.RespondWithJSON(w, http.StatusCreated, req)
+	json_utils.RespondWithJSON(w, http.StatusCreated, return_article)
 }
 
 func HandleGetArticleRefByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
