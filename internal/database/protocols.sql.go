@@ -538,7 +538,7 @@ WITH input_values(id, tumor_group, code,name,tags,notes,protocol_url,patient_han
         $7,
         $8,
         $9,
-        $10        
+        $10       
     )
 )
 INSERT INTO protocols (id, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url, revised_on, activated_on)
@@ -558,30 +558,30 @@ RETURNING id, created_at, updated_at, tumor_group, code, name, tags, notes, prot
 `
 
 type UpsertProtocolParams struct {
-	Column1  interface{}    `json:"column_1"`
-	Column2  TumorGroupEnum `json:"column_2"`
-	Column3  interface{}    `json:"column_3"`
-	Column4  interface{}    `json:"column_4"`
-	Column5  []string       `json:"column_5"`
-	Column6  interface{}    `json:"column_6"`
-	Column7  interface{}    `json:"column_7"`
-	Column8  interface{}    `json:"column_8"`
-	Column9  interface{}    `json:"column_9"`
-	Column10 interface{}    `json:"column_10"`
+	ID                interface{}    `json:"id"`
+	TumorGroup        TumorGroupEnum `json:"tumor_group"`
+	Code              interface{}    `json:"code"`
+	Name              interface{}    `json:"name"`
+	Tags              []string       `json:"tags"`
+	Notes             interface{}    `json:"notes"`
+	ProtocolUrl       interface{}    `json:"protocol_url"`
+	PatientHandoutUrl interface{}    `json:"patient_handout_url"`
+	RevisedOn         interface{}    `json:"revised_on"`
+	ActivatedOn       interface{}    `json:"activated_on"`
 }
 
 func (q *Queries) UpsertProtocol(ctx context.Context, arg UpsertProtocolParams) (Protocol, error) {
 	row := q.db.QueryRowContext(ctx, upsertProtocol,
-		arg.Column1,
-		arg.Column2,
-		arg.Column3,
-		arg.Column4,
-		pq.Array(arg.Column5),
-		arg.Column6,
-		arg.Column7,
-		arg.Column8,
-		arg.Column9,
-		arg.Column10,
+		arg.ID,
+		arg.TumorGroup,
+		arg.Code,
+		arg.Name,
+		pq.Array(arg.Tags),
+		arg.Notes,
+		arg.ProtocolUrl,
+		arg.PatientHandoutUrl,
+		arg.RevisedOn,
+		arg.ActivatedOn,
 	)
 	var i Protocol
 	err := row.Scan(

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 const addToxicity = `-- name: AddToxicity :one
@@ -98,16 +99,19 @@ SELECT
     t.updated_at AS updated_at,
     t.title AS title,
     t.category AS category,
-    t.description AS description,
-    json_agg(
-        json_build_object(
-            'id', tg.id,
-            'created_at', tg.created_at,
-            'updated_at', tg.updated_at,
-            'grade', tg.grade,
-            'description', tg.description
-        )
-    ) AS grades
+    t.description AS description,    
+    COALESCE(
+        json_agg(
+            json_build_object(
+                'id', tg.id,
+                'created_at',
+                'updated_at',
+                'grade', tg.grade,
+                'description', tg.description
+            )
+        ) FILTER (WHERE tg.id IS NOT NULL),
+        '[]'
+    )::jsonb AS grades
 FROM
     toxicities t
 LEFT JOIN
@@ -165,6 +169,7 @@ SELECT
     t.title,
     t.category,
     t.description,
+    COALESCE(
     JSON_AGG(
         JSON_BUILD_OBJECT(
             'id', tg.id,
@@ -175,7 +180,9 @@ SELECT
             'adjustment', ptm.adjustment
         ) 
         ORDER BY tg.grade
-    ) as grades
+        ) FILTER (WHERE tg.id IS NOT NULL),
+        '[]'
+    )::jsonb as grades
 FROM toxicities t
 LEFT JOIN toxicity_grades tg ON t.id = tg.toxicity_id
 LEFT JOIN protocol_tox_modifications ptm ON tg.id = ptm.toxicity_grade_id AND ptm.protocol_id = $1
@@ -232,20 +239,25 @@ SELECT
     t.title AS title,
     t.category AS category,
     t.description AS description,
-    json_agg(
-        json_build_object(
-            'id', tg.id,
-            'created_at', tg.created_at,
-            'updated_at', tg.updated_at,
-            'grade', tg.grade,
-            'description', tg.description
-        )
-    ) AS grades
+    COALESCE(
+        json_agg(
+            json_build_object(
+                'id', tg.id,
+                'created_at',
+                'updated_at', 
+                'grade', tg.grade,
+                'description', tg.description
+            )
+        ) FILTER (WHERE tg.id IS NOT NULL),
+        '[]'
+    )::jsonb AS grades
 FROM
     toxicities t
 LEFT JOIN
     toxicity_grades tg ON t.id = tg.toxicity_id
 WHERE t.id = $1
+GROUP BY
+    t.id, t.created_at, t.updated_at, t.title, t.category, t.description
 `
 
 type GetToxicityByIDRow struct {
@@ -610,57 +622,6 @@ func (q *Queries) UpsertToxicity(ctx context.Context, arg UpsertToxicityParams) 
 	return i, err
 }
 
-const upsertToxicityGrades = `-- name: UpsertToxicityGrades :many
-INSERT INTO toxicity_grades (id,grade,description,toxicity_id,updated_at)
-SELECT
-COALESCE(NULLIF(elem->>'id', '')::uuid, gen_random_uuid())      AS id,
-elem->>'grade'                                                 AS grade,
-COALESCE(elem->>'description', '')                             AS description,
-$1                                                             AS toxicity_id, 
-NOW()                                                          AS updated_at
-FROM jsonb_array_elements($2::jsonb) elem
-ON CONFLICT (grade, toxicity_id)
-DO UPDATE
-SET description = EXCLUDED.description,
-updated_at  = NOW()
-RETURNING id, created_at, updated_at, grade, description, toxicity_id
-`
-
-type UpsertToxicityGradesParams struct {
-	ToxicityID uuid.UUID       `json:"toxicity_id"`
-	Column2    json.RawMessage `json:"column_2"`
-}
-
-func (q *Queries) UpsertToxicityGrades(ctx context.Context, arg UpsertToxicityGradesParams) ([]ToxicityGrade, error) {
-	rows, err := q.db.QueryContext(ctx, upsertToxicityGrades, arg.ToxicityID, arg.Column2)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ToxicityGrade{}
-	for rows.Next() {
-		var i ToxicityGrade
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Grade,
-			&i.Description,
-			&i.ToxicityID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const upsertToxicityToProtocol = `-- name: UpsertToxicityToProtocol :one
 INSERT INTO protocol_tox_modifications (id, toxicity_grade_id, adjustment, protocol_id)
 VALUES ($1, $2, $3, $4)
@@ -697,4 +658,52 @@ func (q *Queries) UpsertToxicityToProtocol(ctx context.Context, arg UpsertToxici
 		&i.ProtocolID,
 	)
 	return i, err
+}
+
+const upsertToxicityWithGrades = `-- name: UpsertToxicityWithGrades :exec
+WITH upsert_toxicity AS (
+  INSERT INTO toxicities (id, title, category, description)
+  VALUES ($1, $2, $3, $4)
+  ON CONFLICT (id) DO UPDATE
+  SET title = EXCLUDED.title,
+      category = EXCLUDED.category,
+      description = EXCLUDED.description,
+      updated_at = NOW()
+  RETURNING id
+), upsert_grades AS (
+  INSERT INTO toxicity_grades (id, grade, description, toxicity_id)
+  SELECT 
+    unnest($5::uuid[]),
+    unnest($6::grade_enum[]),
+    unnest($7::text[]),
+    (SELECT id FROM upsert_toxicity)
+  ON CONFLICT (id) DO UPDATE
+  SET grade = EXCLUDED.grade,
+      description = EXCLUDED.description,
+      updated_at = NOW()
+)
+SELECT 1
+`
+
+type UpsertToxicityWithGradesParams struct {
+	ID          uuid.UUID   `json:"id"`
+	Title       string      `json:"title"`
+	Category    string      `json:"category"`
+	Description string      `json:"description"`
+	Column5     []uuid.UUID `json:"column_5"`
+	Column6     []GradeEnum `json:"column_6"`
+	Column7     []string    `json:"column_7"`
+}
+
+func (q *Queries) UpsertToxicityWithGrades(ctx context.Context, arg UpsertToxicityWithGradesParams) error {
+	_, err := q.db.ExecContext(ctx, upsertToxicityWithGrades,
+		arg.ID,
+		arg.Title,
+		arg.Category,
+		arg.Description,
+		pq.Array(arg.Column5),
+		pq.Array(arg.Column6),
+		pq.Array(arg.Column7),
+	)
+	return err
 }

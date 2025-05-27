@@ -533,11 +533,11 @@ SELECT
 
 type UpdatePrecautionProtocolsParams struct {
 	PrecautionID uuid.UUID   `json:"precaution_id"`
-	Column2      []uuid.UUID `json:"column_2"`
+	ProtocolIds  []uuid.UUID `json:"protocol_ids"`
 }
 
 func (q *Queries) UpdatePrecautionProtocols(ctx context.Context, arg UpdatePrecautionProtocolsParams) error {
-	_, err := q.db.ExecContext(ctx, updatePrecautionProtocols, arg.PrecautionID, pq.Array(arg.Column2))
+	_, err := q.db.ExecContext(ctx, updatePrecautionProtocols, arg.PrecautionID, pq.Array(arg.ProtocolIds))
 	return err
 }
 

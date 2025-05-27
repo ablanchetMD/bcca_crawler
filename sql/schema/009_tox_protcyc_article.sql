@@ -2,8 +2,8 @@
 
 CREATE TABLE protocol_cycles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_at timestamptz NOT NULL DEFAULT NOW(),
+    updated_at timestamptz NOT NULL DEFAULT NOW(),
     cycle TEXT NOT NULL DEFAULT '',
     cycle_duration TEXT NOT NULL DEFAULT '',
     UNIQUE (cycle,protocol_id),
@@ -12,8 +12,8 @@ CREATE TABLE protocol_cycles (
 
 CREATE TABLE article_references (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  created_at timestamptz NOT NULL DEFAULT NOW(),
+  updated_at timestamptz NOT NULL DEFAULT NOW(),
   title TEXT NOT NULL,
   authors TEXT NOT NULL,
   journal TEXT NOT NULL,

@@ -13,15 +13,15 @@ import (
 
 
 type ArticleReferenceResponse struct {
-	Id      uuid.UUID   `json:"Id"`
-	CreatedAt string     `json:"CreatedAt"`
-	UpdatedAt string     `json:"UpdatedAt"`
-	Title   string `json:"Title"`
-	Authors string `json:"Authors"`
-	Journal string `json:"Journal"`
-	Year    string `json:"Year"`
-	Pmid    string `json:"Pmid"`
-	Doi     string `json:"Doi"`
+	Id      uuid.UUID   `json:"id"`
+	CreatedAt string     `json:"created_at"`
+	UpdatedAt string     `json:"updated_at"`
+	Title   string `json:"title"`
+	Authors string `json:"authors"`
+	Journal string `json:"journal"`
+	Year    string `json:"year"`
+	Pmid    string `json:"pmid"`
+	Doi     string `json:"doi"`
 	LinkedProtocols []LinkedProtocols `json:"linked_protocols"`
 }
 
@@ -46,20 +46,10 @@ func HandleGetArticleReferences(c *config.Config, w http.ResponseWriter, r *http
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting article references")
 		return
-	}
-
-	all_articles, err := c.Db.GetALLArticles(ctx)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting all articles")
-		return
-	}
-	println("All articles:", all_articles)
-	println("Array length:", len(all_articles))
-	
+	}	
 	
 	for _, a := range articleReferences {
-		println("Article references:", a.ID.String())
-		println("Article references:", a.Title)
+		
 		var linkedProtocols []LinkedProtocols	
 	
 		protocolIdsBytes, ok := a.ProtocolIds.([]byte)
@@ -174,26 +164,37 @@ func HandleGetArticleRefByID(c *config.Config, w http.ResponseWriter, r *http.Re
 		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting article: %s", parsed_id.ID.String()))
 		return
 	}
-	
-	linkedProtocols, err := ConvertTuplesToStructs[LinkedProtocols](raw_article.ProtocolIds)
 
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting linked protocols: %s", parsed_id.ID.String()))
+	var linkedProtocols []LinkedProtocols	
+	
+	protocolIdsBytes, ok := raw_article.ProtocolIds.([]byte)
+	if !ok {
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error asserting protocol IDs to []byte")
 		return
 	}
 
-	article := ArticleReferenceResponse{
-		Id: raw_article.ID,
-		Title: raw_article.Title,
-		Authors: raw_article.Authors,
-		Journal: raw_article.Journal,
-		Year: raw_article.Year,
-		Pmid: raw_article.Pmid,
-		Doi: raw_article.Doi,
-		LinkedProtocols: linkedProtocols,
-	}
+	err = json.Unmarshal(protocolIdsBytes, &linkedProtocols)
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusInternalServerError, 
+			fmt.Sprintf("Error parsing protocol data: %s", err.Error()))
+		return
+	}	
+	response := ArticleReferenceResponse{
+			Id:          raw_article.ID,
+			CreatedAt:   raw_article.CreatedAt.String(),
+			UpdatedAt:   raw_article.UpdatedAt.String(),
+			Title:       raw_article.Title,
+			Authors:     raw_article.Authors,
+			Journal:     raw_article.Journal,
+			Year:        raw_article.Year,
+			Pmid:        raw_article.Pmid,
+			Doi:         raw_article.Doi,
+			LinkedProtocols: linkedProtocols,	
+				
+		}	
+	
 
-	json_utils.RespondWithJSON(w, http.StatusOK, article)
+	json_utils.RespondWithJSON(w, http.StatusOK, response)
 }
 
 func HandleDeleteArticleRefByID(c *config.Config, w http.ResponseWriter, r *http.Request) {

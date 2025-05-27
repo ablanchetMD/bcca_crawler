@@ -66,6 +66,33 @@ func (q *Queries) CreateArticleReference(ctx context.Context, arg CreateArticleR
 	return i, err
 }
 
+const debugArticleReference = `-- name: DebugArticleReference :many
+SELECT protocol_id, reference_id FROM protocol_references_value
+`
+
+func (q *Queries) DebugArticleReference(ctx context.Context) ([]ProtocolReferencesValue, error) {
+	rows, err := q.db.QueryContext(ctx, debugArticleReference)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ProtocolReferencesValue{}
+	for rows.Next() {
+		var i ProtocolReferencesValue
+		if err := rows.Scan(&i.ProtocolID, &i.ReferenceID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteArticleReference = `-- name: DeleteArticleReference :exec
 DELETE FROM article_references
 WHERE id = $1
@@ -77,19 +104,34 @@ func (q *Queries) DeleteArticleReference(ctx context.Context, id uuid.UUID) erro
 }
 
 const getALLArticles = `-- name: GetALLArticles :many
-SELECT id, created_at, updated_at, title, authors, journal, year, pmid, doi FROM article_references
-ORDER BY year DESC
+SELECT ar.id, ar.created_at, ar.updated_at, ar.title, ar.authors, ar.journal, ar.year, ar.pmid, ar.doi, pr.protocol_id
+FROM article_references ar
+LEFT JOIN protocol_references_value pr ON ar.id = pr.reference_id
+ORDER BY ar.year DESC
 `
 
-func (q *Queries) GetALLArticles(ctx context.Context) ([]ArticleReference, error) {
+type GetALLArticlesRow struct {
+	ID         uuid.UUID     `json:"id"`
+	CreatedAt  time.Time     `json:"created_at"`
+	UpdatedAt  time.Time     `json:"updated_at"`
+	Title      string        `json:"title"`
+	Authors    string        `json:"authors"`
+	Journal    string        `json:"journal"`
+	Year       string        `json:"year"`
+	Pmid       string        `json:"pmid"`
+	Doi        string        `json:"doi"`
+	ProtocolID uuid.NullUUID `json:"protocol_id"`
+}
+
+func (q *Queries) GetALLArticles(ctx context.Context) ([]GetALLArticlesRow, error) {
 	rows, err := q.db.QueryContext(ctx, getALLArticles)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ArticleReference{}
+	items := []GetALLArticlesRow{}
 	for rows.Next() {
-		var i ArticleReference
+		var i GetALLArticlesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.CreatedAt,
@@ -100,6 +142,7 @@ func (q *Queries) GetALLArticles(ctx context.Context) ([]ArticleReference, error
 			&i.Year,
 			&i.Pmid,
 			&i.Doi,
+			&i.ProtocolID,
 		); err != nil {
 			return nil, err
 		}
@@ -171,12 +214,25 @@ func (q *Queries) GetArticleReferenceByID(ctx context.Context, id uuid.UUID) (Ar
 }
 
 const getArticleReferenceByIDWithProtocols = `-- name: GetArticleReferenceByIDWithProtocols :one
-SELECT ar.id, ar.created_at, ar.updated_at, ar.title, ar.authors, ar.journal, ar.year, ar.pmid, ar.doi, ARRAY_AGG(ROW(arpv.protocol_id,p.code)) AS protocol_ids
-FROM article_references ar
-JOIN protocol_references_value arpv ON ar.id = arpv.reference_id
-JOIN protocols p ON arpv.protocol_id = p.id
-WHERE ar.id = $1
-GROUP BY ar.id
+SELECT 
+    art.id, art.created_at, art.updated_at, art.title, art.authors, art.journal, art.year, art.pmid, art.doi, 
+    COALESCE(
+        (
+            SELECT json_agg(
+                json_build_object(
+                    'id', pecv.protocol_id, 
+                    'code', p.code
+                )
+            )
+            FROM protocol_references_value pecv
+            JOIN protocols p ON pecv.protocol_id = p.id
+            WHERE pecv.reference_id = art.id
+        ),
+        '[]'
+    ) AS protocol_ids
+FROM 
+    article_references art
+WHERE art.id = $1
 `
 
 type GetArticleReferenceByIDWithProtocolsRow struct {
@@ -216,14 +272,14 @@ SELECT
     COALESCE(
         (
             SELECT json_agg(
-            json_build_object(
-                'id', pecv.protocol_id, 
-                'code', p.code
+                json_build_object(
+                    'id', pecv.protocol_id, 
+                    'code', p.code
+                )
             )
-        )
-        FROM protocol_references_value pecv
-        JOIN protocols p ON pecv.protocol_id = p.id
-        WHERE pecv.reference_id = art.id
+            FROM protocol_references_value pecv
+            JOIN protocols p ON pecv.protocol_id = p.id
+            WHERE pecv.reference_id = art.id
         ),
         '[]'
     ) AS protocol_ids
@@ -320,11 +376,24 @@ func (q *Queries) GetArticleReferencesByProtocol(ctx context.Context, protocolID
 }
 
 const getArticleReferencesWithProtocols = `-- name: GetArticleReferencesWithProtocols :many
-SELECT ar.id, ar.created_at, ar.updated_at, ar.title, ar.authors, ar.journal, ar.year, ar.pmid, ar.doi, ARRAY_AGG(ROW(arpv.protocol_id,p.code)) AS protocol_ids
-FROM article_references ar
-JOIN protocol_references_value arpv ON ar.id = arpv.reference_id
-JOIN protocols p ON arpv.protocol_id = p.id
-GROUP BY ar.id
+SELECT 
+    art.id, art.created_at, art.updated_at, art.title, art.authors, art.journal, art.year, art.pmid, art.doi, 
+    COALESCE(
+        (
+            SELECT json_agg(
+                json_build_object(
+                    'id', pecv.protocol_id, 
+                    'code', p.code
+                )
+            )
+            FROM protocol_references_value pecv
+            JOIN protocols p ON pecv.protocol_id = p.id
+            WHERE pecv.reference_id = art.id
+        ),
+        '[]'
+    ) AS protocol_ids
+FROM 
+    article_references art
 `
 
 type GetArticleReferencesWithProtocolsRow struct {

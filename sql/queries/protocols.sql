@@ -29,19 +29,19 @@ WITH input_values(id, tumor_group, code,name,tags,notes,protocol_url,patient_han
     VALUES
     (
         CASE
-            WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+            WHEN @id = '00000000-0000-0000-0000-000000000000'::uuid 
             THEN gen_random_uuid() 
-            ELSE $1 
+            ELSE @id 
         END,        
-        $2::tumor_group_enum,
-        $3,
-        $4,
-        $5::TEXT[],
-        $6,
-        $7,
-        $8,
-        $9,
-        $10        
+        @tumor_group::tumor_group_enum,
+        @code,
+        @name,
+        @tags::TEXT[],
+        @notes,
+        @protocol_url,
+        @patient_handout_url,
+        @revised_on,
+        @activated_on       
     )
 )
 INSERT INTO protocols (id, tumor_group, code, name, tags, notes, protocol_url, patient_handout_url, revised_on, activated_on)
@@ -58,6 +58,46 @@ SET tumor_group = EXCLUDED.tumor_group::tumor_group_enum,
     activated_on = EXCLUDED.activated_on,    
     updated_at = NOW()
 RETURNING *;
+
+-- name: GetProtocolData :one
+SELECT sqlc.embed(protocols),sqlc.embed(protocol_cycles),
+FROM protocols
+
+JOIN article_references ON article_references.id = protocol_references_value.reference_id
+LEFT JOIN protocol_references_value ON protocol_references_value.protocol_id = protocols.id
+
+JOIN physicians ON physicians.id = protocol_contact_physicians.physician_id
+LEFT JOIN protocol_contact_physicians ON protocol_contact_physicians.protocol_id = protocols.id
+
+JOIN protocol_eligibility_criteria ON protocol_eligibility_criteria.id = protocol_eligibility_criteria_values.criteria_id
+LEFT JOIN protocol_eligibility_criteria_values ON protocol_eligibility_criteria_values.protocol_id = protocols.id
+
+JOIN protocol_cautions ON protocol_cautions.id = protocol_cautions_values.caution_id
+LEFT JOIN protocol_cautions_values ON protocol_cautions_values.protocol_id = protocols.id
+
+JOIN protocol_precautions ON protocol_precautions.id = protocol_precautions_values.precaution_id
+LEFT JOIN protocol_precautions_values ON protocol_precautions_values.protocol_id = protocols.id
+
+--cycles + treatment
+JOIN protocol_cycles ON protocol_cycles.protocol_id = protocols.id
+JOIN protocol_treatment ON protocol_treatment.id = treatment_cycles_values.protocol_treatment_id
+LEFT JOIN treatment_cycles_values ON treatment_cycles_values.protocol_cycles_id = protocol_cycles.id
+
+--toxicities + totixicies mod + grades
+JOIN toxicities ON toxicities.id = toxicity_grades.toxicity_id
+JOIN toxicity_grades ON toxicity_grades.id = protocol_tox_modifications.toxicity_grade_id
+LEFT JOIN protocol_tox_modifications ON protocol_tox_modifications.protocol_id = protocols.id
+
+--tests
+JOIN tests ON tests.id = protocol_tests.test_id
+LEFT JOIN protocol_tests ON protocol_tests.protocol_id = protocols.id
+
+--meds
+JOIN medications ON medications.id = medication_prescription.medication
+JOIN medication_prescription ON medication_prescription.id = protocol_meds.prescription_id
+LEFT JOIN protocol_meds ON protocol_meds.protocol_id = protocols.id
+
+WHERE protocols.id = $1
 
 -- name: DeleteProtocol :exec
 DELETE FROM protocols

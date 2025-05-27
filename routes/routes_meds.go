@@ -1,13 +1,17 @@
 package routes
 
-import (	
+import (
 	"bcca_crawler/api/protocols"
 	"bcca_crawler/internal/config"
+	"fmt"
+	"net/http"
+
 	"github.com/gorilla/mux"
-	"net/http"	
 )
 
 func RegisterMedRoutes(prefix string, mux *mux.Router, s *config.Config) {
+	uuidPattern := "[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}"
+
 	mux.HandleFunc(prefix +"/medications", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -19,7 +23,7 @@ func RegisterMedRoutes(prefix string, mux *mux.Router, s *config.Config) {
 		}
 	})
 
-	mux.HandleFunc(prefix +"/medications/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/medications/{id:"+uuidPattern+"}", func(w http.ResponseWriter, r *http.Request) {		
 		switch r.Method {
 		case http.MethodGet:
 			protocols.HandleGetMedByID(s, w, r)
@@ -30,7 +34,7 @@ func RegisterMedRoutes(prefix string, mux *mux.Router, s *config.Config) {
 		}
 	})
 
-	mux.HandleFunc(prefix +"/medications/{id}/modifications", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/medications/{id:"+uuidPattern+"}/modifications", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			protocols.HandleGetMedModificationsByMedication(s, w, r)							
@@ -39,7 +43,17 @@ func RegisterMedRoutes(prefix string, mux *mux.Router, s *config.Config) {
 		}
 	})
 
-	mux.HandleFunc(prefix +"/medications/modifications/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/medications/modifications", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("Med Modifications Endpoint")
+		switch r.Method {		
+		case http.MethodPut:
+			protocols.HandlerUpsertMedMod(s, w, r)							
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	mux.HandleFunc(prefix +"/medications/modifications/{id:"+uuidPattern+"}", func(w http.ResponseWriter, r *http.Request) {		
 		switch r.Method {
 		case http.MethodGet:
 			protocols.HandleGetMedModByID(s, w, r)
@@ -49,16 +63,6 @@ func RegisterMedRoutes(prefix string, mux *mux.Router, s *config.Config) {
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		}
 	})
-
-	mux.HandleFunc(prefix +"/medications/modifications", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {		
-		case http.MethodPut:
-			protocols.HandlerUpsertMedMod(s, w, r)							
-		default:
-			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		}
-	})
-
 
 	mux.HandleFunc(prefix +"/prescriptions", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -71,7 +75,7 @@ func RegisterMedRoutes(prefix string, mux *mux.Router, s *config.Config) {
 		}
 	})
 	
-	mux.HandleFunc(prefix +"/prescriptions/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/prescriptions/{id:"+uuidPattern+"}", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			protocols.HandleGetPrescriptionByID(s, w, r)

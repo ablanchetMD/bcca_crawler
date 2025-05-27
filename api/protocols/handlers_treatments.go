@@ -65,7 +65,7 @@ func HandleGetTreatmentByID(c *config.Config, w http.ResponseWriter, r *http.Req
 		return
 	}	
 
-	Treatment := api.MapTreatment(raw_treatment)
+	Treatment := api.MapTreatmentByID(raw_treatment)
 	
 	json_utils.RespondWithJSON(w, http.StatusOK, Treatment)
 }
@@ -90,7 +90,7 @@ func HandleGetTreatmentsByCycleID(c *config.Config, w http.ResponseWriter, r *ht
 	treatments := []api.Treatment{}
 	
 	for _, tx := range raw_tx {
-		treatments = append(treatments, api.MapTreatment(tx))		
+		treatments = append(treatments, api.MapTreatmentByCycle(tx))		
 	}
 
 	json_utils.RespondWithJSON(w, http.StatusOK, treatments)
@@ -155,7 +155,23 @@ func HandleUpsertTreatment(c *config.Config, w http.ResponseWriter, r *http.Requ
 		return		
 	}
 
-	Treatment := api.MapTreatment(raw_tx)
+	Treatment := struct {
+		ID                  string `json:"id"`
+		MedicationID        string `json:"medication_id"`
+		Dose                string `json:"dose"`
+		Route               string `json:"route"`
+		Frequency           string `json:"frequency"`
+		Duration            string `json:"duration"`
+		AdministrationGuide string `json:"administration_guide"`		
+	}{
+		ID:                  raw_tx.ID.String(),
+		MedicationID:        raw_tx.Medication.String(),
+		Dose:                raw_tx.Dose,
+		Route:               raw_tx.Route,
+		Frequency:           raw_tx.Frequency,
+		Duration:            raw_tx.Duration,
+		AdministrationGuide: raw_tx.AdministrationGuide,		
+	}
 
 	json_utils.RespondWithJSON(w, http.StatusOK, Treatment)	
 }

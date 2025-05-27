@@ -195,15 +195,9 @@ func GetProtocolCycles(c *config.Config,ctx context.Context,protocolID uuid.UUID
 		}
 
 		r_treatments := []Treatment{}
-		for _, treat := range treatments {
-			med,err := c.Db.GetMedicationByID(ctx,treat.Medication)
-			if err != nil {
-				return nil, err
-			}
+		for _, treat := range treatments {			
 			
-			r_treatment := MapTreatment(treat)
-			r_treatment.MedicationName = med.Name			
-			
+			r_treatment := MapTreatmentByCycle(treat)			
 			r_treatments = append(r_treatments, r_treatment)
 
 		}

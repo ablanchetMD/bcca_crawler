@@ -180,18 +180,18 @@ WHERE
 WITH current_protocols AS (
     SELECT pcv.protocol_id 
     FROM protocol_precautions_values pcv 
-    WHERE pcv.precaution_id = $1
+    WHERE pcv.precaution_id = @precaution_id
 ),
 to_remove AS (
     DELETE FROM protocol_precautions_values pcv
-    WHERE pcv.precaution_id = $1
-    AND pcv.protocol_id NOT IN (SELECT unnest($2::uuid[]))
+    WHERE pcv.precaution_id = @precaution_id
+    AND pcv.protocol_id NOT IN (SELECT unnest(@protocol_ids::uuid[]))
     RETURNING pcv.protocol_id
 ),
 to_add AS (
     INSERT INTO protocol_precautions_values (precaution_id, protocol_id)
-    SELECT $1, new_protocol
-    FROM unnest($2::uuid[]) AS new_protocol
+    SELECT @precaution_id, new_protocol
+    FROM unnest(@protocol_ids::uuid[]) AS new_protocol
     WHERE new_protocol NOT IN (SELECT cp.protocol_id FROM current_protocols cp)
     RETURNING protocol_id
 )

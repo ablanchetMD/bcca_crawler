@@ -155,16 +155,16 @@ func HandleUpsertProtocol(c *config.Config, w http.ResponseWriter, r *http.Reque
 	}
 
 	protocol,err := c.Db.UpsertProtocol(ctx,database.UpsertProtocolParams{
-		Column1: pid,
-		Column2: database.TumorGroupEnum(req.TumorGroup),
-		Column3: req.Code,
-		Column4: req.Name,
-		Column5: pq.StringArray(req.Tags),
-		Column6: req.Notes,
-		Column7: req.ProtocolUrl,
-		Column8: req.PatientHandoutUrl,
-		Column9: req.RevisedOn,
-		Column10: req.ActivatedOn,
+		ID: pid,
+		TumorGroup: database.TumorGroupEnum(req.TumorGroup),
+		Code: req.Code,
+		Name: req.Name,
+		Tags: pq.StringArray(req.Tags),
+		Notes: req.Notes,
+		ProtocolUrl: req.ProtocolUrl,
+		PatientHandoutUrl: req.PatientHandoutUrl,
+		RevisedOn: req.RevisedOn,
+		ActivatedOn: req.ActivatedOn,
 	})
 
 	if err != nil {

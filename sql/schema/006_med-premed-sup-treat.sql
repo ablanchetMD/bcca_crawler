@@ -2,8 +2,8 @@
 
 CREATE TABLE medications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  created_at timestamptz NOT NULL DEFAULT NOW(),
+  updated_at timestamptz NOT NULL DEFAULT NOW(),
   name TEXT NOT NULL UNIQUE,
   description TEXT NOT NULL DEFAULT '',
   alternate_names TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
@@ -12,8 +12,8 @@ CREATE TABLE medications (
 
 CREATE TABLE medication_prescription (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  created_at timestamptz NOT NULL DEFAULT NOW(),
+  updated_at timestamptz NOT NULL DEFAULT NOW(),
   medication UUID NOT NULL REFERENCES medications(id) ON DELETE CASCADE,
   dose TEXT NOT NULL DEFAULT '',
   route prescription_route_enum NOT NULL DEFAULT 'unknown',
@@ -26,8 +26,8 @@ CREATE TABLE medication_prescription (
 
 CREATE TABLE protocol_treatment (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  created_at timestamptz NOT NULL DEFAULT NOW(),
+  updated_at timestamptz NOT NULL DEFAULT NOW(),
   medication UUID NOT NULL REFERENCES medications(id) ON DELETE CASCADE,  
   dose TEXT NOT NULL,
   route TEXT NOT NULL,
@@ -39,8 +39,8 @@ CREATE TABLE protocol_treatment (
 
 CREATE TABLE medication_modifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  created_at timestamptz NOT NULL DEFAULT NOW(),
+  updated_at timestamptz NOT NULL DEFAULT NOW(),
   category TEXT NOT NULL, -- Hepatic Impairment, Renal Impairment, etc.
   subcategory TEXT NOT NULL,
   adjustment TEXT NOT NULL,

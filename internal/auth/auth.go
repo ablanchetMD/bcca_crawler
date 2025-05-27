@@ -1,20 +1,21 @@
 package auth
 
 import (
+	"bcca_crawler/internal/auth/roles"
+	"bcca_crawler/internal/caching"
+	"bcca_crawler/internal/config"
+	"bcca_crawler/internal/database"
+	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net/http"
-	"time"
 	"strings"
-	"crypto/rand"
+	"time"
+
 	"github.com/golang-jwt/jwt/v5"
-	"bcca_crawler/internal/config"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
-	"bcca_crawler/internal/database"
-	"bcca_crawler/internal/caching"
-	"bcca_crawler/internal/auth/roles"	
-	"encoding/hex"
-	"context"
 )
 
 type contextKey string // Define your own type
@@ -23,20 +24,18 @@ const UserIDKey contextKey = "userID"     // Use a constant of your custom type
 const UserRoleKey contextKey = "userRole" // Use a constant of your custom type
 
 type UserToken struct {
-	UserID         	uuid.UUID  `json:"id"`
-	RefreshToken  	string     `json:"user_token"`
-	AuthToken  		string     `json:"auth_token"`
-	Role			roles.Role	   `json:"role"`
+	UserID       uuid.UUID  `json:"id"`
+	RefreshToken string     `json:"user_token"`
+	AuthToken    string     `json:"auth_token"`
+	Role         roles.Role `json:"role"`
 }
-
-
 
 func HashPassword(password string) (string, error) {
 	hashed_password, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return "", fmt.Errorf("HashPassword Function: %w",err)
+		return "", fmt.Errorf("HashPassword Function: %w", err)
 	}
-	return string(hashed_password),nil
+	return string(hashed_password), nil
 }
 
 func CheckPasswordHash(password, hash string) error {
@@ -46,56 +45,55 @@ func CheckPasswordHash(password, hash string) error {
 
 func GetUserFromContext(r *http.Request) (UserToken, error) {
 	ctx := r.Context()
-	fmt.Println("Context: ",ctx)
+	fmt.Println("Context: ", ctx)
 	userID, ok := r.Context().Value(UserIDKey).(uuid.UUID)
 	if !ok {
-		return UserToken{}, fmt.Errorf("GetUserFromContext Function: %s","user_id not found in context")
+		return UserToken{}, fmt.Errorf("GetUserFromContext Function: %s", "user_id not found in context")
 	}
 	userRole, ok := r.Context().Value(UserRoleKey).(roles.Role)
 	if !ok {
-		return UserToken{}, fmt.Errorf("GetUserFromContext Function: %s","user_role not found in context")
+		return UserToken{}, fmt.Errorf("GetUserFromContext Function: %s", "user_role not found in context")
 	}
 	user := UserToken{
 		UserID: userID,
-		Role: userRole,
+		Role:   userRole,
 	}
 	return user, nil
 }
 
-func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error){
+func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		Issuer: "leukosys-auth",
-		IssuedAt: jwt.NewNumericDate(time.Now()),
+		Issuer:    "leukosys-auth",
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiresIn)),
-		Subject: userID.String(),
+		Subject:   userID.String(),
 	})
 	tokenString, err := token.SignedString([]byte(tokenSecret))
 
 	if err != nil {
-		return "", fmt.Errorf("MakeJWT Function: %w",err)
+		return "", fmt.Errorf("MakeJWT Function: %w", err)
 	}
 
 	return tokenString, nil
 
 }
 
-
 func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
-	token,err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(tokenSecret), nil
 	})
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("ValidateJWT Function: %w",err)
+		return uuid.Nil, fmt.Errorf("ValidateJWT Function: %w", err)
 	}
 
 	claims, ok := token.Claims.(*jwt.RegisteredClaims)
 	if !ok || !token.Valid {
-		return uuid.Nil, fmt.Errorf("ValidateJWT Function: %w",err)
+		return uuid.Nil, fmt.Errorf("ValidateJWT Function: %w", err)
 	}
 
 	userID, err := uuid.Parse(claims.Subject)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("ValidateJWT Function: %w",err)
+		return uuid.Nil, fmt.Errorf("ValidateJWT Function: %w", err)
 	}
 
 	return userID, nil
@@ -103,7 +101,7 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 }
 
 func GetBearerToken(headers http.Header) (string, error) {
-	
+
 	authHeader := headers.Get("Authorization")
 	if authHeader == "" {
 		return "", fmt.Errorf("no Authorization header provided")
@@ -115,10 +113,10 @@ func GetBearerToken(headers http.Header) (string, error) {
 	return strings.TrimPrefix(authHeader, bearerPrefix), nil
 }
 
-func GetCookieToken(r *http.Request,token string) (string, error) {
+func GetCookieToken(r *http.Request, token string) (string, error) {
 	cookie, err := r.Cookie(token)
 	if err != nil {
-		return "", fmt.Errorf("GetCookieToken Function: %w",err)
+		return "", fmt.Errorf("GetCookieToken Function: %w", err)
 	}
 	return cookie.Value, nil
 }
@@ -126,23 +124,23 @@ func GetCookieToken(r *http.Request,token string) (string, error) {
 func GetAPIKey(headers http.Header) (string, error) {
 	authHeader := headers.Get("Authorization")
 	if authHeader == "" {
-		fmt.Println("error with :",authHeader)
+		fmt.Println("error with :", authHeader)
 		return "", fmt.Errorf("no authorization header provided")
 	}
 
 	const apiPrefix = "ApiKey "
 	if !strings.HasPrefix(authHeader, apiPrefix) {
-		fmt.Println("error with :",authHeader,apiPrefix)
+		fmt.Println("error with :", authHeader, apiPrefix)
 		return "", fmt.Errorf("invalid Authorization header format")
-	}	
-	return strings.TrimPrefix(authHeader, apiPrefix), nil	
+	}
+	return strings.TrimPrefix(authHeader, apiPrefix), nil
 }
 
 func MakeRefreshToken() (string, error) {
 	randomBytes := make([]byte, 32)
-	_,err := rand.Read(randomBytes)
+	_, err := rand.Read(randomBytes)
 	if err != nil {
-		return "", fmt.Errorf("MakeRefreshToken Function: %w",err)
+		return "", fmt.Errorf("MakeRefreshToken Function: %w", err)
 	}
 	return hex.EncodeToString(randomBytes), nil
 }
@@ -163,14 +161,13 @@ func SetAuthCookies(w http.ResponseWriter, user UserToken) {
 	AddCookie(w, "auth_token", user.AuthToken, 120)
 }
 
-
-func GetJWTFromRefreshToken(token database.RefreshToken, c *config.Config) (UserToken, error) {	
-	user := UserToken{}	
+func GetJWTFromRefreshToken(token database.RefreshToken, c *config.Config) (UserToken, error) {
+	user := UserToken{}
 
 	jwt, err := MakeJWT(token.UserID, c.Secret, time.Second*120)
 	if err != nil {
-		return user, fmt.Errorf("GetJWTFromRefreshToken Function : %w",err)
-	}	
+		return user, fmt.Errorf("GetJWTFromRefreshToken Function : %w", err)
+	}
 
 	user.RefreshToken = token.Token
 	user.AuthToken = jwt
@@ -180,55 +177,54 @@ func GetJWTFromRefreshToken(token database.RefreshToken, c *config.Config) (User
 }
 
 func CORSMiddleware(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        // Set CORS headers
-        w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
-        w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-        w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, client-platform")
-        w.Header().Set("Access-Control-Allow-Credentials", "true")
-        
-        // Handle preflight OPTIONS requests
-        if r.Method == "OPTIONS" {
-            w.WriteHeader(http.StatusOK)
-            return
-        }
-        
-        // Call the next handler
-        next.ServeHTTP(w, r)
-    })
-}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, client-platform")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
 
+		// Handle preflight OPTIONS requests
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		// Call the next handler
+		next.ServeHTTP(w, r)
+	})
+}
 
 func ValidateRefreshToken(token string, c *config.Config) (UserToken, error) {
 	ctx := context.Background()
 	user := UserToken{}
 
 	refreshToken, err := c.Db.GetRefreshToken(ctx, token)
-	if err != nil {		
-		return user, fmt.Errorf("ValidateRefreshToken Function : %w",err)
+	if err != nil {
+		return user, fmt.Errorf("ValidateRefreshToken Function : %w", err)
 	}
 
 	if refreshToken.ExpiresAt.Before(time.Now()) {
-		return user, fmt.Errorf("ValidateRefreshToken Function : %s","token expired")
+		return user, fmt.Errorf("ValidateRefreshToken Function : %s", "token expired")
 	}
 
 	if refreshToken.RevokedAt.Valid {
-		return user, fmt.Errorf("ValidateRefreshToken Function : %s","token revoked")
-	}	
+		return user, fmt.Errorf("ValidateRefreshToken Function : %s", "token revoked")
+	}
 
 	jwt, err := MakeJWT(refreshToken.UserID, c.Secret, time.Second*120)
 	if err != nil {
-		return user, fmt.Errorf("ValidateRefreshToken Function : %w",err)
+		return user, fmt.Errorf("ValidateRefreshToken Function : %w", err)
 	}
 	//revoke old refresh token and issue new one, for rotation.
 	_, err = c.Db.RevokeRefreshToken(ctx, refreshToken.Token)
 	if err != nil {
-		return user, fmt.Errorf("ValidateRefreshToken Function : %w",err)
+		return user, fmt.Errorf("ValidateRefreshToken Function : %w", err)
 	}
 
 	refresh_token, err := MakeRefreshToken()
 	if err != nil {
-		return user, fmt.Errorf("ValidateRefreshToken Function : %w",err)
+		return user, fmt.Errorf("ValidateRefreshToken Function : %w", err)
 	}
 	_, err = c.Db.CreateRefreshToken(ctx, database.CreateRefreshTokenParams{
 		Token:     refresh_token,
@@ -237,19 +233,19 @@ func ValidateRefreshToken(token string, c *config.Config) (UserToken, error) {
 	})
 
 	if err != nil {
-		return user, fmt.Errorf("ValidateRefreshToken Function : %w",err)
+		return user, fmt.Errorf("ValidateRefreshToken Function : %w", err)
 	}
 
-	userRole,err := roles.RoleFromString(refreshToken.Role)
+	userRole, err := roles.RoleFromString(refreshToken.Role)
 	if err != nil {
-		return user, fmt.Errorf("ValidateRefreshToken Function: %w",err)
+		return user, fmt.Errorf("ValidateRefreshToken Function: %w", err)
 	}
 
 	user.RefreshToken = refresh_token
 	user.AuthToken = jwt
 	user.UserID = refreshToken.UserID
 	user.Role = userRole
-	caching.SetRoleCache(refreshToken.UserID, userRole, time.Now().Add(time.Minute * 60))
+	caching.SetRoleCache(refreshToken.UserID, userRole, time.Now().Add(time.Minute*60))
 
 	return user, nil
 }

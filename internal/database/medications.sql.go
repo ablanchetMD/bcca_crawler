@@ -741,7 +741,7 @@ WITH input_values(id, name, description, category,alternate_names) AS (
     END,
     $2,
     $3,
-    $4::medication_category_enum,
+    $4,
     $5::TEXT[]
   )
 )
@@ -832,16 +832,15 @@ WITH input_values(id, medication, dose, route, frequency, duration, instructions
     CASE 
       WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
       THEN gen_random_uuid() 
-      ELSE $1 
+      ELSE $1::uuid 
     END,
-    $2,
+    $2::uuid,
     $3,
-    $4::medication_route_enum,
+    $4::prescription_route_enum,
     $5,
     $6,
     $7,
-    $8,
-    $9
+    $8::int
   )
 )
 INSERT INTO medication_prescription (id, medication, dose, route, frequency, duration, instructions, renewals)
@@ -859,15 +858,14 @@ RETURNING id, created_at, updated_at, medication, dose, route, frequency, durati
 `
 
 type UpsertPrescriptionParams struct {
-	Column1 interface{} `json:"column_1"`
-	Column2 interface{} `json:"column_2"`
-	Column3 interface{} `json:"column_3"`
-	Column4 interface{} `json:"column_4"`
-	Column5 interface{} `json:"column_5"`
-	Column6 interface{} `json:"column_6"`
-	Column7 interface{} `json:"column_7"`
-	Column8 interface{} `json:"column_8"`
-	Column9 interface{} `json:"column_9"`
+	Column1 interface{}           `json:"column_1"`
+	Column2 uuid.UUID             `json:"column_2"`
+	Column3 interface{}           `json:"column_3"`
+	Column4 PrescriptionRouteEnum `json:"column_4"`
+	Column5 interface{}           `json:"column_5"`
+	Column6 interface{}           `json:"column_6"`
+	Column7 interface{}           `json:"column_7"`
+	Column8 int32                 `json:"column_8"`
 }
 
 func (q *Queries) UpsertPrescription(ctx context.Context, arg UpsertPrescriptionParams) (MedicationPrescription, error) {
@@ -880,7 +878,6 @@ func (q *Queries) UpsertPrescription(ctx context.Context, arg UpsertPrescription
 		arg.Column6,
 		arg.Column7,
 		arg.Column8,
-		arg.Column9,
 	)
 	var i MedicationPrescription
 	err := row.Scan(

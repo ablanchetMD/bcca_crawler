@@ -31,8 +31,24 @@ SET
 RETURNING *;
 
 -- name: GetTreatments :many
-SELECT * FROM protocol_treatment
-ORDER BY medication ASC;
+SELECT m.id as medication_id, m.name as medication_name, m.description as medication_description, m.category as medication_category ,m.alternate_names as medication_alternates, pt.id as treatment_id, pt.dose, pt.created_at,pt.updated_at, pt.route, pt.frequency, pt.duration, pt.administration_guide
+FROM medications m
+JOIN protocol_treatment pt ON m.id = pt.medication
+ORDER BY medication_name ASC;
+
+-- name: GetProtocolTreatmentByID :one
+SELECT m.id as medication_id, m.name as medication_name, m.description as medication_description, m.category as medication_category ,m.alternate_names as medication_alternates, pt.id as treatment_id, pt.dose, pt.created_at,pt.updated_at, pt.route, pt.frequency, pt.duration, pt.administration_guide
+FROM medications m
+JOIN protocol_treatment pt ON m.id = pt.medication
+WHERE pt.id = $1;
+
+-- name: GetTreatmentsByCycle :many
+SELECT m.id as medication_id, m.name as medication_name, m.description as medication_description, m.category as medication_category ,m.alternate_names as medication_alternates, pt.id as treatment_id, pt.dose, pt.created_at,pt.updated_at, pt.route, pt.frequency, pt.duration, pt.administration_guide
+FROM medications m
+JOIN protocol_treatment pt ON m.id = pt.medication
+JOIN treatment_cycles_values ON pt.id = treatment_cycles_values.protocol_treatment_id
+WHERE treatment_cycles_values.protocol_cycles_id = $1
+ORDER BY medication_name ASC;
 
 -- name: GetProtocolTreatmentByData :one
 SELECT * FROM protocol_treatment
@@ -71,9 +87,7 @@ WHERE protocol_cycles_id = $1 AND protocol_treatment_id = $2;
 DELETE FROM protocol_treatment
 WHERE id = $1;
 
--- name: GetProtocolTreatmentByID :one
-SELECT * FROM protocol_treatment
-WHERE id = $1;
+
 
 -- name: GetCycles :many
 SELECT * FROM protocol_cycles
@@ -93,9 +107,3 @@ FROM protocol_cycles
 WHERE protocol_cycles.protocol_id = $1
 ORDER BY protocol_cycles.cycle ASC;
 
--- name: GetTreatmentsByCycle :many
-SELECT protocol_treatment.*
-FROM protocol_treatment
-JOIN treatment_cycles_values ON protocol_treatment.id = treatment_cycles_values.protocol_treatment_id
-WHERE treatment_cycles_values.protocol_cycles_id = $1
-ORDER BY protocol_treatment.medication ASC;

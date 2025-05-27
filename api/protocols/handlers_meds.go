@@ -166,6 +166,8 @@ func HandleGetPrescriptions(c *config.Config, w http.ResponseWriter, r *http.Req
 						ID: a.MedicationPrescriptionID.String(),
 						MedicationName: a.Name,
 						MedicationID: a.MedicationID.String(),
+						CreatedAt: a.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
+						UpdatedAt: a.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),
 						Dose: a.Dose,
 						Route: string(a.Route),
 						Frequency: a.Frequency,
@@ -246,6 +248,7 @@ func HandleUpsertPrescription(c *config.Config, w http.ResponseWriter, r *http.R
 		json_utils.RespondWithError(w, http.StatusBadRequest, "Invalid Medication ID")
 		return
 	}
+	
 
 	medication := database.UpsertPrescriptionParams{
 		Column1: pid,
@@ -405,6 +408,8 @@ func HandleGetPrescriptionsByCategory(c *config.Config, w http.ResponseWriter, r
 			ID: a.MedicationPrescriptionID.String(),
 			MedicationName: a.Name,
 			MedicationID: a.MedicationID.String(),
+			CreatedAt: a.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
+			UpdatedAt: a.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),
 			Dose: a.Dose,
 			Route: string(a.Route),
 			Frequency: a.Frequency,

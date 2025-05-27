@@ -64,7 +64,9 @@ func HandleGetPrecautions(c *config.Config, w http.ResponseWriter, r *http.Reque
 		precautions = append(precautions, PrecautionResp{
 			ID:          a.ID.String(),
 			Title:       a.Title,			
-			Description:     a.Description,			
+			Description:     a.Description,
+			CreateAt:    a.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
+			UpdateAt:    a.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),			
 			LinkedProtocols: linkedProtocols,		
 		})
 	}
@@ -109,8 +111,8 @@ func HandleGetPrecautionByID(c *config.Config, w http.ResponseWriter, r *http.Re
 		ID: raw_caution.ID.String(),
 		Title: raw_caution.Title,
 		Description: raw_caution.Description,
-		CreateAt: raw_caution.CreatedAt.String(),
-		UpdateAt: raw_caution.UpdatedAt.String(),
+		CreateAt: raw_caution.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
+		UpdateAt: raw_caution.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),
 		LinkedProtocols: linkedProtocols,
 	}
 	
@@ -261,7 +263,7 @@ func HandleUpdatePrecautionsToProtocols(c *config.Config, w http.ResponseWriter,
 
 	err = c.Db.UpdatePrecautionProtocols(ctx, database.UpdatePrecautionProtocolsParams{		
 		PrecautionID: ids.ID,
-		Column2: selectedUUIDs,
+		ProtocolIds: selectedUUIDs,
 	})
 
 	if err != nil {

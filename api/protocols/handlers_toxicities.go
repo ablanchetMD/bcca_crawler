@@ -7,8 +7,7 @@ import (
 	"bcca_crawler/api"
 	"fmt"
 	"net/http"
-	"github.com/google/uuid"
-	"encoding/json"	
+	"github.com/google/uuid"	
 
 )
 
@@ -44,7 +43,7 @@ func HandleGetToxicities(c *config.Config, w http.ResponseWriter, r *http.Reques
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting toxicities")
 		return
 	}
-	
+	api.PrintStruct(raw)
 	for _, obj := range raw {
 		fobj,err := api.MapToToxicityWithGrades(obj)
 		if err != nil {
@@ -70,9 +69,12 @@ func HandleGetToxicityByID(c *config.Config, w http.ResponseWriter, r *http.Requ
 	raw, err := c.Db.GetToxicityByID(ctx, ids.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting toxicity by id")
+
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting toxicity by id with error: %s", err.Error()))
 		return
 	}
+
+	
 	
 	fobj,err := api.MapToToxicityWithGradesOne(raw)
 	if err != nil {
@@ -146,57 +148,32 @@ func HandlerUpsertToxicityWithGrades(c *config.Config, w http.ResponseWriter, r 
 		return
 	}
 
-	ctx := r.Context()	
-
-	pid, err:= uuid.Parse(req.ID)
-	if err != nil {
-		pid = uuid.New()
+	ctx := r.Context()
+	
+	params := database.UpsertToxicityWithGradesParams{
+		ID:          	api.ParseOrGenerateUUID(req.ID),
+		Title:       	req.Title,
+		Category:    	req.Category,
+		Description: 	req.Description,
+		Column5:        make([]uuid.UUID, len(req.Grades)),
+		Column6:    	make([]database.GradeEnum, len(req.Grades)),
+		Column7:     	make([]string, len(req.Grades)),
 	}
-
-	raw, err := c.Db.UpsertToxicity(ctx, database.UpsertToxicityParams{
-		ID: pid,
-		Title: req.Title,
-		Category: req.Category,
-		Description: req.Description,
-	})
+	
+	for i, g := range req.Grades {
+		params.Column5[i] = api.ParseOrGenerateUUID(g.ID)
+		params.Column6[i] = database.GradeEnum(g.Grade)
+		params.Column7[i] = g.Description
+	}
+	
+	err = c.Db.UpsertToxicityWithGrades(ctx, params)	
 	
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error upserting toxicity: %s", req.ID))
 		return
-	}	
-
-	gradesJSON, err := json.Marshal(req.Grades)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		return		
-	}
-	
-	raw_toxgrades,err := c.Db.UpsertToxicityGrades(ctx, database.UpsertToxicityGradesParams{
-		ToxicityID: raw.ID,
-		Column2: gradesJSON,
-	})		
-
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error upserting toxicity grades: %s", req.ID))
-		return		
 	}
 
-	toxgrades := []api.ToxicityGrade{}
-
-	for _, obj := range raw_toxgrades {
-		fobj := api.MapToToxicityGrade(obj)		
-		toxgrades = append(toxgrades, fobj)
-	}
-
-	Toxicity := api.ToxicityWithGrades{
-		ID: raw.ID,
-		Title: raw.Title,
-		Category: raw.Category,
-		Description: raw.Description,
-		Grades: toxgrades,
-	}
-
-	json_utils.RespondWithJSON(w, http.StatusOK, Toxicity)	
+	json_utils.RespondWithJSON(w, http.StatusOK, req)	
 }
 
 func HandleUpsertAdjustmentsToProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {

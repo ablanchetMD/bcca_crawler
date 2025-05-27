@@ -77,6 +77,13 @@ func ParseAndValidateID(r *http.Request) (IDs, error) {
     return ids, nil
 }
 
+func ParseOrGenerateUUID(s string) uuid.UUID {
+	if u, err := uuid.Parse(s); err == nil {
+		return u
+	}
+	return uuid.New()
+}
+
 func UnmarshalAndValidatePayload(c *config.Config,r *http.Request, v interface{}) error {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {

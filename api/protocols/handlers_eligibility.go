@@ -106,13 +106,42 @@ func HandleGetEligibilityCriteria(c *config.Config, w http.ResponseWriter, r *ht
 			ID: ec.ID.String(),
 			Type: string(ec.Type),
 			Description: ec.Description,
-			CreatedAt: ec.CreatedAt.String(),
-			UpdatedAt: ec.UpdatedAt.String(),
+			CreatedAt: ec.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
+			UpdatedAt: ec.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),
 			LinkedProtocols: linkedProtocols,
 		})
 	}
 
 	json_utils.RespondWithJSON(w, http.StatusOK, eligibilityCriteria)
+}
+
+func HandleGetEligibilityCriteriaByProtocol(c *config.Config, w http.ResponseWriter, r *http.Request){
+	ctx := r.Context()
+
+	ids, err := api.ParseAndValidateID(r)
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	elig_criterias,err := c.Db.GetEligibilityByProtocol(ctx,ids.ProtocolID)
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return 
+	}
+
+	r_elig_criterias := []EligibilityCriterionResp{}
+	for _, ec := range elig_criterias {		
+		r_elig_criterias = append(r_elig_criterias, EligibilityCriterionResp{
+			ID: ec.ID.String(),
+			Type: string(ec.Type),
+			Description: ec.Description,
+			CreatedAt: ec.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
+			UpdatedAt: ec.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),			
+		})
+	}
+
+	json_utils.RespondWithJSON(w, http.StatusOK, r_elig_criterias)
 }
 
 
@@ -316,3 +345,5 @@ func HandleUpdateEligibilityToProtocols(c *config.Config, w http.ResponseWriter,
 
 	json_utils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "criterias updated for protocol"})
 }
+
+

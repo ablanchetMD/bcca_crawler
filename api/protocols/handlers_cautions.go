@@ -64,8 +64,8 @@ func HandleGetCautions(c *config.Config, w http.ResponseWriter, r *http.Request)
 		cautions = append(cautions, CautionResp{
 			ID:          a.ID.String(),		
 			Description:     a.Description,
-			CreatedAt: a.CreatedAt.String(),
-			UpdatedAt: a.UpdatedAt.String(),			
+			CreatedAt: a.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
+			UpdatedAt: a.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),			
 			LinkedProtocols: linkedProtocols,		
 		})
 	}
@@ -110,8 +110,8 @@ func HandleGetCautionsByID(c *config.Config, w http.ResponseWriter, r *http.Requ
 	Caution := CautionResp{
 		ID: raw_caution.ID.String(),
 		Description: raw_caution.Description,
-		CreatedAt: raw_caution.CreatedAt.String(),
-		UpdatedAt: raw_caution.UpdatedAt.String(),
+		CreatedAt: raw_caution.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
+		UpdatedAt: raw_caution.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),
 		LinkedProtocols: linkedProtocols,
 	}
 	

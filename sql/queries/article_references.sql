@@ -53,16 +53,34 @@ SELECT * FROM article_references
 WHERE id = $1;
 
 -- name: GetArticleReferenceByIDWithProtocols :one
-SELECT ar.*, ARRAY_AGG(ROW(arpv.protocol_id,p.code)) AS protocol_ids
-FROM article_references ar
-JOIN protocol_references_value arpv ON ar.id = arpv.reference_id
-JOIN protocols p ON arpv.protocol_id = p.id
-WHERE ar.id = $1
-GROUP BY ar.id;
+SELECT 
+    art.*, 
+    COALESCE(
+        (
+            SELECT json_agg(
+                json_build_object(
+                    'id', pecv.protocol_id, 
+                    'code', p.code
+                )
+            )
+            FROM protocol_references_value pecv
+            JOIN protocols p ON pecv.protocol_id = p.id
+            WHERE pecv.reference_id = art.id
+        ),
+        '[]'
+    ) AS protocol_ids
+FROM 
+    article_references art
+WHERE art.id = $1;
+
+-- name: DebugArticleReference :many
+SELECT * FROM protocol_references_value;
 
 -- name: GetALLArticles :many
-SELECT * FROM article_references
-ORDER BY year DESC;
+SELECT ar.*, pr.protocol_id
+FROM article_references ar
+LEFT JOIN protocol_references_value pr ON ar.id = pr.reference_id
+ORDER BY ar.year DESC;
 
 -- name: GetArticleReferencesByProtocol :many
 SELECT article_references.*
@@ -81,14 +99,14 @@ SELECT
     COALESCE(
         (
             SELECT json_agg(
-            json_build_object(
-                'id', pecv.protocol_id, 
-                'code', p.code
+                json_build_object(
+                    'id', pecv.protocol_id, 
+                    'code', p.code
+                )
             )
-        )
-        FROM protocol_references_value pecv
-        JOIN protocols p ON pecv.protocol_id = p.id
-        WHERE pecv.reference_id = art.id
+            FROM protocol_references_value pecv
+            JOIN protocols p ON pecv.protocol_id = p.id
+            WHERE pecv.reference_id = art.id
         ),
         '[]'
     ) AS protocol_ids
@@ -96,11 +114,24 @@ FROM
     article_references art;
 
 -- name: GetArticleReferencesWithProtocols :many
-SELECT ar.*, ARRAY_AGG(ROW(arpv.protocol_id,p.code)) AS protocol_ids
-FROM article_references ar
-JOIN protocol_references_value arpv ON ar.id = arpv.reference_id
-JOIN protocols p ON arpv.protocol_id = p.id
-GROUP BY ar.id;
+SELECT 
+    art.*, 
+    COALESCE(
+        (
+            SELECT json_agg(
+                json_build_object(
+                    'id', pecv.protocol_id, 
+                    'code', p.code
+                )
+            )
+            FROM protocol_references_value pecv
+            JOIN protocols p ON pecv.protocol_id = p.id
+            WHERE pecv.reference_id = art.id
+        ),
+        '[]'
+    ) AS protocol_ids
+FROM 
+    article_references art;
 
 -- name: AddArticleReferenceToProtocol :exec
 INSERT INTO protocol_references_value (protocol_id, reference_id)
