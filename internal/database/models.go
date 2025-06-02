@@ -445,7 +445,7 @@ type MedicationPrescription struct {
 	ID           uuid.UUID             `json:"id"`
 	CreatedAt    time.Time             `json:"created_at"`
 	UpdatedAt    time.Time             `json:"updated_at"`
-	Medication   uuid.UUID             `json:"medication"`
+	MedicationID uuid.UUID             `json:"medication_id"`
 	Dose         string                `json:"dose"`
 	Route        PrescriptionRouteEnum `json:"route"`
 	Frequency    string                `json:"frequency"`
@@ -571,7 +571,7 @@ type ProtocolTreatment struct {
 	ID                  uuid.UUID `json:"id"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
-	Medication          uuid.UUID `json:"medication"`
+	MedicationID        uuid.UUID `json:"medication_id"`
 	Dose                string    `json:"dose"`
 	Route               string    `json:"route"`
 	Frequency           string    `json:"frequency"`

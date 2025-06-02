@@ -100,13 +100,13 @@ func HandleUpsertReference(c *config.Config, w http.ResponseWriter, r *http.Requ
 	}	
 	
 	article, err := c.Db.UpsertArticleReference(r.Context(), database.UpsertArticleReferenceParams{
-		Column1: pid,
-		Column2: req.Title,
-		Column3: req.Authors,
-		Column4: req.Journal,
-		Column5: req.Year,
-		Column6: req.Pmid,
-		Column7: req.Doi,
+		ID: pid,
+		Title: req.Title,
+		Authors: req.Authors,
+		Journal: req.Journal,
+		Year: req.Year,
+		Pmid: req.Pmid,
+		Doi: req.Doi,
 	})		
 
 	if err != nil {		

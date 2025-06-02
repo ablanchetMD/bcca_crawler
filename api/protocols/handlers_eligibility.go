@@ -7,66 +7,31 @@ import (
 	"bcca_crawler/api"
 	"fmt"
 	"net/http"
-	"github.com/google/uuid"
-	"strings"
-	"encoding/json"	
+	"github.com/google/uuid"	
 
 )
-
-
-type EligibilityCriterionReq struct {
-	ID 			string `json:"id" validate:"omitempty,uuid"`
-	Type 		string `json:"type" validate:"required,eligibility_criteria"`
-	Description string `json:"description" validate:"required,min=1,max=500"`
-	ProtocolID	string `json:"protocol_id" validate:"omitempty,uuid"`
-}
-
-type EligibilityCriteriaReq struct {
-	EligibilityCriteria []EligibilityCriterionReq `json:"eligibility_criteria"`
-}
-
-type EligibilityUpdateReq struct {
-	SelectedProtocolIDs []string `json:"protocol_ids"`
-}
-
-type EligibilityCriterionResp struct {
-	ID 			string `json:"id"`
-	Type 		string `json:"type"`
-	Description string `json:"description"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
-	LinkedProtocols []api.LinkedProtocols `json:"linked_protocols"`
-}
-
-func (e *EligibilityCriterionReq) ToTypeEnum() database.EligibilityEnum {
-	return database.EligibilityEnum(strings.ToLower(e.Type))
-}
-
-type ErrorResponse struct {
-	Field   string `json:"field"`   // Field that caused the error
-	Message string `json:"message"` // Error message
-}
-
 
 func HandleGetEligibilityCriteria(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	category := r.URL.Query().Get("category")
-	
-	var eligibility  []database.GetEligibilityCriteriaByTypeRow
 
 	switch category {
 	case "":
-		elig, err := c.Db.GetElibilityCriteria(ctx)
+		items, err := c.Db.GetElibilityCriteria(ctx)
 		
 		if err != nil {
 			println(err.Error())
 			json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting eligibility criteria with no requirements")
 			return
 		}
-		for _, e := range elig {
-			eligibility = append(eligibility, database.GetEligibilityCriteriaByTypeRow(e))
+		returned_value, err := api.MapAllWithError(items,MapEligibilityWithProtocols)
+		
+		if err != nil {
+			json_utils.RespondWithError(w, http.StatusInternalServerError, "Error mapping eligibility criteria")
+			return
 		}
+		json_utils.RespondWithJSON(w, http.StatusOK, returned_value)	
 	default:		
 
 		err := c.Validate.Var(category, "required,eligibility_criteria")
@@ -75,44 +40,22 @@ func HandleGetEligibilityCriteria(c *config.Config, w http.ResponseWriter, r *ht
 			return
 		}
 		
-		elig, err := c.Db.GetEligibilityCriteriaByType(ctx, category)
+		items, err := c.Db.GetEligibilityCriteriaByType(ctx, category)
 		
 		if err != nil {
 			json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting eligibility criteria with requirements")
 			return
 		}
-		eligibility = elig
-	}
-	var eligibilityCriteria []EligibilityCriterionResp
+		returned_value, err := api.MapAllWithError(items,MapEligibilityWithProtocols)
 
-	for _, ec := range eligibility {
-		
-		var linkedProtocols []api.LinkedProtocols	
-	
-		protocolIdsBytes, ok := ec.ProtocolIds.([]byte)
-		if !ok {
-			json_utils.RespondWithError(w, http.StatusInternalServerError, "Error asserting protocol IDs to []byte")
+		if err != nil {
+			json_utils.RespondWithError(w, http.StatusInternalServerError, "Error mapping eligibility criteria")
 			return
 		}
-
-		err := json.Unmarshal(protocolIdsBytes, &linkedProtocols)
-		if err != nil {
-			json_utils.RespondWithError(w, http.StatusInternalServerError, 
-				fmt.Sprintf("Error parsing protocol data: %s", err.Error()))
-			return
-		}		
-		
-		eligibilityCriteria = append(eligibilityCriteria, EligibilityCriterionResp{
-			ID: ec.ID.String(),
-			Type: string(ec.Type),
-			Description: ec.Description,
-			CreatedAt: ec.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-			UpdatedAt: ec.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-			LinkedProtocols: linkedProtocols,
-		})
+		json_utils.RespondWithJSON(w, http.StatusOK, returned_value)
 	}
 
-	json_utils.RespondWithJSON(w, http.StatusOK, eligibilityCriteria)
+	
 }
 
 func HandleGetEligibilityCriteriaByProtocol(c *config.Config, w http.ResponseWriter, r *http.Request){
@@ -124,24 +67,19 @@ func HandleGetEligibilityCriteriaByProtocol(c *config.Config, w http.ResponseWri
 		return
 	}
 
-	elig_criterias,err := c.Db.GetEligibilityByProtocol(ctx,ids.ProtocolID)
+	items,err := c.Db.GetEligibilityByProtocol(ctx,ids.ProtocolID)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return 
 	}
 
-	r_elig_criterias := []EligibilityCriterionResp{}
-	for _, ec := range elig_criterias {		
-		r_elig_criterias = append(r_elig_criterias, EligibilityCriterionResp{
-			ID: ec.ID.String(),
-			Type: string(ec.Type),
-			Description: ec.Description,
-			CreatedAt: ec.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-			UpdatedAt: ec.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),			
-		})
-	}
+	returned_value, err := api.MapAllWithError(items,MapEligibilityWithProtocols)
 
-	json_utils.RespondWithJSON(w, http.StatusOK, r_elig_criterias)
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error mapping eligibility criteria")
+		return
+	}
+	json_utils.RespondWithJSON(w, http.StatusOK, returned_value)
 }
 
 
@@ -155,37 +93,21 @@ func HandleGetEligibilityCriteriaByID(c *config.Config, w http.ResponseWriter, r
 		return
 	}
 
-	elig, err := c.Db.GetEligibilityCriteriaByID(ctx, ids.ID)
+	item, err := c.Db.GetEligibilityCriteriaByID(ctx, ids.ID)
 
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting eligibility criteria: %s", ids.ID.String()))
 		return
 	}
-	var eligibilityCriteria EligibilityCriterionResp
-
-	var linkedProtocols []api.LinkedProtocols	
 	
-	protocolIdsBytes, ok := elig.ProtocolIds.([]byte)
-	if !ok {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error asserting protocol IDs to []byte")
-		return
-	}
+	returned_value, err := MapEligibilityWithProtocols(item)
 
-	err = json.Unmarshal(protocolIdsBytes, &linkedProtocols)
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, 
-			fmt.Sprintf("Error parsing protocol data: %s", err.Error()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error mapping eligibility criteria")
 		return
 	}
 
-	eligibilityCriteria = EligibilityCriterionResp{
-		ID: elig.ID.String(),
-		Type: string(elig.Type),
-		Description: elig.Description,
-		LinkedProtocols: linkedProtocols,
-	}
-
-	json_utils.RespondWithJSON(w, http.StatusOK, eligibilityCriteria)
+	json_utils.RespondWithJSON(w, http.StatusOK, returned_value)
 }
 
 func HandleDeleteEligibilityCriteriaByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
@@ -226,9 +148,9 @@ func HandleUpsertEligibilityCriteria(c *config.Config, w http.ResponseWriter, r 
 	}		
 	
 	elig,err := c.Db.UpsertEligibilityCriteria(ctx,database.UpsertEligibilityCriteriaParams{
-		Column1: pid,
-		Column2: req.ToTypeEnum(),
-		Column3: req.Description,
+		ID: pid,
+		Type: req.ToTypeEnum(),
+		Description: req.Description,
 	})
 
 	if err != nil {
@@ -316,7 +238,7 @@ func HandleUpdateEligibilityToProtocols(c *config.Config, w http.ResponseWriter,
 		return
 	}
 	
-	var req EligibilityUpdateReq
+	var req ChangeProtocolReq
 	err = api.UnmarshalAndValidatePayload(c, r, &req)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
@@ -335,7 +257,7 @@ func HandleUpdateEligibilityToProtocols(c *config.Config, w http.ResponseWriter,
 
 	err = c.Db.UpdateEligibilityProtocols(ctx, database.UpdateEligibilityProtocolsParams{		
 		CriteriaID: ids.ID,
-		Column2: selectedUUIDs,
+		ProtocolIds: selectedUUIDs,
 	})
 
 	if err != nil {

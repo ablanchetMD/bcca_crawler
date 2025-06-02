@@ -513,7 +513,7 @@ WITH input_values(id, title, authors, journal, year, doi, pmid) AS (
     CASE 
       WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
       THEN gen_random_uuid() 
-      ELSE $1 
+      ELSE $1
     END,
     $2,
     $3,
@@ -537,24 +537,24 @@ RETURNING id, created_at, updated_at, title, authors, journal, year, pmid, doi
 `
 
 type UpsertArticleReferenceParams struct {
-	Column1 interface{} `json:"column_1"`
-	Column2 interface{} `json:"column_2"`
-	Column3 interface{} `json:"column_3"`
-	Column4 interface{} `json:"column_4"`
-	Column5 interface{} `json:"column_5"`
-	Column6 interface{} `json:"column_6"`
-	Column7 interface{} `json:"column_7"`
+	ID      interface{} `json:"id"`
+	Title   interface{} `json:"title"`
+	Authors interface{} `json:"authors"`
+	Journal interface{} `json:"journal"`
+	Year    interface{} `json:"year"`
+	Doi     interface{} `json:"doi"`
+	Pmid    interface{} `json:"pmid"`
 }
 
 func (q *Queries) UpsertArticleReference(ctx context.Context, arg UpsertArticleReferenceParams) (ArticleReference, error) {
 	row := q.db.QueryRowContext(ctx, upsertArticleReference,
-		arg.Column1,
-		arg.Column2,
-		arg.Column3,
-		arg.Column4,
-		arg.Column5,
-		arg.Column6,
-		arg.Column7,
+		arg.ID,
+		arg.Title,
+		arg.Authors,
+		arg.Journal,
+		arg.Year,
+		arg.Doi,
+		arg.Pmid,
 	)
 	var i ArticleReference
 	err := row.Scan(

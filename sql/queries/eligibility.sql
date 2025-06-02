@@ -8,12 +8,12 @@ WITH input_values(id, type, description) AS (
     VALUES
     (
         CASE
-            WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+            WHEN @id = '00000000-0000-0000-0000-000000000000'::uuid 
             THEN gen_random_uuid() 
-            ELSE $1 
+            ELSE @id 
         END,        
-        $2::eligibility_enum,
-        $3
+        @type::eligibility_enum,
+        @description
     )
 )
 INSERT INTO protocol_eligibility_criteria (id, type, description)
@@ -138,13 +138,13 @@ WITH current_protocols AS (
 to_remove AS (
     DELETE FROM protocol_eligibility_criteria_values pcv
     WHERE pcv.criteria_id = $1
-    AND pcv.protocol_id NOT IN (SELECT unnest($2::uuid[]))
+    AND pcv.protocol_id NOT IN (SELECT unnest(@protocol_ids::uuid[]))
     RETURNING pcv.protocol_id
 ),
 to_add AS (
     INSERT INTO protocol_eligibility_criteria_values (criteria_id, protocol_id)
     SELECT $1, new_protocol
-    FROM unnest($2::uuid[]) AS new_protocol
+    FROM unnest(@protocol_ids::uuid[]) AS new_protocol
     WHERE new_protocol NOT IN (SELECT cp.protocol_id FROM current_protocols cp)
     RETURNING protocol_id
 )

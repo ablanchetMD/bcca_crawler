@@ -8,69 +8,30 @@ import (
 	"fmt"
 	"net/http"
 	"github.com/google/uuid"
-	"encoding/json"	
+		
 
 )
 
 
-type CautionReq struct {
-	ID 			string `json:"id" validate:"omitempty,uuid"`	
-	Description string `json:"description" validate:"required,min=1,max=500"`
-	ProtocolID	string `json:"protocol_id" validate:"omitempty,uuid"`
-}
-
-type CautionUpdateReq struct {
-	SelectedProtocolIDs []string `json:"protocol_ids"`
-}
-
-
-type CautionResp struct {
-	ID 			string `json:"id"`
-	CreatedAt 	string `json:"created_at"`
-	UpdatedAt 	string `json:"updated_at"`	
-	Description string `json:"description"`
-	LinkedProtocols []api.LinkedProtocols `json:"linked_protocols"`
-}
-
-
-
 func HandleGetCautions(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()	
-	cautions := []CautionResp{}
-	raw_cautions, err := c.Db.GetCautionWithProtocols(ctx)
+	ctx := r.Context()		
+	items, err := c.Db.GetCautionWithProtocols(ctx)
 
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting cautions")
 		fmt.Println("Error:", err)
 		return
 	}
-	
-	for _, a := range raw_cautions {
-		
-		var linkedProtocols []api.LinkedProtocols	
-	
-		protocolIdsBytes, ok := a.ProtocolIds.([]byte)
-		if !ok {
-			json_utils.RespondWithError(w, http.StatusInternalServerError, "Error asserting protocol IDs to []byte")
-			return
-		}
 
-		err = json.Unmarshal(protocolIdsBytes, &linkedProtocols)
-		if err != nil {
-			json_utils.RespondWithError(w, http.StatusInternalServerError, 
-				fmt.Sprintf("Error parsing protocol data: %s", err.Error()))
-			return
-		}	
-		cautions = append(cautions, CautionResp{
-			ID:          a.ID.String(),		
-			Description:     a.Description,
-			CreatedAt: a.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-			UpdatedAt: a.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),			
-			LinkedProtocols: linkedProtocols,		
-		})
-	}
+	returned_value, err := api.MapAllWithError(items,MapCautionWithProtocols)
 
-	json_utils.RespondWithJSON(w, http.StatusOK, cautions)
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting cautions")
+		fmt.Println("Error:", err)		
+		return
+	}	
+
+	json_utils.RespondWithJSON(w, http.StatusOK, returned_value)
 }
 
 
@@ -84,7 +45,7 @@ func HandleGetCautionsByID(c *config.Config, w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	raw_caution, err := c.Db.GetCautionByIDWithProtocols(ctx, ids.ID)
+	item, err := c.Db.GetCautionByIDWithProtocols(ctx, ids.ID)
 
 	if err != nil {
 		println(err.Error())
@@ -92,30 +53,14 @@ func HandleGetCautionsByID(c *config.Config, w http.ResponseWriter, r *http.Requ
 		return
 	}	
 	
-	var linkedProtocols []api.LinkedProtocols	
-	
-	protocolIdsBytes, ok := raw_caution.ProtocolIds.([]byte)
-	if !ok {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error asserting protocol IDs to []byte")
-		return
-	}
+	returned_value, err := MapCautionWithProtocols(item)
 
-	err = json.Unmarshal(protocolIdsBytes, &linkedProtocols)
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, 
-			fmt.Sprintf("Error parsing protocol data: %s", err.Error()))
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-
-	Caution := CautionResp{
-		ID: raw_caution.ID.String(),
-		Description: raw_caution.Description,
-		CreatedAt: raw_caution.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-		UpdatedAt: raw_caution.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-		LinkedProtocols: linkedProtocols,
-	}
 	
-	json_utils.RespondWithJSON(w, http.StatusOK, Caution)
+	json_utils.RespondWithJSON(w, http.StatusOK, returned_value)
 }
 
 func HandleDeleteCautionByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
@@ -155,8 +100,8 @@ func HandleUpsertCaution(c *config.Config, w http.ResponseWriter, r *http.Reques
 	}		
 	
 	caution,err := c.Db.UpsertCaution(ctx,database.UpsertCautionParams{
-		Column1: pid,		
-		Column2: req.Description,		
+		ID: pid,		
+		Description: req.Description,		
 	})
 
 	if err != nil {		
@@ -242,7 +187,7 @@ func HandleUpdateCautionsToProtocols(c *config.Config, w http.ResponseWriter, r 
 		return
 	}
 	
-	var req CautionUpdateReq
+	var req ChangeProtocolReq
 	err = api.UnmarshalAndValidatePayload(c, r, &req)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
@@ -261,7 +206,7 @@ func HandleUpdateCautionsToProtocols(c *config.Config, w http.ResponseWriter, r 
 
 	err = c.Db.UpdateCautionProtocols(ctx, database.UpdateCautionProtocolsParams{		
 		CautionID: ids.ID,
-		Column2: selectedUUIDs,
+		ProtocolIds: selectedUUIDs,
 	})
 
 	if err != nil {

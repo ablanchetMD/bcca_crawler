@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"github.com/google/uuid"
+	"encoding/json"	
 
 
 )
@@ -26,8 +27,7 @@ type LabReq struct {
 
 func HandleGetLabs(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	labs := []api.LabResp{}
-
+	
 	category := r.URL.Query().Get("test_category")
 
 	var test_labs []database.Test
@@ -49,9 +49,7 @@ func HandleGetLabs(c *config.Config, w http.ResponseWriter, r *http.Request) {
 			test_labs = raw_labs
 		}	
 	
-	for _, a := range test_labs {		
-		labs = append(labs, api.MapLab(a))	
-	}
+	labs := api.MapAll(test_labs,MapLab)	
 
 	json_utils.RespondWithJSON(w, http.StatusOK, labs)
 }
@@ -74,7 +72,7 @@ func HandleGetLabByID(c *config.Config, w http.ResponseWriter, r *http.Request) 
 		return
 	}		
 
-	Test := api.MapLab(raw_test)
+	Test := MapLab(raw_test)
 	
 	json_utils.RespondWithJSON(w, http.StatusOK, Test)
 }
@@ -117,14 +115,14 @@ func HandleUpsertLab(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	}		
 	
 	test,err := c.Db.UpsertTest(ctx,database.UpsertTestParams{
-		Column1: pid,
-		Column2: req.Name,
-		Column3: req.Description,
-		Column4: req.FormUrl,
-		Column5: req.Unit,
-		Column6: req.LowerLimit,
-		Column7: req.UpperLimit,
-		Column8: req.TestCategory,
+		ID: pid,
+		Name: req.Name,
+		Description: req.Description,
+		FormUrl: req.FormUrl,
+		Unit: req.Unit,
+		LowerLimit: req.LowerLimit,
+		UpperLimit: req.UpperLimit,
+		TestCategory: req.TestCategory,
 	})	
 
 	if err != nil {
@@ -132,7 +130,7 @@ func HandleUpsertLab(c *config.Config, w http.ResponseWriter, r *http.Request) {
 		return		
 	}
 	
-	return_test := api.MapLab(test)
+	return_test := MapLab(test)
 
 	json_utils.RespondWithJSON(w, http.StatusOK, return_test)	
 }
@@ -183,8 +181,33 @@ func HandleAddLabToProtocol(c *config.Config, w http.ResponseWriter, r *http.Req
 
 func HandleGetLabsByProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	labs := []api.LabResp{}
+		
+	ids, err := api.ParseAndValidateID(r)
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}		
+
 	
+	items, err := c.Db.GetTestsByProtocol(ctx,ids.ProtocolID)
+
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting labs")
+		return
+	}
+
+	var labs LabsByProtocol
+    if err := json.Unmarshal(items, &labs); err != nil {
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprint("failed to unmarshal tests json: %w", err))
+        return 
+    }
+
+	json_utils.RespondWithJSON(w, http.StatusOK, labs)
+}
+
+func HandleGetLabsByProtocolwithOptions(c *config.Config, w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+		
 	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
@@ -220,10 +243,10 @@ func HandleGetLabsByProtocol(c *config.Config, w http.ResponseWriter, r *http.Re
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting labs")
 		return
 	}
+
+	labs := api.MapAll(raw_labs,MapLab)
 	
-	for _, a := range raw_labs {		
-		labs = append(labs, api.MapLab(a))		
-	}
+	
 
 	json_utils.RespondWithJSON(w, http.StatusOK, labs)
 }

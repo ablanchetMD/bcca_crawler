@@ -33,11 +33,11 @@ RETURNING *;
 WITH input_values(id, description) AS (
   VALUES (
     CASE 
-      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      WHEN @id = '00000000-0000-0000-0000-000000000000'::uuid 
       THEN gen_random_uuid() 
-      ELSE $1 
+      ELSE @id 
     END,
-    $2
+    @description
   )
 )
 INSERT INTO protocol_cautions (id, description)
@@ -94,18 +94,18 @@ WHERE
 WITH current_protocols AS (
     SELECT pcv.protocol_id 
     FROM protocol_cautions_values pcv 
-    WHERE pcv.caution_id = $1
+    WHERE pcv.caution_id = @caution_id
 ),
 to_remove AS (
     DELETE FROM protocol_cautions_values pcv
-    WHERE pcv.caution_id = $1
-    AND pcv.protocol_id NOT IN (SELECT unnest($2::uuid[]))
+    WHERE pcv.caution_id = @caution_id
+    AND pcv.protocol_id NOT IN (SELECT unnest(@protocol_ids::uuid[]))
     RETURNING pcv.protocol_id
 ),
 to_add AS (
     INSERT INTO protocol_cautions_values (caution_id, protocol_id)
-    SELECT $1, new_protocol
-    FROM unnest($2::uuid[]) AS new_protocol
+    SELECT @caution_id, new_protocol
+    FROM unnest(@protocol_ids::uuid[]) AS new_protocol
     WHERE new_protocol NOT IN (SELECT cp.protocol_id FROM current_protocols cp)
     RETURNING protocol_id
 )
@@ -117,12 +117,12 @@ SELECT
 WITH input_values(id,title, description) AS (
   VALUES (
     CASE 
-      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      WHEN @id = '00000000-0000-0000-0000-000000000000'::uuid 
       THEN gen_random_uuid() 
-      ELSE $1 
+      ELSE @id
     END,
-    $2,
-    $3
+    @title,
+    @description
   )
 )
 INSERT INTO protocol_precautions (id,title, description)

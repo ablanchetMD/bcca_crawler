@@ -12,27 +12,7 @@ import (
 )
 
 
-type ToxicityReq struct {
-	ID 						string `json:"id" validate:"omitempty,uuid"`	
-	Title 					string `json:"title" validate:"required"`
-	Category 				string `json:"category" validate:"required"`
-	Description 			string `json:"description" validate:"omitempty,min=1,max=1000"`
-	Grades 					[]ToxicityGradeReq `json:"grades" validate:"required"`
-	
-}
 
-type ToxicityGradeReq struct {
-	ID 						string `json:"id" validate:"omitempty,uuid"`	
-	Grade 					string `json:"grade" validate:"required,grade"`
-	Description				string `json:"description" validate:"min=1,max=1000"`
-}
-
-type ToxModReq struct {
-	ID 						string `json:"id" validate:"omitempty,uuid"`
-	ToxicityGradeID 		string `json:"toxicity_id" validate:"required,uuid"`
-	ProtocolID 				string `json:"protocol_id" validate:"required,uuid"`
-	Adjustment 				string `json:"adjustment" validate:"required"`
-}
 
 func HandleGetToxicities(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()

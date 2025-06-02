@@ -2,11 +2,12 @@ package api
 
 import (
 	"bcca_crawler/internal/config"
-	"bcca_crawler/internal/database"
+	"bcca_crawler/internal/database"	
 	"github.com/google/uuid"
 	"context"	
 	"fmt"
 	"strings"
+	"encoding/json"	
 )
 
 
@@ -27,148 +28,83 @@ func CMD_DeleteProtocol(c *config.Config, arg string) error {
 }
 
 func GetProtocolReferences(c *config.Config,ctx context.Context,protocolID uuid.UUID) ([]ArticleReference, error) {
-	articles,err := c.Db.GetArticleReferencesByProtocol(ctx,protocolID)
+	items,err := c.Db.GetArticleReferencesByProtocol(ctx,protocolID)
 	if err != nil {
 		return nil, err
 	}
 
-	r_articles := []ArticleReference{}
-	for _, a := range articles {
-		r_articles = append(r_articles, mapArticleRef(a))
-	}
-	return r_articles, nil
+	returned_items := MapAll(items,mapArticleRef)	
+	return returned_items, nil
 }
 
 func GetProtocolPhysicians(c *config.Config,ctx context.Context,protocolID uuid.UUID) ([]Physician, error) {
-	contact_physicians,err := c.Db.GetPhysicianByProtocol(ctx,protocolID)
+	items,err := c.Db.GetPhysicianByProtocol(ctx,protocolID)
 	if err != nil {
 		return nil, err
 	}
 
-	r_contact_physicians := []Physician{}
-	for _, p := range contact_physicians {
-		r_contact_physicians = append(r_contact_physicians, mapPhysician(p))
-	}
-	return r_contact_physicians, nil
+	returned_items := MapAll(items,mapPhysician)	
+	return returned_items, nil
 }
 
 func GetProtocolCautions(c *config.Config,ctx context.Context,protocolID uuid.UUID) ([]ProtocolCaution, error) {
-	cautions,err := c.Db.GetProtocolCautionsByProtocol(ctx,protocolID)
+	items,err := c.Db.GetProtocolCautionsByProtocol(ctx,protocolID)
 	if err != nil {
 		return nil, err
 	}
 
-	r_cautions := []ProtocolCaution{}
-	for _, c := range cautions {
-		r_cautions = append(r_cautions, MapCaution(c))
-	}
-	return r_cautions, nil
+	returned_items := MapAll(items,MapCaution)		
+	return returned_items, nil
 }
 
 func GetProtocolPrecautions(c *config.Config,ctx context.Context,protocolID uuid.UUID) ([]ProtocolPrecaution, error) {
-	precautions,err := c.Db.GetProtocolPrecautionsByProtocol(ctx,protocolID)
+	items,err := c.Db.GetProtocolPrecautionsByProtocol(ctx,protocolID)
 	if err != nil {
 		return nil, err
 	}
 
-	r_precautions := []ProtocolPrecaution{}
-	for _, p := range precautions {
-		r_precautions = append(r_precautions, MapPrecaution(p))
-	}
-	return r_precautions, nil
+	returned_items := MapAll(items,MapPrecaution)	
+	return returned_items, nil
 }
 
 func GetProtocolEligibilityCriteria(c *config.Config,ctx context.Context,protocolID uuid.UUID) ([]ProtocolEligibilityCriterion, error) {
-	elig_criterias,err := c.Db.GetEligibilityByProtocol(ctx,protocolID)
+	items,err := c.Db.GetEligibilityByProtocol(ctx,protocolID)
 	if err != nil {
 		return nil, err
 	}
 
-	r_elig_criterias := []ProtocolEligibilityCriterion{}
-	for _, ec := range elig_criterias {		
-		r_elig_criterias = append(r_elig_criterias, MapEligibilityCriterion(ec))
-	}
-	return r_elig_criterias, nil
+	returned_items := MapAll(items,MapEligibilityCriterion)	
+	return returned_items, nil
 }
 
-func GetBaselineTests(c *config.Config,ctx context.Context,protocolID uuid.UUID) (BaselineTests, error) {
-	baseline_tests,err := c.Db.GetTestsByProtocolByCategoryAndUrgency(ctx,database.GetTestsByProtocolByCategoryAndUrgencyParams{
-		ProtocolID: protocolID,
-		Category: database.CategoryEnumBaseline,
-		Urgency: database.UrgencyEnumUrgent,
-	})
+func GetTests(c *config.Config,ctx context.Context,protocolID uuid.UUID) (LabsByProtocol, error) {
+	items,err := c.Db.GetTestsByProtocol(ctx,protocolID)
+	var labs LabsByProtocol
 	if err != nil {
-		return BaselineTests{}, err
+		return labs, err
 	}
 
-	r_baseline_tests := mapTest(baseline_tests)
-
-	nonurgent_tests,err := c.Db.GetTestsByProtocolByCategoryAndUrgency(ctx,database.GetTestsByProtocolByCategoryAndUrgencyParams{
-		ProtocolID: protocolID,
-		Category: database.CategoryEnumBaseline,
-		Urgency: database.UrgencyEnumNonUrgent,
-	})
-	if err != nil {
-		return BaselineTests{}, err
+	if err := json.Unmarshal(items, &labs); err != nil {
+		return labs, fmt.Errorf("failed to unmarshal tests json: %w", err)
 	}
 
-	r_nonurgent_tests := mapTest(nonurgent_tests)
+	return labs,nil  
 
-	ifnec_tests,err := c.Db.GetTestsByProtocolByCategoryAndUrgency(ctx,database.GetTestsByProtocolByCategoryAndUrgencyParams{
-		ProtocolID: protocolID,
-		Category: database.CategoryEnumBaseline,
-		Urgency: database.UrgencyEnumIfNecessary,
-	})
-	if err != nil {
-		return BaselineTests{}, err
-	}
-
-	r_ifnec_tests := mapTest(ifnec_tests)
-
-	return BaselineTests{
-		RequiredBeforeTreatment: r_baseline_tests,
-		RequiredButCanProceed:   r_nonurgent_tests,
-		IfClinicallyIndicated:   r_ifnec_tests,
-	}, nil
 }
 
-func GetFollowUpTests(c *config.Config,ctx context.Context,protocolID uuid.UUID) (FollowUpTests, error) {
-	followup_tests,err := c.Db.GetTestsByProtocolByCategoryAndUrgency(ctx,database.GetTestsByProtocolByCategoryAndUrgencyParams{
-		ProtocolID: protocolID,
-		Category: database.CategoryEnumFollowup,
-		Urgency: database.UrgencyEnumUrgent,
-	})
-	if err != nil {
-		return FollowUpTests{}, err
-	}
-
-	r_followup_tests := mapTest(followup_tests)
-
-	followup_ifnec_tests,err := c.Db.GetTestsByProtocolByCategoryAndUrgency(ctx,database.GetTestsByProtocolByCategoryAndUrgencyParams{
-		ProtocolID: protocolID,
-		Category: database.CategoryEnumFollowup,
-		Urgency: database.UrgencyEnumIfNecessary,
-	})
-	if err != nil {
-		return FollowUpTests{}, err
-	}
-
-	r_followup_ifnec_tests := mapTest(followup_ifnec_tests)
-
-	return FollowUpTests{
-		Required:               r_followup_tests,
-		IfClinicallyIndicated:  r_followup_ifnec_tests,
-	}, nil
-}
-
-
-func GetProtocolToxicities(c *config.Config,ctx context.Context,protocolID uuid.UUID) ([]Toxicity, error) {
-	tox_mod,err := c.Db.GetToxicityModificationByProtocol(ctx,protocolID)
+func GetProtocolToxicities(c *config.Config,ctx context.Context,protocolID uuid.UUID) ([]ToxicityWithGradesAndAdjustments, error) {
+	items,err := c.Db.GetToxicitiesWithGradesAndAdjustmentsByProtocol(ctx,protocolID)
 	if err != nil {
 		return nil, err
 	}
+
+	returned_value,err := MapAllWithError(items,MapToToxicityWithGradesAndAdjustmentsByProtocol)
+
+	if err != nil {
+		return nil, err
+	}	
 	
-	return mapToToxicities(tox_mod), nil
+	return returned_value, nil
 }
 
 func GetProtocolModifications(c *config.Config,ctx context.Context,protocolID uuid.UUID) ([]MedicationModification, error) {
@@ -210,9 +146,9 @@ func GetProtocolCycles(c *config.Config,ctx context.Context,protocolID uuid.UUID
 }
 
 
-func CMD_GetProtocolBy(c *config.Config,ctx context.Context, ByWhat string, arg string) (ProtocolPayload, error) {
+func CMD_GetProtocolBy(c *config.Config,ctx context.Context, ByWhat string, arg string) (ProtocolSumPayload, error) {
 	
-	Payload := ProtocolPayload{}
+	Payload := ProtocolSumPayload{}
 	protocol := database.Protocol{}
 	err := error(nil)
 
@@ -252,17 +188,11 @@ func CMD_GetProtocolBy(c *config.Config,ctx context.Context, ByWhat string, arg 
 		return Payload, err
 	}
 
-	r_baseline_tests,err := GetBaselineTests(c,ctx,protocol.ID)
+	r_tests,err := GetTests(c,ctx,protocol.ID)
 	if err != nil {
-		fmt.Println("Error getting baseline tests: ", err)
+		fmt.Println("Error getting tests: ", err)
 		return Payload, err
-	}
-
-	r_followup_tests,err := GetFollowUpTests(c,ctx,protocol.ID)
-	if err != nil {
-		fmt.Println("Error getting followup tests: ", err)
-		return Payload, err
-	}
+	}	
 
 	r_contact_physicians,err := GetProtocolPhysicians(c,ctx,protocol.ID)
 	if err != nil {
@@ -303,15 +233,12 @@ func CMD_GetProtocolBy(c *config.Config,ctx context.Context, ByWhat string, arg 
 		return Payload, err
 	}
 
-	Payload = ProtocolPayload{
+	Payload = ProtocolSumPayload{
 		ProtocolSummary:            r_protocol,
 		ProtocolEligibilityCriteria: r_elig_criterias,
 		ProtocolPrecautions:        r_precautions,
 		ProtocolCautions:           r_cautions,
-		Tests:                      Tests{
-			Baseline: r_baseline_tests,
-			FollowUp: r_followup_tests,
-		},
+		Tests:                      r_tests,
 		ProtocolCycles:             r_cycles,
 		TreatmentModifications:     r_med_mod,
 		Toxicities:     			r_tox_mod,

@@ -1,5 +1,5 @@
 -- name: AddProtocolTreatment :one
-INSERT INTO protocol_treatment (medication, dose, route, frequency, duration, administration_guide)
+INSERT INTO protocol_treatment (medication_id, dose, route, frequency, duration, administration_guide)
 VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
@@ -7,7 +7,7 @@ RETURNING *;
 UPDATE protocol_treatment
 SET
     updated_at = NOW(),
-    medication = $2,
+    medication_id = $2,
     dose = $3,
     route = $4,
     frequency = $5,
@@ -17,12 +17,12 @@ WHERE id = $1
 RETURNING *;
 
 -- name: UpsertProtocolTreatment :one
-INSERT INTO protocol_treatment (id, medication, dose, route, frequency, duration, administration_guide)
+INSERT INTO protocol_treatment (id, medication_id, dose, route, frequency, duration, administration_guide)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (id) DO UPDATE
 SET
     updated_at = NOW(),
-    medication = EXCLUDED.medication,
+    medication_id = EXCLUDED.medication_id,
     dose = EXCLUDED.dose,
     route = EXCLUDED.route,
     frequency = EXCLUDED.frequency,
@@ -33,26 +33,26 @@ RETURNING *;
 -- name: GetTreatments :many
 SELECT m.id as medication_id, m.name as medication_name, m.description as medication_description, m.category as medication_category ,m.alternate_names as medication_alternates, pt.id as treatment_id, pt.dose, pt.created_at,pt.updated_at, pt.route, pt.frequency, pt.duration, pt.administration_guide
 FROM medications m
-JOIN protocol_treatment pt ON m.id = pt.medication
+JOIN protocol_treatment pt ON m.id = pt.medication_id
 ORDER BY medication_name ASC;
 
 -- name: GetProtocolTreatmentByID :one
 SELECT m.id as medication_id, m.name as medication_name, m.description as medication_description, m.category as medication_category ,m.alternate_names as medication_alternates, pt.id as treatment_id, pt.dose, pt.created_at,pt.updated_at, pt.route, pt.frequency, pt.duration, pt.administration_guide
 FROM medications m
-JOIN protocol_treatment pt ON m.id = pt.medication
+JOIN protocol_treatment pt ON m.id = pt.medication_id
 WHERE pt.id = $1;
 
 -- name: GetTreatmentsByCycle :many
 SELECT m.id as medication_id, m.name as medication_name, m.description as medication_description, m.category as medication_category ,m.alternate_names as medication_alternates, pt.id as treatment_id, pt.dose, pt.created_at,pt.updated_at, pt.route, pt.frequency, pt.duration, pt.administration_guide
 FROM medications m
-JOIN protocol_treatment pt ON m.id = pt.medication
+JOIN protocol_treatment pt ON m.id = pt.medication_id
 JOIN treatment_cycles_values ON pt.id = treatment_cycles_values.protocol_treatment_id
 WHERE treatment_cycles_values.protocol_cycles_id = $1
 ORDER BY medication_name ASC;
 
 -- name: GetProtocolTreatmentByData :one
 SELECT * FROM protocol_treatment
-WHERE medication = $1 AND dose = $2 AND route = $3 AND frequency = $4 AND duration = $5;
+WHERE medication_id = $1 AND dose = $2 AND route = $3 AND frequency = $4 AND duration = $5;
 
 -- name: AddCycleToProtocol :one
 INSERT INTO protocol_cycles (protocol_id, cycle, cycle_duration)

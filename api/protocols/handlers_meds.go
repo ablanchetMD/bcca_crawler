@@ -13,45 +13,21 @@ import (
 
 )
 
-type MedReq struct {
-	ID 			string `json:"id" validate:"omitempty,uuid"`
-	Name 		string `json:"name" validate:"required,min=1,max=250"`
-	Description string `json:"description" validate:"omitempty,min=1,max=500"`
-	Category 	string `json:"category" validate:"omitempty,min=1,max=50"`
-	AlternateNames []string `json:"alternate_names" validate:"omitempty,min=1,max=500"`		
-}
-
-type PrescriptionReq struct {
-	ID 				string `json:"id" validate:"omitempty,uuid"`	
-	MedicationID 	string `json:"medication_id" validate:"required,uuid"`
-	Dose 			string `json:"dose" validate:"required"`
-	Route 			string `json:"route" validate:"required,prescription_route"`
-	Frequency 		string `json:"frequency" validate:"required"`
-	Duration 		string `json:"duration" validate:"omitempty"`
-	Instructions 	string `json:"instructions" validate:"omitempty,min=1,max=1000"`
-	Renewals 		int32 	`json:"renewals" validate:"omitempty,min=0,max=50"`
-}
-
-func (e *PrescriptionReq) ToRouteEnum() database.PrescriptionRouteEnum {
-	return database.PrescriptionRouteEnum(strings.ToLower(e.Route))
-}
 
 
 func HandleGetMeds(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	meds := []api.MedicationResp{}
-	raw_meds, err := c.Db.GetMedications(ctx)
+	
+	items, err := c.Db.GetMedications(ctx)
 
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting Meds")
 		return
 	}
 	
-	for _, a := range raw_meds {		
-		meds = append(meds, api.MapMedication(a))		
-	}
+	returned_value := api.MapAll(items,MapMedication)
 
-	json_utils.RespondWithJSON(w, http.StatusOK, meds)
+	json_utils.RespondWithJSON(w, http.StatusOK, returned_value)
 }
 
 func HandleGetMedByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
@@ -64,16 +40,16 @@ func HandleGetMedByID(c *config.Config, w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	raw_med, err := c.Db.GetMedicationByID(ctx, ids.ID)
+	item, err := c.Db.GetMedicationByID(ctx, ids.ID)
 
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting Med: %s", ids.ID.String()))
 		return
 	}
 	
-	Med := api.MapMedication(raw_med)
+	returned_value := MapMedication(item)
 
-	json_utils.RespondWithJSON(w, http.StatusOK, Med)
+	json_utils.RespondWithJSON(w, http.StatusOK, returned_value)
 }
 
 func HandleDeleteMedByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
@@ -113,11 +89,11 @@ func HandleUpsertMed(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	}
 
 	medication := database.UpsertMedicationParams{
-		Column1: pid,		
-		Column2: med.Name,		
-		Column3: med.Description,		
-		Column4: med.Category,
-		Column5: med.AlternateNames,		
+		ID: pid,		
+		Name: med.Name,		
+		Description: med.Description,		
+		Category: med.Category,
+		AlternateNames: med.AlternateNames,		
 	}
 
 	return_med, err := c.Db.UpsertMedication(ctx, medication)
@@ -127,26 +103,24 @@ func HandleUpsertMed(c *config.Config, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json_utils.RespondWithJSON(w, http.StatusCreated, api.MapMedication(return_med))
+	json_utils.RespondWithJSON(w, http.StatusCreated, MapMedication(return_med))
 }
 
 func HandleGetPrescriptions(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	px := []api.PrescriptionResp{}
+	ctx := r.Context()	
 
 	med_id := r.URL.Query().Get("medication_id")	
 
 	switch med_id {
 		case "":
-			raw, err := c.Db.GetPrescriptions(ctx)
+			items, err := c.Db.GetPrescriptions(ctx)
 			if err != nil {
 				json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting Prescriptions")
 				return
 			}
 
-			for _, a := range raw {		
-				px = append(px, api.MapPrescription(a))	
-			}
+			returned_value := api.MapAll(items,MapPrescription)			
+			json_utils.RespondWithJSON(w, http.StatusOK, returned_value)
 			
 		default:
 			pmed_id, err := uuid.Parse(med_id)
@@ -155,33 +129,16 @@ func HandleGetPrescriptions(c *config.Config, w http.ResponseWriter, r *http.Req
 				return
 			}
 
-			raw, err := c.Db.GetPrescriptionsByMed(ctx, pmed_id)
+			items, err := c.Db.GetPrescriptionsByMed(ctx, pmed_id)
 			if err != nil {
 				json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting Prescriptions")
 				return
 			}
-			for _, a := range raw {		
-				px = append(px, 
-					api.PrescriptionResp{
-						ID: a.MedicationPrescriptionID.String(),
-						MedicationName: a.Name,
-						MedicationID: a.MedicationID.String(),
-						CreatedAt: a.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-						UpdatedAt: a.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-						Dose: a.Dose,
-						Route: string(a.Route),
-						Frequency: a.Frequency,
-						Duration: a.Duration,
-						Instructions: a.Instructions,
-						Renewals: a.Renewals,
-					})	
-			}
+			returned_value := api.MapAll(items,MapPrescription)			
+			json_utils.RespondWithJSON(w, http.StatusOK, returned_value)		
 			
-		}		
-
+		}
 	
-
-	json_utils.RespondWithJSON(w, http.StatusOK, px)
 }
 
 func HandleGetPrescriptionByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
@@ -194,16 +151,16 @@ func HandleGetPrescriptionByID(c *config.Config, w http.ResponseWriter, r *http.
 		return
 	}
 
-	raw_prescription, err := c.Db.GetPrescriptionByID(ctx, ids.ID)
+	item, err := c.Db.GetPrescriptionByID(ctx, ids.ID)
 
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting Prescription: %s", ids.ID.String()))
 		return
 	}
 
-	Prescription := api.MapPrescriptionsByID(raw_prescription)
+	returned_value := MapPrescription(item)
 
-	json_utils.RespondWithJSON(w, http.StatusOK, Prescription)
+	json_utils.RespondWithJSON(w, http.StatusOK, returned_value)
 }
 
 func HandleDeletePrescriptionByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
@@ -251,14 +208,14 @@ func HandleUpsertPrescription(c *config.Config, w http.ResponseWriter, r *http.R
 	
 
 	medication := database.UpsertPrescriptionParams{
-		Column1: pid,
-		Column2: med_id,
-		Column3: med.Dose,
-		Column4: med.ToRouteEnum(),
-		Column5: med.Frequency,
-		Column6: med.Duration,
-		Column7: med.Instructions,
-		Column8: med.Renewals,
+		ID: pid,
+		MedicationID: med_id,
+		Dose: med.Dose,
+		Route: med.ToRouteEnum(),
+		Frequency: med.Frequency,
+		Duration: med.Duration,
+		Instructions: med.Instructions,
+		Renewals: med.Renewals,
 	}		
 	return_px, err := c.Db.UpsertPrescription(ctx, medication)
 
@@ -267,17 +224,17 @@ func HandleUpsertPrescription(c *config.Config, w http.ResponseWriter, r *http.R
 		return
 	}
 
-	return_med, err := c.Db.GetMedicationByID(ctx, return_px.Medication)
+	return_med, err := c.Db.GetMedicationByID(ctx, return_px.MedicationID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting Med: %s", return_px.Medication.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting Med: %s", return_px.MedicationID.String()))
 		return
 	}
 
-	formated_px := api.PrescriptionResp{
-		ID: return_px.ID.String(),
+	formated_px := PrescriptionResp{
+		ID: return_px.ID,
 		MedicationName: return_med.Name,
-		MedicationID: return_px.Medication.String(),
+		MedicationID: return_px.MedicationID,
 		Dose: return_px.Dose,
 		Route: string(return_px.Route),
 		Frequency: return_px.Frequency,
@@ -390,7 +347,7 @@ func HandleGetPrescriptionsByCategory(c *config.Config, w http.ResponseWriter, r
 		return
 	}
 
-	px,err := c.Db.GetPrescriptionsByProtocolByCategory(ctx, database.GetPrescriptionsByProtocolByCategoryParams{
+	items,err := c.Db.GetPrescriptionsByProtocolByCategory(ctx, database.GetPrescriptionsByProtocolByCategoryParams{
 		ProtocolID: parsed_pid,
 		Category: database.MedProtoCategoryEnum(strings.ToLower(category)),
 	})
@@ -400,26 +357,9 @@ func HandleGetPrescriptionsByCategory(c *config.Config, w http.ResponseWriter, r
 		return
 	}
 
-	prescriptions := []api.PrescriptionResp{}
+	returned_value := api.MapAll(items,MapPrescription)
 
-	for _, a := range px {		
-
-		prescriptions = append(prescriptions, api.PrescriptionResp{
-			ID: a.MedicationPrescriptionID.String(),
-			MedicationName: a.Name,
-			MedicationID: a.MedicationID.String(),
-			CreatedAt: a.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-			UpdatedAt: a.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-			Dose: a.Dose,
-			Route: string(a.Route),
-			Frequency: a.Frequency,
-			Duration: a.Duration,
-			Instructions: a.Instructions,
-			Renewals: a.Renewals,
-		})
-	}
-
-	json_utils.RespondWithJSON(w, http.StatusOK, prescriptions)
+	json_utils.RespondWithJSON(w, http.StatusOK, returned_value)
 
 }
 

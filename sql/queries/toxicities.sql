@@ -58,6 +58,41 @@ LEFT JOIN
 GROUP BY
     t.id, t.created_at, t.updated_at, t.title, t.category, t.description;
 
+-- name: GetToxicitiesWithGradesAndAdjustmentsByProtocol :many
+SELECT 
+    t.id,
+    t.created_at,
+    t.updated_at,
+    t.title,
+    t.category,
+    t.description,
+    COALESCE(
+    JSON_AGG(
+        JSON_BUILD_OBJECT(
+            'id', tg.id,
+            'created_at', tg.created_at,
+            'updated_at', tg.updated_at,
+            'grade', tg.grade,
+            'description', tg.description,
+            'adjustment', ptm.adjustment
+        ) 
+        ORDER BY tg.grade
+        ) FILTER (WHERE tg.id IS NOT NULL),
+        '[]'
+    )::json as grades
+FROM toxicities t
+LEFT JOIN toxicity_grades tg ON tg.toxicity_id = t.id
+LEFT JOIN protocol_tox_modifications ptm 
+  ON ptm.toxicity_grade_id = tg.id 
+  AND ptm.protocol_id = $1
+WHERE EXISTS (
+  SELECT 1 FROM protocol_tox_modifications ptm2
+  JOIN toxicity_grades tg2 ON ptm2.toxicity_grade_id = tg2.id
+  WHERE tg2.toxicity_id = t.id AND ptm2.protocol_id = $1
+)
+GROUP BY t.id;
+
+
 -- name: GetToxicitiesWithGradesAndAdjustments :many
 SELECT 
     t.id,

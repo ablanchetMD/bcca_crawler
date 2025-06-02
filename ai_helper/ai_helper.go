@@ -24,7 +24,7 @@ type ProtocolPayload struct {
 	ProtocolEligibilityCriteria []api.ProtocolEligibilityCriterion	 `json:"ProtocolEligibilityCriteria"`
 	ProtocolPrecautions        []api.ProtocolPrecaution 		     `json:"ProtocolPrecautions"`
 	ProtocolCautions		   []api.ProtocolCaution			 	 `json:"ProtocolCautions"`
-	Tests                      api.Tests                     		 `json:"Tests"`
+	Tests                      api.LabsByProtocol                     		 `json:"Tests"`
 	ProtocolCycles             []api.ProtocolCycle           		 `json:"ProtocolCycles"`	
 	Toxicities			       []api.Toxicity      				     `json:"Toxicities"`	
 	Physicians                 []api.Physician                		 `json:"Physicians"`
@@ -428,156 +428,51 @@ func GetAiData(s *config.Config,proto string) error {
 	}
 	
 
-	for _, test := range payload.Tests.Baseline.RequiredBeforeTreatment {
-		add,err := s.Db.AddTest(ctx, database.AddTestParams{
-			Name: test,
-		})
-		if err != nil {
-			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
-				// Duplicate key value violation
-				add,err = s.Db.GetTestByName(ctx, test)
-					
-				if err != nil {
-					fmt.Println("Error getting test: ", err)
-					return err
-				}
-			} else {
-				fmt.Println("Error creating test: ", err)
-				return err
-			}
-		}
-
-		_,_ = s.Db.AddTestToProtocolByCategoryAndUrgency(ctx, database.AddTestToProtocolByCategoryAndUrgencyParams{
-			ProtocolID: protocol.ID,
-			TestID: add.ID,
-			Category: database.CategoryEnumBaseline,
-			Urgency: database.UrgencyEnumUrgent,
-		})
-
-
-	}	
+	
 
 	// Create Tests, Non Urgent	
 
-	for _, test := range payload.Tests.Baseline.RequiredButCanProceed {
-		add,err := s.Db.AddTest(ctx, database.AddTestParams{
-			Name: test,
-		})
-		if err != nil {
-			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
-				// Duplicate key value violation
-				add,err = s.Db.GetTestByName(ctx, test)
-					
+	for categoryStr, urgencies := range payload.Tests.Tests {
+		for urgencyStr, tests := range urgencies {
+			// Parse enums from strings
+			category,urgency,err := api.GetCategoryAndUrgency(categoryStr,urgencyStr)
+			if err != nil {
+				fmt.Println("Error with category and urgency:",err)
+				continue
+			}
+
+			for _, test := range tests {
+				added, err := s.Db.AddTest(ctx, database.AddTestParams{
+					Name:        test.Name,
+					Description: test.Description,
+				})
 				if err != nil {
-					fmt.Println("Error getting test: ", err)
+					if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
+						added, err = s.Db.GetTestByName(ctx, test.Name)
+						if err != nil {
+							fmt.Println("Error getting test: ", err)
+							return err
+						}
+					} else {
+						fmt.Println("Error creating test: ", err)
+						return err
+					}
+				}
+
+				_, err = s.Db.AddTestToProtocolByCategoryAndUrgency(ctx, database.AddTestToProtocolByCategoryAndUrgencyParams{
+					ProtocolID: protocol.ID,
+					TestID:     added.ID,
+					Category:   category,
+					Urgency:    urgency,
+				})
+				if err != nil {
+					fmt.Println("Error linking test to protocol: ", err)
 					return err
 				}
-			} else {
-				fmt.Println("Error creating test: ", err)
-				return err
 			}
 		}
-		
-		_,_ = s.Db.AddTestToProtocolByCategoryAndUrgency(ctx, database.AddTestToProtocolByCategoryAndUrgencyParams{
-			ProtocolID: protocol.ID,
-			TestID: add.ID,
-			Category: database.CategoryEnumBaseline,
-			Urgency: database.UrgencyEnumNonUrgent,
-		})
-
 	}
-
-	
-	// Create Tests, If clinically indicated
-	
-	for _, test := range payload.Tests.Baseline.IfClinicallyIndicated {
-		add,err := s.Db.AddTest(ctx, database.AddTestParams{
-			Name: test,
-		})
-		if err != nil {
-			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
-				// Duplicate key value violation
-				add,err = s.Db.GetTestByName(ctx, test)
-					
-				if err != nil {
-					fmt.Println("Error getting test: ", err)
-					return err
-				}
-			} else {
-				fmt.Println("Error creating test: ", err)
-				return err
-			}
-		}
 		
-		_,_ = s.Db.AddTestToProtocolByCategoryAndUrgency(ctx, database.AddTestToProtocolByCategoryAndUrgencyParams{
-			ProtocolID: protocol.ID,
-			TestID: add.ID,
-			Category: database.CategoryEnumBaseline,
-			Urgency: database.UrgencyEnumIfNecessary,
-		})
-
-	}	
-
-	// Create Tests, follow-up
-	
-	for _, test := range payload.Tests.FollowUp.Required {
-		add,err := s.Db.AddTest(ctx, database.AddTestParams{
-			Name: test,
-		})
-		if err != nil {
-			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
-				// Duplicate key value violation
-				add,err = s.Db.GetTestByName(ctx, test)
-					
-				if err != nil {
-					fmt.Println("Error getting test: ", err)
-					return err
-				}
-			} else {
-				fmt.Println("Error creating test: ", err)
-				return err
-			}
-		}
-		
-		_,_ = s.Db.AddTestToProtocolByCategoryAndUrgency(ctx, database.AddTestToProtocolByCategoryAndUrgencyParams{
-			ProtocolID: protocol.ID,
-			TestID: add.ID,
-			Category: database.CategoryEnumFollowup,
-			Urgency: database.UrgencyEnumUrgent,
-		})
-
-	}
-
-	// Create Tests, if necessary
-	
-	for _, test := range payload.Tests.FollowUp.IfClinicallyIndicated {
-		add,err := s.Db.AddTest(ctx, database.AddTestParams{
-			Name: test,
-		})
-		if err != nil {
-			if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
-				// Duplicate key value violation
-				add,err = s.Db.GetTestByName(ctx, test)
-					
-				if err != nil {
-					fmt.Println("Error getting test: ", err)
-					return err
-				}
-			} else {
-				fmt.Println("Error creating test: ", err)
-				return err
-			}
-		}
-		
-		_,_ = s.Db.AddTestToProtocolByCategoryAndUrgency(ctx, database.AddTestToProtocolByCategoryAndUrgencyParams{
-			ProtocolID: protocol.ID,
-			TestID: add.ID,
-			Category: database.CategoryEnumFollowup,
-			Urgency: database.UrgencyEnumIfNecessary,
-		})
-		
-	}
-	
 
 	// Create Toxicity Modifications
 	
@@ -697,7 +592,7 @@ func GetAiData(s *config.Config,proto string) error {
 			}		
 
 			treatment,err := s.Db.AddProtocolTreatment(ctx, database.AddProtocolTreatmentParams{
-				Medication: med.ID,
+				MedicationID: med.ID,
 				Dose: treatx.Dose,
 				Route: treatx.Route,
 				Frequency: treatx.Frequency,
@@ -710,7 +605,7 @@ func GetAiData(s *config.Config,proto string) error {
 					// Duplicate key value violation
 					fmt.Println("Treatment Record already exists so retrieving from database.")
 					treatment,err = s.Db.GetProtocolTreatmentByData(ctx, database.GetProtocolTreatmentByDataParams{
-						Medication: med.ID,
+						MedicationID: med.ID,
 						Dose: treatx.Dose,
 						Route: treatx.Route,
 						Frequency: treatx.Frequency,

@@ -4,7 +4,7 @@ VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- name: AddPrescription :one
-INSERT INTO medication_prescription (medication, dose, route, frequency, duration, instructions, renewals)
+INSERT INTO medication_prescription (medication_id, dose, route, frequency, duration, instructions, renewals)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 
@@ -12,14 +12,14 @@ RETURNING *;
 WITH input_values(id, name, description, category,alternate_names) AS (
   VALUES (
     CASE 
-      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      WHEN @id = '00000000-0000-0000-0000-000000000000'::uuid 
       THEN gen_random_uuid() 
-      ELSE $1 
+      ELSE @id 
     END,
-    $2,
-    $3,
-    $4,
-    $5::TEXT[]
+    @name,
+    @description,
+    @category,
+    @alternate_names::TEXT[]
   )
 )
 INSERT INTO medications (id, name, description, category,alternate_names)
@@ -33,26 +33,26 @@ SET name = EXCLUDED.name,
 RETURNING *;
 
 -- name: UpsertPrescription :one
-WITH input_values(id, medication, dose, route, frequency, duration, instructions, renewals) AS (
+WITH input_values(id, medication_id, dose, route, frequency, duration, instructions, renewals) AS (
   VALUES (
     CASE 
-      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      WHEN @id = '00000000-0000-0000-0000-000000000000'::uuid 
       THEN gen_random_uuid() 
-      ELSE $1::uuid 
+      ELSE @id::uuid 
     END,
-    $2::uuid,
-    $3,
-    $4::prescription_route_enum,
-    $5,
-    $6,
-    $7,
-    $8::int
+    @medication_id::uuid,
+    @dose,
+    @route::prescription_route_enum,
+    @frequency,
+    @duration,
+    @instructions,
+    @renewals::int
   )
 )
-INSERT INTO medication_prescription (id, medication, dose, route, frequency, duration, instructions, renewals)
-SELECT id, medication, dose, route, frequency, duration, instructions, renewals FROM input_values
+INSERT INTO medication_prescription (id, medication_id, dose, route, frequency, duration, instructions, renewals)
+SELECT id, medication_id, dose, route, frequency, duration, instructions, renewals FROM input_values
 ON CONFLICT (id) DO UPDATE
-SET medication = EXCLUDED.medication,
+SET medication_id = EXCLUDED.medication_id,
     dose = EXCLUDED.dose,
     route = EXCLUDED.route,
     frequency = EXCLUDED.frequency,

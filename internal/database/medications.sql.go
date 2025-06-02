@@ -80,13 +80,13 @@ func (q *Queries) AddMedicationModification(ctx context.Context, arg AddMedicati
 }
 
 const addPrescription = `-- name: AddPrescription :one
-INSERT INTO medication_prescription (medication, dose, route, frequency, duration, instructions, renewals)
+INSERT INTO medication_prescription (medication_id, dose, route, frequency, duration, instructions, renewals)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, created_at, updated_at, medication, dose, route, frequency, duration, instructions, renewals
+RETURNING id, created_at, updated_at, medication_id, dose, route, frequency, duration, instructions, renewals
 `
 
 type AddPrescriptionParams struct {
-	Medication   uuid.UUID             `json:"medication"`
+	MedicationID uuid.UUID             `json:"medication_id"`
 	Dose         string                `json:"dose"`
 	Route        PrescriptionRouteEnum `json:"route"`
 	Frequency    string                `json:"frequency"`
@@ -97,7 +97,7 @@ type AddPrescriptionParams struct {
 
 func (q *Queries) AddPrescription(ctx context.Context, arg AddPrescriptionParams) (MedicationPrescription, error) {
 	row := q.db.QueryRowContext(ctx, addPrescription,
-		arg.Medication,
+		arg.MedicationID,
 		arg.Dose,
 		arg.Route,
 		arg.Frequency,
@@ -110,7 +110,7 @@ func (q *Queries) AddPrescription(ctx context.Context, arg AddPrescriptionParams
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.Medication,
+		&i.MedicationID,
 		&i.Dose,
 		&i.Route,
 		&i.Frequency,
@@ -757,20 +757,20 @@ RETURNING id, created_at, updated_at, name, description, alternate_names, catego
 `
 
 type UpsertMedicationParams struct {
-	Column1 interface{} `json:"column_1"`
-	Column2 interface{} `json:"column_2"`
-	Column3 interface{} `json:"column_3"`
-	Column4 interface{} `json:"column_4"`
-	Column5 []string    `json:"column_5"`
+	ID             interface{} `json:"id"`
+	Name           interface{} `json:"name"`
+	Description    interface{} `json:"description"`
+	Category       interface{} `json:"category"`
+	AlternateNames []string    `json:"alternate_names"`
 }
 
 func (q *Queries) UpsertMedication(ctx context.Context, arg UpsertMedicationParams) (Medication, error) {
 	row := q.db.QueryRowContext(ctx, upsertMedication,
-		arg.Column1,
-		arg.Column2,
-		arg.Column3,
-		arg.Column4,
-		pq.Array(arg.Column5),
+		arg.ID,
+		arg.Name,
+		arg.Description,
+		arg.Category,
+		pq.Array(arg.AlternateNames),
 	)
 	var i Medication
 	err := row.Scan(
@@ -827,7 +827,7 @@ func (q *Queries) UpsertMedicationModification(ctx context.Context, arg UpsertMe
 }
 
 const upsertPrescription = `-- name: UpsertPrescription :one
-WITH input_values(id, medication, dose, route, frequency, duration, instructions, renewals) AS (
+WITH input_values(id, medication_id, dose, route, frequency, duration, instructions, renewals) AS (
   VALUES (
     CASE 
       WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
@@ -843,10 +843,10 @@ WITH input_values(id, medication, dose, route, frequency, duration, instructions
     $8::int
   )
 )
-INSERT INTO medication_prescription (id, medication, dose, route, frequency, duration, instructions, renewals)
-SELECT id, medication, dose, route, frequency, duration, instructions, renewals FROM input_values
+INSERT INTO medication_prescription (id, medication_id, dose, route, frequency, duration, instructions, renewals)
+SELECT id, medication_id, dose, route, frequency, duration, instructions, renewals FROM input_values
 ON CONFLICT (id) DO UPDATE
-SET medication = EXCLUDED.medication,
+SET medication_id = EXCLUDED.medication_id,
     dose = EXCLUDED.dose,
     route = EXCLUDED.route,
     frequency = EXCLUDED.frequency,
@@ -854,37 +854,37 @@ SET medication = EXCLUDED.medication,
     instructions = EXCLUDED.instructions,
     renewals = EXCLUDED.renewals,
     updated_at = NOW()
-RETURNING id, created_at, updated_at, medication, dose, route, frequency, duration, instructions, renewals
+RETURNING id, created_at, updated_at, medication_id, dose, route, frequency, duration, instructions, renewals
 `
 
 type UpsertPrescriptionParams struct {
-	Column1 interface{}           `json:"column_1"`
-	Column2 uuid.UUID             `json:"column_2"`
-	Column3 interface{}           `json:"column_3"`
-	Column4 PrescriptionRouteEnum `json:"column_4"`
-	Column5 interface{}           `json:"column_5"`
-	Column6 interface{}           `json:"column_6"`
-	Column7 interface{}           `json:"column_7"`
-	Column8 int32                 `json:"column_8"`
+	ID           interface{}           `json:"id"`
+	MedicationID uuid.UUID             `json:"medication_id"`
+	Dose         interface{}           `json:"dose"`
+	Route        PrescriptionRouteEnum `json:"route"`
+	Frequency    interface{}           `json:"frequency"`
+	Duration     interface{}           `json:"duration"`
+	Instructions interface{}           `json:"instructions"`
+	Renewals     int32                 `json:"renewals"`
 }
 
 func (q *Queries) UpsertPrescription(ctx context.Context, arg UpsertPrescriptionParams) (MedicationPrescription, error) {
 	row := q.db.QueryRowContext(ctx, upsertPrescription,
-		arg.Column1,
-		arg.Column2,
-		arg.Column3,
-		arg.Column4,
-		arg.Column5,
-		arg.Column6,
-		arg.Column7,
-		arg.Column8,
+		arg.ID,
+		arg.MedicationID,
+		arg.Dose,
+		arg.Route,
+		arg.Frequency,
+		arg.Duration,
+		arg.Instructions,
+		arg.Renewals,
 	)
 	var i MedicationPrescription
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.Medication,
+		&i.MedicationID,
 		&i.Dose,
 		&i.Route,
 		&i.Frequency,

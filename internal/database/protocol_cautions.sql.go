@@ -498,12 +498,12 @@ SELECT
 `
 
 type UpdateCautionProtocolsParams struct {
-	CautionID uuid.UUID   `json:"caution_id"`
-	Column2   []uuid.UUID `json:"column_2"`
+	CautionID   uuid.UUID   `json:"caution_id"`
+	ProtocolIds []uuid.UUID `json:"protocol_ids"`
 }
 
 func (q *Queries) UpdateCautionProtocols(ctx context.Context, arg UpdateCautionProtocolsParams) error {
-	_, err := q.db.ExecContext(ctx, updateCautionProtocols, arg.CautionID, pq.Array(arg.Column2))
+	_, err := q.db.ExecContext(ctx, updateCautionProtocols, arg.CautionID, pq.Array(arg.ProtocolIds))
 	return err
 }
 
@@ -605,12 +605,12 @@ RETURNING id, created_at, updated_at, description
 `
 
 type UpsertCautionParams struct {
-	Column1 interface{} `json:"column_1"`
-	Column2 interface{} `json:"column_2"`
+	ID          interface{} `json:"id"`
+	Description interface{} `json:"description"`
 }
 
 func (q *Queries) UpsertCaution(ctx context.Context, arg UpsertCautionParams) (ProtocolCaution, error) {
-	row := q.db.QueryRowContext(ctx, upsertCaution, arg.Column1, arg.Column2)
+	row := q.db.QueryRowContext(ctx, upsertCaution, arg.ID, arg.Description)
 	var i ProtocolCaution
 	err := row.Scan(
 		&i.ID,
@@ -627,7 +627,7 @@ WITH input_values(id,title, description) AS (
     CASE 
       WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
       THEN gen_random_uuid() 
-      ELSE $1 
+      ELSE $1
     END,
     $2,
     $3
@@ -643,13 +643,13 @@ RETURNING id, created_at, updated_at, title, description
 `
 
 type UpsertPrecautionParams struct {
-	Column1 interface{} `json:"column_1"`
-	Column2 interface{} `json:"column_2"`
-	Column3 interface{} `json:"column_3"`
+	ID          interface{} `json:"id"`
+	Title       interface{} `json:"title"`
+	Description interface{} `json:"description"`
 }
 
 func (q *Queries) UpsertPrecaution(ctx context.Context, arg UpsertPrecautionParams) (ProtocolPrecaution, error) {
-	row := q.db.QueryRowContext(ctx, upsertPrecaution, arg.Column1, arg.Column2, arg.Column3)
+	row := q.db.QueryRowContext(ctx, upsertPrecaution, arg.ID, arg.Title, arg.Description)
 	var i ProtocolPrecaution
 	err := row.Scan(
 		&i.ID,

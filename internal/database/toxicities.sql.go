@@ -231,6 +231,82 @@ func (q *Queries) GetToxicitiesWithGradesAndAdjustments(ctx context.Context, pro
 	return items, nil
 }
 
+const getToxicitiesWithGradesAndAdjustmentsByProtocol = `-- name: GetToxicitiesWithGradesAndAdjustmentsByProtocol :many
+SELECT 
+    t.id,
+    t.created_at,
+    t.updated_at,
+    t.title,
+    t.category,
+    t.description,
+    COALESCE(
+    JSON_AGG(
+        JSON_BUILD_OBJECT(
+            'id', tg.id,
+            'created_at', tg.created_at,
+            'updated_at', tg.updated_at,
+            'grade', tg.grade,
+            'description', tg.description,
+            'adjustment', ptm.adjustment
+        ) 
+        ORDER BY tg.grade
+        ) FILTER (WHERE tg.id IS NOT NULL),
+        '[]'
+    )::json as grades
+FROM toxicities t
+LEFT JOIN toxicity_grades tg ON tg.toxicity_id = t.id
+LEFT JOIN protocol_tox_modifications ptm 
+  ON ptm.toxicity_grade_id = tg.id 
+  AND ptm.protocol_id = $1
+WHERE EXISTS (
+  SELECT 1 FROM protocol_tox_modifications ptm2
+  JOIN toxicity_grades tg2 ON ptm2.toxicity_grade_id = tg2.id
+  WHERE tg2.toxicity_id = t.id AND ptm2.protocol_id = $1
+)
+GROUP BY t.id
+`
+
+type GetToxicitiesWithGradesAndAdjustmentsByProtocolRow struct {
+	ID          uuid.UUID       `json:"id"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+	Title       string          `json:"title"`
+	Category    string          `json:"category"`
+	Description string          `json:"description"`
+	Grades      json.RawMessage `json:"grades"`
+}
+
+func (q *Queries) GetToxicitiesWithGradesAndAdjustmentsByProtocol(ctx context.Context, protocolID uuid.UUID) ([]GetToxicitiesWithGradesAndAdjustmentsByProtocolRow, error) {
+	rows, err := q.db.QueryContext(ctx, getToxicitiesWithGradesAndAdjustmentsByProtocol, protocolID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetToxicitiesWithGradesAndAdjustmentsByProtocolRow{}
+	for rows.Next() {
+		var i GetToxicitiesWithGradesAndAdjustmentsByProtocolRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Title,
+			&i.Category,
+			&i.Description,
+			&i.Grades,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getToxicityByID = `-- name: GetToxicityByID :one
 SELECT
     t.id AS id,

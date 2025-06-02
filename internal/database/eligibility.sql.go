@@ -369,12 +369,12 @@ SELECT
 `
 
 type UpdateEligibilityProtocolsParams struct {
-	CriteriaID uuid.UUID   `json:"criteria_id"`
-	Column2    []uuid.UUID `json:"column_2"`
+	CriteriaID  uuid.UUID   `json:"criteria_id"`
+	ProtocolIds []uuid.UUID `json:"protocol_ids"`
 }
 
 func (q *Queries) UpdateEligibilityProtocols(ctx context.Context, arg UpdateEligibilityProtocolsParams) error {
-	_, err := q.db.ExecContext(ctx, updateEligibilityProtocols, arg.CriteriaID, pq.Array(arg.Column2))
+	_, err := q.db.ExecContext(ctx, updateEligibilityProtocols, arg.CriteriaID, pq.Array(arg.ProtocolIds))
 	return err
 }
 
@@ -401,13 +401,13 @@ RETURNING id, created_at, updated_at, type, description
 `
 
 type UpsertEligibilityCriteriaParams struct {
-	Column1 interface{}     `json:"column_1"`
-	Column2 EligibilityEnum `json:"column_2"`
-	Column3 interface{}     `json:"column_3"`
+	ID          interface{}     `json:"id"`
+	Type        EligibilityEnum `json:"type"`
+	Description interface{}     `json:"description"`
 }
 
 func (q *Queries) UpsertEligibilityCriteria(ctx context.Context, arg UpsertEligibilityCriteriaParams) (ProtocolEligibilityCriterium, error) {
-	row := q.db.QueryRowContext(ctx, upsertEligibilityCriteria, arg.Column1, arg.Column2, arg.Column3)
+	row := q.db.QueryRowContext(ctx, upsertEligibilityCriteria, arg.ID, arg.Type, arg.Description)
 	var i ProtocolEligibilityCriterium
 	err := row.Scan(
 		&i.ID,

@@ -141,7 +141,7 @@ func HandleUpsertTreatment(c *config.Config, w http.ResponseWriter, r *http.Requ
 	
 	raw_tx,err := c.Db.UpsertProtocolTreatment(ctx,database.UpsertProtocolTreatmentParams{
 		ID: pid,
-		Medication: mid,
+		MedicationID: mid,
 		Dose: req.Dose,
 		Route: req.Route,
 		Frequency: req.Frequency,
@@ -165,7 +165,7 @@ func HandleUpsertTreatment(c *config.Config, w http.ResponseWriter, r *http.Requ
 		AdministrationGuide string `json:"administration_guide"`		
 	}{
 		ID:                  raw_tx.ID.String(),
-		MedicationID:        raw_tx.Medication.String(),
+		MedicationID:        raw_tx.MedicationID.String(),
 		Dose:                raw_tx.Dose,
 		Route:               raw_tx.Route,
 		Frequency:           raw_tx.Frequency,

@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/google/uuid"
 )
@@ -212,6 +213,73 @@ func (q *Queries) GetTestsByCategory(ctx context.Context, testCategory string) (
 	return items, nil
 }
 
+const getTestsByProtocol = `-- name: GetTestsByProtocol :one
+SELECT jsonb_build_object(
+  'tests', jsonb_build_object(
+    'baseline', jsonb_build_object(
+      'urgent', COALESCE((
+        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
+          SELECT 
+            json_build_object(
+              'id', tst.id,
+              'name', tst.name,
+              'description', tst.description
+            ) AS test
+          FROM tests tst
+          JOIN protocol_tests pt ON pt.test_id = tst.id
+          WHERE pt.protocol_id = $1 AND pt.category = 'baseline' AND pt.urgency = 'urgent'
+        ) sub
+      ), '[]'::jsonb),
+      
+      'non_urgent', COALESCE((
+        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
+          SELECT json_build_object('id', tst.id, 'name', tst.name, 'description', tst.description) AS test
+          FROM tests tst
+          JOIN protocol_tests pt ON pt.test_id = tst.id
+          WHERE pt.protocol_id = $1 AND pt.category = 'baseline' AND pt.urgency = 'non_urgent'
+        ) t
+      ), '[]'::jsonb),
+
+      'if_necessary', COALESCE((
+        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
+          SELECT json_build_object('id', tst.id, 'name', tst.name, 'description', tst.description) AS test
+          FROM tests tst
+          JOIN protocol_tests pt ON pt.test_id = tst.id
+          WHERE pt.protocol_id = $1 AND pt.category = 'baseline' AND pt.urgency = 'if_necessary'
+        ) t
+      ), '[]'::jsonb)
+    ),
+
+    'followup', jsonb_build_object(
+      'urgent', COALESCE((
+        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
+          SELECT json_build_object('id', tst.id, 'name', tst.name, 'description', tst.description) AS test
+          FROM tests tst
+          JOIN protocol_tests pt ON pt.test_id = tst.id
+          WHERE pt.protocol_id = $1 AND pt.category = 'followup' AND pt.urgency = 'urgent'
+        ) t
+      ), '[]'::jsonb),
+
+      'if_necessary', COALESCE((
+        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
+          SELECT json_build_object('id', tst.id, 'name', tst.name, 'description', tst.description) AS test
+          FROM tests tst
+          JOIN protocol_tests pt ON pt.test_id = tst.id
+          WHERE pt.protocol_id = $1 AND pt.category = 'followup' AND pt.urgency = 'if_necessary'
+        ) t
+      ), '[]'::jsonb)
+    )
+  )
+) AS tests
+`
+
+func (q *Queries) GetTestsByProtocol(ctx context.Context, protocolID uuid.UUID) (json.RawMessage, error) {
+	row := q.db.QueryRowContext(ctx, getTestsByProtocol, protocolID)
+	var tests json.RawMessage
+	err := row.Scan(&tests)
+	return tests, err
+}
+
 const getTestsByProtocolByCategoryAndUrgency = `-- name: GetTestsByProtocolByCategoryAndUrgency :many
 SELECT t.id, t.created_at, t.updated_at, t.name, t.description, t.form_url, t.unit, t.lower_limit, t.upper_limit, t.test_category
 FROM tests t
@@ -357,26 +425,26 @@ RETURNING id, created_at, updated_at, name, description, form_url, unit, lower_l
 `
 
 type UpsertTestParams struct {
-	Column1 interface{} `json:"column_1"`
-	Column2 interface{} `json:"column_2"`
-	Column3 interface{} `json:"column_3"`
-	Column4 interface{} `json:"column_4"`
-	Column5 interface{} `json:"column_5"`
-	Column6 interface{} `json:"column_6"`
-	Column7 interface{} `json:"column_7"`
-	Column8 interface{} `json:"column_8"`
+	ID           interface{} `json:"id"`
+	Name         interface{} `json:"name"`
+	Description  interface{} `json:"description"`
+	FormUrl      interface{} `json:"form_url"`
+	Unit         interface{} `json:"unit"`
+	LowerLimit   interface{} `json:"lower_limit"`
+	UpperLimit   interface{} `json:"upper_limit"`
+	TestCategory interface{} `json:"test_category"`
 }
 
 func (q *Queries) UpsertTest(ctx context.Context, arg UpsertTestParams) (Test, error) {
 	row := q.db.QueryRowContext(ctx, upsertTest,
-		arg.Column1,
-		arg.Column2,
-		arg.Column3,
-		arg.Column4,
-		arg.Column5,
-		arg.Column6,
-		arg.Column7,
-		arg.Column8,
+		arg.ID,
+		arg.Name,
+		arg.Description,
+		arg.FormUrl,
+		arg.Unit,
+		arg.LowerLimit,
+		arg.UpperLimit,
+		arg.TestCategory,
 	)
 	var i Test
 	err := row.Scan(

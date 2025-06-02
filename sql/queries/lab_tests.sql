@@ -13,17 +13,17 @@ RETURNING *;
 WITH input_values(id, name, description, form_url, unit, lower_limit, upper_limit, test_category) AS (
   VALUES (
     CASE 
-      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      WHEN @id = '00000000-0000-0000-0000-000000000000'::uuid 
       THEN gen_random_uuid() 
-      ELSE $1 
+      ELSE @id 
     END,
-    $2,
-    $3,
-    $4,
-    $5,
-    $6,
-    $7,
-    $8::test_category_enum
+    @name,
+    @description,
+    @form_url,
+    @unit,
+    @lower_limit,
+    @upper_limit,
+    @test_category::test_category_enum
   )
 )
 INSERT INTO tests (id, name, description, form_url, unit, lower_limit, upper_limit, test_category)
@@ -59,6 +59,65 @@ SELECT t.*
 FROM tests t
 JOIN protocol_tests pt ON t.id = pt.test_id
 WHERE pt.protocol_id = $1 AND pt.category = $2 AND pt.urgency = $3;
+
+-- name: GetTestsByProtocol :one
+SELECT jsonb_build_object(
+  'tests', jsonb_build_object(
+    'baseline', jsonb_build_object(
+      'urgent', COALESCE((
+        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
+          SELECT 
+            json_build_object(
+              'id', tst.id,
+              'name', tst.name,
+              'description', tst.description
+            ) AS test
+          FROM tests tst
+          JOIN protocol_tests pt ON pt.test_id = tst.id
+          WHERE pt.protocol_id = $1 AND pt.category = 'baseline' AND pt.urgency = 'urgent'
+        ) sub
+      ), '[]'::jsonb),
+      
+      'non_urgent', COALESCE((
+        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
+          SELECT json_build_object('id', tst.id, 'name', tst.name, 'description', tst.description) AS test
+          FROM tests tst
+          JOIN protocol_tests pt ON pt.test_id = tst.id
+          WHERE pt.protocol_id = $1 AND pt.category = 'baseline' AND pt.urgency = 'non_urgent'
+        ) t
+      ), '[]'::jsonb),
+
+      'if_necessary', COALESCE((
+        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
+          SELECT json_build_object('id', tst.id, 'name', tst.name, 'description', tst.description) AS test
+          FROM tests tst
+          JOIN protocol_tests pt ON pt.test_id = tst.id
+          WHERE pt.protocol_id = $1 AND pt.category = 'baseline' AND pt.urgency = 'if_necessary'
+        ) t
+      ), '[]'::jsonb)
+    ),
+
+    'followup', jsonb_build_object(
+      'urgent', COALESCE((
+        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
+          SELECT json_build_object('id', tst.id, 'name', tst.name, 'description', tst.description) AS test
+          FROM tests tst
+          JOIN protocol_tests pt ON pt.test_id = tst.id
+          WHERE pt.protocol_id = $1 AND pt.category = 'followup' AND pt.urgency = 'urgent'
+        ) t
+      ), '[]'::jsonb),
+
+      'if_necessary', COALESCE((
+        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
+          SELECT json_build_object('id', tst.id, 'name', tst.name, 'description', tst.description) AS test
+          FROM tests tst
+          JOIN protocol_tests pt ON pt.test_id = tst.id
+          WHERE pt.protocol_id = $1 AND pt.category = 'followup' AND pt.urgency = 'if_necessary'
+        ) t
+      ), '[]'::jsonb)
+    )
+  )
+) AS tests;
 
 -- name: AddTestToProtocolByCategoryAndUrgency :one
 INSERT INTO protocol_tests (protocol_id, test_id, category, urgency)

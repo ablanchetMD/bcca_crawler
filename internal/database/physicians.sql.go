@@ -330,20 +330,20 @@ RETURNING id, created_at, updated_at, first_name, last_name, email, site
 `
 
 type UpsertPhysicianParams struct {
-	Column1 interface{}       `json:"column_1"`
-	Column2 interface{}       `json:"column_2"`
-	Column3 interface{}       `json:"column_3"`
-	Column4 interface{}       `json:"column_4"`
-	Column5 PhysicianSiteEnum `json:"column_5"`
+	ID        interface{}       `json:"id"`
+	FirstName interface{}       `json:"first_name"`
+	LastName  interface{}       `json:"last_name"`
+	Email     interface{}       `json:"email"`
+	Site      PhysicianSiteEnum `json:"site"`
 }
 
 func (q *Queries) UpsertPhysician(ctx context.Context, arg UpsertPhysicianParams) (Physician, error) {
 	row := q.db.QueryRowContext(ctx, upsertPhysician,
-		arg.Column1,
-		arg.Column2,
-		arg.Column3,
-		arg.Column4,
-		arg.Column5,
+		arg.ID,
+		arg.FirstName,
+		arg.LastName,
+		arg.Email,
+		arg.Site,
 	)
 	var i Physician
 	err := row.Scan(

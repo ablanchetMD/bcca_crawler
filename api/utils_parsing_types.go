@@ -14,7 +14,7 @@ type ProtocolPayload struct {
 	ProtocolEligibilityCriteria []ProtocolEligibilityCriterion `json:"ProtocolEligibilityCriteria"`
 	ProtocolPrecautions        []ProtocolPrecaution        		`json:"ProtocolPrecautions"`
 	ProtocolCautions		   []ProtocolCaution			   `json:"ProtocolCautions"`
-	Tests                      Tests                     	  `json:"Tests"`
+	Tests                      LabsByProtocol              	  `json:"Tests"`
 	ProtocolCycles             []ProtocolCycle             `json:"ProtocolCycles"`	
 	Toxicities			       []Toxicity      				`json:"Toxicities"`
 	TreatmentModifications	   []MedicationModification    `json:"TreatmentModifications"`
@@ -27,10 +27,10 @@ type ProtocolSumPayload struct {
 	ProtocolEligibilityCriteria []ProtocolEligibilityCriterion 		`json:"eligibility_criteria"`
 	ProtocolPrecautions        []ProtocolPrecaution        			`json:"precautions"`
 	ProtocolCautions		   []ProtocolCaution			   		`json:"cautions"`
-	Tests                      Tests                     	  		`json:"tests"`
+	Tests                      LabsByProtocol              	  		`json:"tests"`
 	ProtocolCycles             []ProtocolCycle             			`json:"cycles"`	
-	Toxicities			       []Toxicity      						`json:"toxicities"`
-	TreatmentModifications	   []MedicationModification    			`json:"TreatmentModifications"`
+	Toxicities			       []ToxicityWithGradesAndAdjustments   `json:"toxicities"`
+	TreatmentModifications	   []MedicationModification    			`json:"treatment_modifications"`
 	Physicians                 []Physician                 			`json:"physicians"`
 	ArticleReferences          []ArticleReference          			`json:"article_references"`
 }
@@ -43,8 +43,8 @@ type ArticleReference struct {
 	Year    string			 `json:"year"`
 	Pmid    string 			`json:"pmid"`
 	Doi     string 			`json:"doi"`
-	CreatedAt   string  		`json:"created_at"`
-    UpdatedAt   string 			`json:"updated_at"`
+	CreatedAt   time.Time    		`json:"created_at"`
+    UpdatedAt   time.Time   			`json:"updated_at"`
 }
 
 type LinkedProtocols struct {
@@ -56,8 +56,8 @@ type Physician struct {
 	ID 	  		uuid.UUID 	`json:"id"`
 	FirstName 	string 		`json:"first_name"`
 	LastName  	string 		`json:"last_name"`
-	CreatedAt   string  		`json:"created_at"`
-    UpdatedAt   string 			`json:"updated_at"`
+	CreatedAt   time.Time    		`json:"created_at"`
+    UpdatedAt   time.Time   			`json:"updated_at"`
 }
 
 type SummaryProtocol struct {
@@ -67,8 +67,8 @@ type SummaryProtocol struct {
 	Name       		string 		`json:"name"`
 	Tags       		[]string 	`json:"tags"`
 	Notes      		string 		`json:"notes"`
-	CreatedOn		string 		`json:"created_on"`
-	UpdatedOn		string		`json:"updated_on"`
+	CreatedAt		time.Time   		`json:"created_at"`
+	UpdatedAt		time.Time  		`json:"updated_at"`
 	RevisedOn  		string 		`json:"revised_on"`
 	ActivatedOn 	string 		`json:"activated_on"`
 	ProtocolUrl 	string 		`json:"protocol_url"`
@@ -81,23 +81,23 @@ type ProtocolEligibilityCriterion struct {
 	ID 			uuid.UUID 					`json:"id"`
 	Type        database.EligibilityEnum 	`json:"type"`
 	Description string 						`json:"description"`
-	CreatedAt   string  		`json:"created_at"`
-    UpdatedAt   string 			`json:"updated_at"`
+	CreatedAt   time.Time    		`json:"created_at"`
+    UpdatedAt   time.Time   			`json:"updated_at"`
 }
 
 type ProtocolPrecaution struct {
 	ID 		uuid.UUID 		`json:"id"`
 	Title       string 		`json:"title"`
 	Description string 		`json:"description"`
-	CreatedAt   string  		`json:"created_at"`
-    UpdatedAt   string 			`json:"updated_at"`
+	CreatedAt   time.Time    		`json:"created_at"`
+    UpdatedAt   time.Time   			`json:"updated_at"`
 }
 
 type ProtocolCaution struct {	
 	ID 		uuid.UUID 		`json:"id"`
 	Description string 		`json:"description"`
-	CreatedAt   string  		`json:"created_at"`
-    UpdatedAt   string 			`json:"updated_at"`
+	CreatedAt   time.Time    		`json:"created_at"`
+    UpdatedAt   time.Time   			`json:"updated_at"`
 }
 
 type Treatment struct {
@@ -109,31 +109,25 @@ type Treatment struct {
 	Frequency             string                 `json:"frequency"`
 	Duration              string                 `json:"duration"`
 	AdministrationGuide   string                 `json:"administration_guide"`
-	CreatedAt			  string                 `json:"created_at"`
-	UpdatedAt			  string                 `json:"updated_at"`	
+	CreatedAt			  time.Time                   `json:"created_at"`
+	UpdatedAt			  time.Time                   `json:"updated_at"`	
 }
 
-type Tests struct {
-	Baseline BaselineTests `json:"baseline"`
-	FollowUp FollowUpTests `json:"follow_up"`
+type LabsByProtocol struct {
+	Tests map[string]map[string][]LabSummary `json:"tests"`
 }
 
-type BaselineTests struct {
-	RequiredBeforeTreatment []string `json:"required_before_treatment"`
-	RequiredButCanProceed   []string `json:"required_but_can_proceed"`
-	IfClinicallyIndicated   []string `json:"if_clinically_indicated"`
-}
-
-type FollowUpTests struct {
-	Required               []string `json:"required"`
-	IfClinicallyIndicated  []string `json:"if_clinically_indicated"`
+type LabSummary struct {
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
 }
 
 type MedicationModification struct {
 	MedicationID			uuid.UUID 						`json:"medication_id"`	
 	Medication  			string 							`json:"medication"`
-	CreatedAt   string  		`json:"created_at"`
-    UpdatedAt   string 			`json:"updated_at"`
+	CreatedAt   time.Time    		`json:"created_at"`
+    UpdatedAt   time.Time   			`json:"updated_at"`
 	ModificationCategory 	[]ModificationCategory 			`json:"modification_category"`
 }
 
@@ -144,8 +138,8 @@ type ModificationCategory struct {
 
 type Modifications struct {
 	ID          uuid.UUID 		`json:"id"`
-	CreatedAt   string  		`json:"created_at"`
-    UpdatedAt   string 			`json:"updated_at"`
+	CreatedAt   time.Time    		`json:"created_at"`
+    UpdatedAt   time.Time   			`json:"updated_at"`
 	Description string 			`json:"description"`
 	Adjustment  string			`json:"adjustment"`
 }
@@ -155,8 +149,8 @@ type ToxicityModification struct {
 	ID          uuid.UUID `json:"id"`
 	GradeID     uuid.UUID `json:"grade_id"`	
 	Grade       string    `json:"grade"`
-	CreatedAt   string  		`json:"created_at"`
-    UpdatedAt   string 			`json:"updated_at"`
+	CreatedAt   time.Time    		`json:"created_at"`
+    UpdatedAt   time.Time   			`json:"updated_at"`
 	GradeDescription string `json:"grade_description"`
 	Adjustment  string `json:"Adjustment"`
 }
@@ -164,8 +158,8 @@ type ToxicityModification struct {
 type Toxicity struct {	
 	ID            uuid.UUID `json:"id"`
 	Title         string `json:"title"`
-	CreatedAt   string  		`json:"created_at"`
-    UpdatedAt   string 			`json:"updated_at"`
+	CreatedAt   time.Time    		`json:"created_at"`
+    UpdatedAt   time.Time   			`json:"updated_at"`
 	Description   string `json:"description"`
 	Category      string `json:"category"`
 	Modifications []ToxicityModification `json:"modifications"`
@@ -173,16 +167,16 @@ type Toxicity struct {
 
 type ToxicityGrade struct {
     ID          uuid.UUID  		`json:"id"`
-    CreatedAt   string  		`json:"created_at"`
-    UpdatedAt   string 			`json:"updated_at"`
+    CreatedAt   time.Time    		`json:"created_at"`
+    UpdatedAt   time.Time   			`json:"updated_at"`
     Grade       string    		 `json:"grade"`
     Description string    		 `json:"description"`
 }
 
 type ToxicityWithGrades struct {
     ID          uuid.UUID        `json:"id"`
-    CreatedAt   string        	 `json:"created_at"`
-    UpdatedAt   string           `json:"updated_at"`
+    CreatedAt   time.Time       `json:"created_at"`
+    UpdatedAt   time.Time       `json:"updated_at"`
     Title       string           `json:"title"`
     Category    string           `json:"category"`
     Description string           `json:"description"`
@@ -208,6 +202,40 @@ type ToxicityWithGradesAndAdjustments struct {
     Grades      []ToxicityGradeWithAdjustment `json:"grades"`
 }
 
+func ParseLinkedProtocols(data any) ([]LinkedProtocols, error) {
+	bytes, ok := data.([]byte)
+	if !ok {
+		return nil, fmt.Errorf("expected []byte but got %T", data)
+	}
+	var protocols []LinkedProtocols
+	if err := json.Unmarshal(bytes, &protocols); err != nil {
+		return nil, err
+	}
+	return protocols, nil
+}
+
+func GetCategoryAndUrgency(categoryKey, urgencyKey string) (database.CategoryEnum, database.UrgencyEnum, error) {
+	switch categoryKey {
+	case "Baseline":
+		switch urgencyKey {
+		case "RequiredBeforeTreatment":
+			return database.CategoryEnumBaseline, database.UrgencyEnumUrgent, nil
+		case "RequiredButCanProceed":
+			return database.CategoryEnumBaseline, database.UrgencyEnumNonUrgent, nil
+		case "IfClinicallyIndicated":
+			return database.CategoryEnumBaseline, database.UrgencyEnumIfNecessary, nil
+		}
+	case "FollowUp":
+		switch urgencyKey {
+		case "Required":
+			return database.CategoryEnumFollowup, database.UrgencyEnumUrgent, nil
+		case "IfClinicallyIndicated":
+			return database.CategoryEnumFollowup, database.UrgencyEnumIfNecessary, nil
+		}
+	}
+	return "", "", fmt.Errorf("unknown category or urgency: %s -> %s", categoryKey, urgencyKey)
+}
+
 
 // Conversion function
 func MapToToxicityWithGrades(row database.GetToxicitiesWithGradesRow) (ToxicityWithGrades, error) {
@@ -220,8 +248,8 @@ func MapToToxicityWithGrades(row database.GetToxicitiesWithGradesRow) (ToxicityW
 
 	return ToxicityWithGrades{
 		ID:          row.ID,
-		CreatedAt:   row.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-		UpdatedAt:   row.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),
+		CreatedAt:   row.CreatedAt,
+		UpdatedAt:   row.UpdatedAt,
 		Title:       row.Title,
 		Category:    row.Category,
 		Description: row.Description,
@@ -237,8 +265,8 @@ func MapToToxicityWithGradesOne(row database.GetToxicityByIDRow) (ToxicityWithGr
     
     return ToxicityWithGrades{
         ID:          row.ID,
-        CreatedAt:   row.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-        UpdatedAt:   row.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),
+        CreatedAt:   row.CreatedAt,
+        UpdatedAt:   row.UpdatedAt,
         Title:       row.Title,
         Category:    row.Category,
         Description: row.Description,
@@ -263,11 +291,28 @@ func MapToToxicityWithGradesAndAdjustments(row database.GetToxicitiesWithGradesA
     }, nil
 }
 
+func MapToToxicityWithGradesAndAdjustmentsByProtocol(row database.GetToxicitiesWithGradesAndAdjustmentsByProtocolRow) (ToxicityWithGradesAndAdjustments, error) {
+    var grades []ToxicityGradeWithAdjustment
+    if err := json.Unmarshal(row.Grades, &grades); err != nil {
+        return ToxicityWithGradesAndAdjustments{}, err
+    }
+    
+    return ToxicityWithGradesAndAdjustments{
+        ID:          row.ID,
+        CreatedAt:   row.CreatedAt,
+        UpdatedAt:   row.UpdatedAt,
+        Title:       row.Title,
+        Category:    row.Category,
+        Description: row.Description,
+        Grades:      grades,
+    }, nil
+}
+
 func MapToToxicityGrade(tox database.ToxicityGrade) ToxicityGrade {
 	return ToxicityGrade{
 		ID:          tox.ID,
-		CreatedAt:   tox.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-		UpdatedAt:   tox.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),		
+		CreatedAt:   tox.CreatedAt,
+		UpdatedAt:   tox.UpdatedAt,		
 		Description: tox.Description,		
 		Grade:      string(tox.Grade),
 	}
@@ -280,27 +325,7 @@ type ProtocolCycle struct {
 	Treatments    []Treatment    `json:"Treatments"`
 }
 
-type MedicationResp struct {
-	ID 			string `json:"id"`
-	Name 		string `json:"name"`
-	Description string `json:"description"`
-	CreatedAt 	string `json:"created_at"`
-	UpdatedAt 	string `json:"updated_at"`
-	Category 	string `json:"category"`
-	AlternateNames []string `json:"alternate_names"`
-}
 
-func MapMedication(src database.Medication) MedicationResp {
-	return MedicationResp{
-		ID:          src.ID.String(),
-		Name:        src.Name,
-		CreatedAt:   src.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-		UpdatedAt:   src.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-		Description: src.Description,
-		Category:    src.Category,
-		AlternateNames: src.AlternateNames,
-	}
-}
 
 type MedModificationResp struct {
 	ID 			string `json:"id"`
@@ -321,67 +346,6 @@ func MapMedModification(src database.MedicationModification) MedModificationResp
 	}
 }
 
-type PrescriptionResp struct {
-	ID 			string `json:"id"`
-	MedicationID string `json:"medication_id"`
-	MedicationName string `json:"medication_name"`
-	CreatedAt 	string `json:"created_at"`
-	UpdatedAt 	string `json:"updated_at"`
-	Dose 		string `json:"dose"`
-	Route 		string `json:"route"`
-	Frequency 	string `json:"frequency"`
-	Duration 	string `json:"duration"`
-	Instructions string `json:"instructions"`
-	Renewals 	int32 `json:"renewals"`
-}
-
-func MapPrescriptionByProtByCat(src database.GetPrescriptionsByProtocolByCategoryRow) PrescriptionResp {
-	return PrescriptionResp{
-		ID:            src.MedicationPrescriptionID.String(),
-		MedicationID:  src.MedicationID.String(),
-		MedicationName: src.Name,
-		CreatedAt:   src.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-		UpdatedAt:   src.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-		Dose:          src.Dose,
-		Route:         string(src.Route),
-		Frequency:     src.Frequency,
-		Duration:      src.Duration,
-		Instructions:  src.Instructions,
-		Renewals:      src.Renewals,
-	}
-}
-
-func MapPrescriptionsByID(src database.GetPrescriptionByIDRow) PrescriptionResp {
-	return PrescriptionResp{
-		ID:            src.MedicationPrescriptionID.String(),
-		MedicationID:  src.MedicationID.String(),
-		MedicationName: src.Name,
-		CreatedAt:   src.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-		UpdatedAt:   src.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-		Dose:          src.Dose,
-		Route:         string(src.Route),
-		Frequency:     src.Frequency,
-		Duration:      src.Duration,
-		Instructions:  src.Instructions,
-		Renewals:      src.Renewals,
-	}
-}
-
-func MapPrescription(src database.GetPrescriptionsRow) PrescriptionResp {
-	return PrescriptionResp{
-		ID:            src.MedicationPrescriptionID.String(),
-		MedicationID:  src.MedicationID.String(),
-		MedicationName: src.Name,
-		CreatedAt:   src.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-		UpdatedAt:   src.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-		Dose:          src.Dose,
-		Route:         string(src.Route),
-		Frequency:     src.Frequency,
-		Duration:      src.Duration,
-		Instructions:  src.Instructions,
-		Renewals:      src.Renewals,
-	}
-}
 
 func mapArticleRef(src database.ArticleReference) ArticleReference {
 	
@@ -414,42 +378,20 @@ func mapSummaryProtocol(src database.Protocol) SummaryProtocol {
 		Notes:      src.Notes,
 		ProtocolUrl: src.ProtocolUrl,
 		HandOutUrl: src.PatientHandoutUrl,
+		CreatedAt: src.CreatedAt,
+		UpdatedAt: src.UpdatedAt,
 	}
 }
 
-type LabResp struct {
-	ID 			string `json:"id"`
-	Name 		string `json:"name"`
-	CreatedAt 	string `json:"created_at"`
-	UpdatedAt 	string `json:"updated_at"`
-	Description string `json:"description"`
-	FormUrl 	string `json:"form_url"`
-	Unit 		string `json:"unit"`
-	LowerLimit 	float64 `json:"lower_limit"`
-	UpperLimit 	float64 `json:"upper_limit"`
-	TestCategory string `json:"test_category"`	
-}
 
-func MapLab(src database.Test) LabResp {
-	return LabResp{
-		ID:          src.ID.String(),
-		Name:       src.Name,
-		CreatedAt:   src.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-		UpdatedAt:   src.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-		Description: src.Description,
-		FormUrl:     src.FormUrl,
-		Unit:        src.Unit,
-		LowerLimit:  src.LowerLimit,
-		UpperLimit:  src.UpperLimit,
-		TestCategory: src.TestCategory,
-	}
-}
 
 func MapEligibilityCriterion(src database.ProtocolEligibilityCriterium) ProtocolEligibilityCriterion {
 	return ProtocolEligibilityCriterion{
 		ID: 		src.ID,
 		Type:        src.Type,
 		Description: src.Description,
+		CreatedAt: src.CreatedAt,
+		UpdatedAt: src.UpdatedAt,
 	}
 }
 
@@ -458,6 +400,8 @@ func MapPrecaution(src database.ProtocolPrecaution) ProtocolPrecaution {
 		ID: 		src.ID,
 		Title:       src.Title,
 		Description: src.Description,
+		CreatedAt: src.CreatedAt,
+		UpdatedAt: src.UpdatedAt,
 	}
 }
 
@@ -465,6 +409,8 @@ func MapCaution(src database.ProtocolCaution) ProtocolCaution {
 	return ProtocolCaution{
 		ID: 		src.ID,
 		Description: src.Description,
+		CreatedAt: src.CreatedAt,
+		UpdatedAt: src.UpdatedAt,
 	}
 }
 
@@ -482,8 +428,8 @@ func MapTreatment(src database.GetTreatmentsRow) Treatment {
 		ID:                    src.TreatmentID,
 		MedicationID: 		   src.MedicationID,
 		MedicationName:        src.MedicationName,
-		CreatedAt:             src.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-		UpdatedAt:             src.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),		
+		CreatedAt:             src.CreatedAt,
+		UpdatedAt:             src.UpdatedAt,		
 		Dose:                  src.Dose,
 		Route:                 src.Route,
 		Frequency:             src.Frequency,
@@ -497,8 +443,8 @@ func MapTreatmentByCycle(src database.GetTreatmentsByCycleRow) Treatment {
 		ID:                    src.TreatmentID,
 		MedicationID: 		   src.MedicationID,
 		MedicationName:        src.MedicationName,
-		CreatedAt:             src.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-		UpdatedAt:             src.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),		
+		CreatedAt:             src.CreatedAt,
+		UpdatedAt:             src.UpdatedAt,		
 		Dose:                  src.Dose,
 		Route:                 src.Route,
 		Frequency:             src.Frequency,
@@ -512,8 +458,8 @@ func MapTreatmentByID(src database.GetProtocolTreatmentByIDRow) Treatment {
 		ID:                    src.TreatmentID,
 		MedicationID: 		   src.MedicationID,
 		MedicationName:        src.MedicationName,
-		CreatedAt:             src.CreatedAt.Format(`"2006-01-02 15:04:05 MST"`),
-		UpdatedAt:             src.UpdatedAt.Format(`"2006-01-02 15:04:05 MST"`),		
+		CreatedAt:             src.CreatedAt,
+		UpdatedAt:             src.UpdatedAt,		
 		Dose:                  src.Dose,
 		Route:                 src.Route,
 		Frequency:             src.Frequency,
@@ -525,7 +471,7 @@ func MapTreatmentByID(src database.GetProtocolTreatmentByIDRow) Treatment {
 
 
 func mapTest(src []database.Test) []string {
-	var tests []string
+	tests := make([]string, 0, len(src))
 	for _, t := range src {
 		tests = append(tests, t.Name)
 	}

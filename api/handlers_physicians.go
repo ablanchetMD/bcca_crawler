@@ -91,11 +91,11 @@ func HandleUpsertPhysician(c *config.Config, w http.ResponseWriter, r *http.Requ
 	}		
 	
 	raw, err := c.Db.UpsertPhysician(ctx, database.UpsertPhysicianParams{
-		Column1: pid,
-		Column2: req.FirstName,
-		Column3: req.LastName,
-		Column4: req.Email,
-		Column5: database.PhysicianSiteEnum(req.Site),		
+		ID: pid,
+		FirstName: req.FirstName,
+		LastName: req.LastName,
+		Email: req.Email,
+		Site: database.PhysicianSiteEnum(req.Site),		
 	})
 
 	if err != nil {

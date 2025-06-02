@@ -20,16 +20,16 @@ RETURNING *;
 WITH input_values(id, title, authors, journal, year, doi, pmid) AS (
   VALUES (
     CASE 
-      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      WHEN @id = '00000000-0000-0000-0000-000000000000'::uuid 
       THEN gen_random_uuid() 
-      ELSE $1 
+      ELSE @id
     END,
-    $2,
-    $3,
-    $4,
-    $5,
-    $6,
-    $7
+    @title,
+    @authors,
+    @journal,
+    @year,
+    @doi,
+    @pmid
   )
 )
 INSERT INTO article_references (id, title, authors, journal, year, doi, pmid)
