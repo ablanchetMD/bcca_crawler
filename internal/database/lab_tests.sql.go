@@ -54,34 +54,19 @@ func (q *Queries) AddTest(ctx context.Context, arg AddTestParams) (Test, error) 
 	return i, err
 }
 
-const addTestToProtocolByCategoryAndUrgency = `-- name: AddTestToProtocolByCategoryAndUrgency :one
-INSERT INTO protocol_tests (protocol_id, test_id, category, urgency)
-VALUES ($1, $2, $3, $4)
-RETURNING protocol_id, test_id, category, urgency
+const addTestToProtoTestCategory = `-- name: AddTestToProtoTestCategory :exec
+INSERT INTO protocol_tests_value (protocol_tests_id, tests_id)
+VALUES ($1, $2)
 `
 
-type AddTestToProtocolByCategoryAndUrgencyParams struct {
-	ProtocolID uuid.UUID    `json:"protocol_id"`
-	TestID     uuid.UUID    `json:"test_id"`
-	Category   CategoryEnum `json:"category"`
-	Urgency    UrgencyEnum  `json:"urgency"`
+type AddTestToProtoTestCategoryParams struct {
+	ProtocolTestsID uuid.UUID `json:"protocol_tests_id"`
+	TestsID         uuid.UUID `json:"tests_id"`
 }
 
-func (q *Queries) AddTestToProtocolByCategoryAndUrgency(ctx context.Context, arg AddTestToProtocolByCategoryAndUrgencyParams) (ProtocolTest, error) {
-	row := q.db.QueryRowContext(ctx, addTestToProtocolByCategoryAndUrgency,
-		arg.ProtocolID,
-		arg.TestID,
-		arg.Category,
-		arg.Urgency,
-	)
-	var i ProtocolTest
-	err := row.Scan(
-		&i.ProtocolID,
-		&i.TestID,
-		&i.Category,
-		&i.Urgency,
-	)
-	return i, err
+func (q *Queries) AddTestToProtoTestCategory(ctx context.Context, arg AddTestToProtoTestCategoryParams) error {
+	_, err := q.db.ExecContext(ctx, addTestToProtoTestCategory, arg.ProtocolTestsID, arg.TestsID)
+	return err
 }
 
 const deleteTest = `-- name: DeleteTest :exec
@@ -91,6 +76,49 @@ DELETE FROM tests WHERE id = $1
 func (q *Queries) DeleteTest(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, deleteTest, id)
 	return err
+}
+
+const getProtocolTests = `-- name: GetProtocolTests :one
+SELECT COALESCE(jsonb_agg(protocol_tests_data ORDER BY protocol_tests_data.position), '[]'::jsonb) AS data
+FROM (
+  SELECT 
+    pt.id,
+    pt.created_at,
+    pt.updated_at,
+    pt.category,
+    pt.comments,
+    pt.position,
+    COALESCE(tests.tests, '[]'::jsonb) AS tests
+  FROM protocol_tests pt
+  LEFT JOIN LATERAL (
+    SELECT jsonb_agg(
+      jsonb_build_object(
+        'id', t.id,
+        'name', t.name,
+        'created_at', t.created_at,
+        'updated_at', t.updated_at,
+        'description', t.description,
+        'form_url', t.form_url,
+        'unit', t.unit,
+        'lower_limit', t.lower_limit,
+        'upper_limit', t.upper_limit,
+        'test_category', t.test_category
+      ) ORDER BY t.test_category, t.name
+    ) AS tests
+    FROM tests t
+    JOIN protocol_tests_value ptv
+      ON ptv.tests_id = t.id
+    WHERE ptv.protocol_tests_id = pt.id
+  ) tests ON TRUE
+  WHERE pt.protocol_id = $1
+) protocol_tests_data
+`
+
+func (q *Queries) GetProtocolTests(ctx context.Context, protocolID uuid.UUID) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getProtocolTests, protocolID)
+	var data interface{}
+	err := row.Scan(&data)
+	return data, err
 }
 
 const getTestByID = `-- name: GetTestByID :one
@@ -135,6 +163,42 @@ func (q *Queries) GetTestByName(ctx context.Context, name string) (Test, error) 
 		&i.TestCategory,
 	)
 	return i, err
+}
+
+const getTestCategoryByID = `-- name: GetTestCategoryByID :one
+SELECT jsonb_build_object(
+  'id', pt.id,
+  'created_at', pt.created_at,
+  'updated_at', pt.updated_at,
+  'category', pt.category,
+  'comments', pt.comments,
+  'position', pt.position,
+  'tests', COALESCE((
+    SELECT jsonb_agg(jsonb_build_object(
+      'id', t.id,
+      'name', t.name,
+      'created_at', t.created_at,
+      'updated_at', t.updated_at,
+      'description', t.description,
+      'form_url', t.form_url,
+      'unit', t.unit,
+      'lower_limit', t.lower_limit,
+      'upper_limit', t.upper_limit,
+      'test_category', t.test_category
+    ) ORDER BY t.test_category, t.name)
+    FROM tests t
+    JOIN protocol_tests_value tc ON tc.tests_id = t.id AND tc.protocol_tests_id = pt.id
+  ), '[]'::jsonb)
+) AS data
+FROM protocol_tests pt
+WHERE pt.id = $1
+`
+
+func (q *Queries) GetTestCategoryByID(ctx context.Context, id uuid.UUID) (json.RawMessage, error) {
+	row := q.db.QueryRowContext(ctx, getTestCategoryByID, id)
+	var data json.RawMessage
+	err := row.Scan(&data)
+	return data, err
 }
 
 const getTests = `-- name: GetTests :many
@@ -213,138 +277,28 @@ func (q *Queries) GetTestsByCategory(ctx context.Context, testCategory string) (
 	return items, nil
 }
 
-const getTestsByProtocol = `-- name: GetTestsByProtocol :one
-SELECT jsonb_build_object(
-  'tests', jsonb_build_object(
-    'baseline', jsonb_build_object(
-      'urgent', COALESCE((
-        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
-          SELECT 
-            json_build_object(
-              'id', tst.id,
-              'name', tst.name,
-              'description', tst.description
-            ) AS test
-          FROM tests tst
-          JOIN protocol_tests pt ON pt.test_id = tst.id
-          WHERE pt.protocol_id = $1 AND pt.category = 'baseline' AND pt.urgency = 'urgent'
-        ) sub
-      ), '[]'::jsonb),
-      
-      'non_urgent', COALESCE((
-        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
-          SELECT json_build_object('id', tst.id, 'name', tst.name, 'description', tst.description) AS test
-          FROM tests tst
-          JOIN protocol_tests pt ON pt.test_id = tst.id
-          WHERE pt.protocol_id = $1 AND pt.category = 'baseline' AND pt.urgency = 'non_urgent'
-        ) t
-      ), '[]'::jsonb),
-
-      'if_necessary', COALESCE((
-        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
-          SELECT json_build_object('id', tst.id, 'name', tst.name, 'description', tst.description) AS test
-          FROM tests tst
-          JOIN protocol_tests pt ON pt.test_id = tst.id
-          WHERE pt.protocol_id = $1 AND pt.category = 'baseline' AND pt.urgency = 'if_necessary'
-        ) t
-      ), '[]'::jsonb)
-    ),
-
-    'followup', jsonb_build_object(
-      'urgent', COALESCE((
-        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
-          SELECT json_build_object('id', tst.id, 'name', tst.name, 'description', tst.description) AS test
-          FROM tests tst
-          JOIN protocol_tests pt ON pt.test_id = tst.id
-          WHERE pt.protocol_id = $1 AND pt.category = 'followup' AND pt.urgency = 'urgent'
-        ) t
-      ), '[]'::jsonb),
-
-      'if_necessary', COALESCE((
-        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
-          SELECT json_build_object('id', tst.id, 'name', tst.name, 'description', tst.description) AS test
-          FROM tests tst
-          JOIN protocol_tests pt ON pt.test_id = tst.id
-          WHERE pt.protocol_id = $1 AND pt.category = 'followup' AND pt.urgency = 'if_necessary'
-        ) t
-      ), '[]'::jsonb)
-    )
-  )
-) AS tests
+const removeTestCategoryByID = `-- name: RemoveTestCategoryByID :exec
+DELETE FROM protocol_tests
+WHERE id = $1
 `
 
-func (q *Queries) GetTestsByProtocol(ctx context.Context, protocolID uuid.UUID) (json.RawMessage, error) {
-	row := q.db.QueryRowContext(ctx, getTestsByProtocol, protocolID)
-	var tests json.RawMessage
-	err := row.Scan(&tests)
-	return tests, err
+func (q *Queries) RemoveTestCategoryByID(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, removeTestCategoryByID, id)
+	return err
 }
 
-const getTestsByProtocolByCategoryAndUrgency = `-- name: GetTestsByProtocolByCategoryAndUrgency :many
-SELECT t.id, t.created_at, t.updated_at, t.name, t.description, t.form_url, t.unit, t.lower_limit, t.upper_limit, t.test_category
-FROM tests t
-JOIN protocol_tests pt ON t.id = pt.test_id
-WHERE pt.protocol_id = $1 AND pt.category = $2 AND pt.urgency = $3
+const removeTestToProtoTestCategory = `-- name: RemoveTestToProtoTestCategory :exec
+DELETE FROM protocol_tests_value
+WHERE protocol_tests_id = $1 AND tests_id = $2
 `
 
-type GetTestsByProtocolByCategoryAndUrgencyParams struct {
-	ProtocolID uuid.UUID    `json:"protocol_id"`
-	Category   CategoryEnum `json:"category"`
-	Urgency    UrgencyEnum  `json:"urgency"`
+type RemoveTestToProtoTestCategoryParams struct {
+	ProtocolTestsID uuid.UUID `json:"protocol_tests_id"`
+	TestsID         uuid.UUID `json:"tests_id"`
 }
 
-func (q *Queries) GetTestsByProtocolByCategoryAndUrgency(ctx context.Context, arg GetTestsByProtocolByCategoryAndUrgencyParams) ([]Test, error) {
-	rows, err := q.db.QueryContext(ctx, getTestsByProtocolByCategoryAndUrgency, arg.ProtocolID, arg.Category, arg.Urgency)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Test{}
-	for rows.Next() {
-		var i Test
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Name,
-			&i.Description,
-			&i.FormUrl,
-			&i.Unit,
-			&i.LowerLimit,
-			&i.UpperLimit,
-			&i.TestCategory,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const removeTestFromProtocolByCategoryAndUrgency = `-- name: RemoveTestFromProtocolByCategoryAndUrgency :exec
-DELETE FROM protocol_tests WHERE protocol_id = $1 AND test_id = $2 AND category = $3 AND urgency = $4
-`
-
-type RemoveTestFromProtocolByCategoryAndUrgencyParams struct {
-	ProtocolID uuid.UUID    `json:"protocol_id"`
-	TestID     uuid.UUID    `json:"test_id"`
-	Category   CategoryEnum `json:"category"`
-	Urgency    UrgencyEnum  `json:"urgency"`
-}
-
-func (q *Queries) RemoveTestFromProtocolByCategoryAndUrgency(ctx context.Context, arg RemoveTestFromProtocolByCategoryAndUrgencyParams) error {
-	_, err := q.db.ExecContext(ctx, removeTestFromProtocolByCategoryAndUrgency,
-		arg.ProtocolID,
-		arg.TestID,
-		arg.Category,
-		arg.Urgency,
-	)
+func (q *Queries) RemoveTestToProtoTestCategory(ctx context.Context, arg RemoveTestToProtoTestCategoryParams) error {
+	_, err := q.db.ExecContext(ctx, removeTestToProtoTestCategory, arg.ProtocolTestsID, arg.TestsID)
 	return err
 }
 
@@ -393,6 +347,60 @@ func (q *Queries) UpdateTest(ctx context.Context, arg UpdateTestParams) (Test, e
 	return i, err
 }
 
+const upsertProtoTestCategory = `-- name: UpsertProtoTestCategory :one
+WITH input_values(id, protocol_id, category, comments,position) AS (
+  VALUES (
+    CASE 
+      WHEN $1::uuid  = '00000000-0000-0000-0000-000000000000'
+      THEN gen_random_uuid() 
+      ELSE $1::uuid 
+    END,
+    $2::uuid,
+    $3::TEXT,
+    $4::text,
+    COALESCE($5::INT, 0)
+  )
+)
+INSERT INTO protocol_tests (id, protocol_id, category, comments,position)
+SELECT id, protocol_id, category, comments,position FROM input_values
+ON CONFLICT (id) DO UPDATE
+SET protocol_id = EXCLUDED.protocol_id,
+    category = EXCLUDED.category,
+    comments = EXCLUDED.comments,
+    position = EXCLUDED.position,   
+    updated_at = NOW()
+RETURNING id, created_at, updated_at, protocol_id, category, comments, position
+`
+
+type UpsertProtoTestCategoryParams struct {
+	ID         uuid.UUID `json:"id"`
+	ProtocolID uuid.UUID `json:"protocol_id"`
+	Category   string    `json:"category"`
+	Comments   string    `json:"comments"`
+	Position   int32     `json:"position"`
+}
+
+func (q *Queries) UpsertProtoTestCategory(ctx context.Context, arg UpsertProtoTestCategoryParams) (ProtocolTest, error) {
+	row := q.db.QueryRowContext(ctx, upsertProtoTestCategory,
+		arg.ID,
+		arg.ProtocolID,
+		arg.Category,
+		arg.Comments,
+		arg.Position,
+	)
+	var i ProtocolTest
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ProtocolID,
+		&i.Category,
+		&i.Comments,
+		&i.Position,
+	)
+	return i, err
+}
+
 const upsertTest = `-- name: UpsertTest :one
 WITH input_values(id, name, description, form_url, unit, lower_limit, upper_limit, test_category) AS (
   VALUES (
@@ -405,9 +413,9 @@ WITH input_values(id, name, description, form_url, unit, lower_limit, upper_limi
     $3,
     $4,
     $5,
-    $6,
-    $7,
-    $8::test_category_enum
+    $6::FLOAT,
+    $7::FLOAT,
+    $8
   )
 )
 INSERT INTO tests (id, name, description, form_url, unit, lower_limit, upper_limit, test_category)
@@ -430,8 +438,8 @@ type UpsertTestParams struct {
 	Description  interface{} `json:"description"`
 	FormUrl      interface{} `json:"form_url"`
 	Unit         interface{} `json:"unit"`
-	LowerLimit   interface{} `json:"lower_limit"`
-	UpperLimit   interface{} `json:"upper_limit"`
+	LowerLimit   float64     `json:"lower_limit"`
+	UpperLimit   float64     `json:"upper_limit"`
 	TestCategory interface{} `json:"test_category"`
 }
 

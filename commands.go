@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"io"
 )
 
@@ -72,11 +73,19 @@ func handlerGeoLocation(s *config.Config, cmd command) error {
 
 func handlerAnalyzePDF(s *config.Config, cmd command) error {
 	// Analyze a PDF
-	err := ai_helper.GetAiData(s,cmd.Args[0])
-	if err != nil {
-		fmt.Println("Error analyzing PDF: ", err)
-		return err 
+	if len(cmd.Args) < 1 {
+		return errors.New("missing PDF URLs argument")
 	}
+	// Validate all URLs
+    for _, url := range cmd.Args {
+        if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+            return fmt.Errorf("invalid URL: %s. URL must start with http:// or https://", url)
+        }
+    }
+	// Call the AI helper to analyze the PDF
+	// This function will handle the PDF analysis and return any errors encountered
+
+	ai_helper.RunAllLinks(s,cmd.Args)	
 	
 	return nil
 }
@@ -123,6 +132,17 @@ func handlerDeleteProtocol(s *config.Config, cmd command) error {
 	return nil
 }
 
+func handlerResetDatabase(s *config.Config, cmd command) error {
+	// Reset the database
+	err := api.CMD_ResetDatabase(s)
+	if err != nil {
+		fmt.Println("Error resetting database: ", err)
+		return err
+	}
+	fmt.Println("Database reset successfully")
+	return nil
+}
+
 
 func handlerCreateUser(s *config.Config, cmd command) error {
 	// Create a new user
@@ -149,11 +169,38 @@ func handlerCrawl(s *config.Config, cmd command) error {
 	if err != nil {
 		fmt.Println("Error getting HTML: ", err)
 	}
-	_,err = crawler.GetURLsFromHTML(html)
+	WebProtocol,err := crawler.GetURLsFromHTML(html)
 	if err != nil {
 		fmt.Println("Error getting URLs: ", err)
 	}
-	// fmt.Println("Links found: ", links)
+
+	protocol_list := make([]string, 0)
+
+	for _, protocol := range WebProtocol {
+		fmt.Println("Protocol Name: ", protocol.Code)		
+		for _, link:= range protocol.Links {
+			textVal, ok := link["text"]
+			if ok && strings.Contains(textVal, "Protocol") {
+				href := link["href"]
+				fmt.Println("➡ Found Protocol link:", href)
+				protocol_list = append(protocol_list, href)
+
+			}
+		}		
+	}	
+	
+	ai_helper.RunAllLinks(s,protocol_list)
+	
+	return nil
+}
+
+func handlerSingleCrawl(s *config.Config, cmd command) error {
+	if len(cmd.Args) < 1 {
+		return errors.New("missing URL argument")
+	}
+	// Get a single protocol from a website
+			
+	ai_helper.RunAllLinks(s,cmd.Args)
 	
 	return nil
 }

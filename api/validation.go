@@ -1,6 +1,6 @@
 package api
 
-import(
+import (
 	"github.com/go-playground/validator/v10"
 	"unicode"
 
@@ -9,79 +9,78 @@ import(
 
 // Predefined list of valid tumor group codes
 var validTumorGroups = map[string]bool{
-	"lymphoma": true,
-	"myeloma": true,
-	"bmt": true,
-	"leukemia": true,
-	"breast": true,
+	"lymphoma":         true,
+	"myeloma":          true,
+	"bmt":              true,
+	"leukemia":         true,
+	"breast":           true,
 	"gastrointestinal": true,
-	"genitourinary": true,
-	"gynecology": true,
-	"head_and_neck": true,
-	"lung": true,
-	"skin": true,
-	"neuro-oncology": true,
-	"sarcoma": true,
-	"ocular": true,
-	"unknown": true,
-	"unknown_primary": true,
+	"genitourinary":    true,
+	"gynecology":       true,
+	"head_and_neck":    true,
+	"lung":             true,
+	"skin":             true,
+	"neuro-oncology":   true,
+	"sarcoma":          true,
+	"ocular":           true,
+	"unknown":          true,
+	"unknown_primary":  true,
 	// Add more as needed
 }
 
 var validEligiblityCriteria = map[string]bool{
 	"inclusion": true,
 	"exclusion": true,
-	"notes": true,
-	"unknown": true,
+	"notes":     true,
+	"unknown":   true,
 }
 
 var validTestProtocolCategories = map[string]bool{
 	"baseline": true,
 	"followup": true,
-	"unknown": true,
+	"unknown":  true,
 }
 
 var validTestProtocolUrgency = map[string]bool{
-	"urgent": true,
-	"non_urgent": true,
+	"urgent":       true,
+	"non_urgent":   true,
 	"if_necessary": true,
-	"unknown": true,
+	"unknown":      true,
 }
 
 var validProtocolPrescriptionCategory = map[string]bool{
-	"premed": true,
+	"premed":  true,
 	"support": true,
 	"unknown": true,
 }
 
 var validPrescriptionRoutes = map[string]bool{
-	"oral": true,
-	"iv": true,
-	"im": true,
-	"sc": true,
+	"oral":    true,
+	"iv":      true,
+	"im":      true,
+	"sc":      true,
 	"topical": true,
 	"unknown": true,
 }
 
 var validGrades = map[string]bool{
-	"1": true,
-	"2": true,
-	"3": true,
-	"4": true,
+	"1":       true,
+	"2":       true,
+	"3":       true,
+	"4":       true,
 	"unknown": true,
 }
 
 var validPhysicianSites = map[string]bool{
-	"vancouver": true,
-	"victoria": true,
-	"abbotsford": true,
-	"kelowna": true,
+	"vancouver":     true,
+	"victoria":      true,
+	"abbotsford":    true,
+	"kelowna":       true,
 	"prince_george": true,
-	"nanaimo": true,
-	"surrey": true,
-	"unknown": true,
+	"nanaimo":       true,
+	"surrey":        true,
+	"unknown":       true,
 }
-
 
 // Custom validation function
 func TumorGroupValidator(fl validator.FieldLevel) bool {
@@ -125,14 +124,14 @@ func PhysicianSiteValidator(fl validator.FieldLevel) bool {
 }
 
 // PasswordStrengthValidator checks for strong passwords using bitwise operations.
-func PasswordStrengthValidator(fl validator.FieldLevel) (bool) {
+func PasswordStrengthValidator(fl validator.FieldLevel) bool {
 	password := fl.Field().String()
-	
+
 	const (
-		hasLower  = 1 << iota // 0001
-		hasUpper              // 0010
-		hasNumber             // 0100
-		hasSpecial            // 1000
+		hasLower   = 1 << iota // 0001
+		hasUpper               // 0010
+		hasNumber              // 0100
+		hasSpecial             // 1000
 	)
 	requiredMask := hasLower | hasUpper | hasNumber | hasSpecial // 1111
 
@@ -163,7 +162,7 @@ func PasswordStrengthValidator(fl validator.FieldLevel) (bool) {
 		if flags == requiredMask {
 			return true
 		}
-	}	
+	}
 
 	// Check if all criteria are met
 	return flags == requiredMask

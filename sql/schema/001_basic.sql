@@ -1,8 +1,8 @@
 -- +goose Up
 CREATE TABLE protocols (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  created_at timestamptz NOT NULL DEFAULT NOW(),
+  updated_at timestamptz NOT NULL DEFAULT NOW(),
   tumor_group TEXT NOT NULL,
   code TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,

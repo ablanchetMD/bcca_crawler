@@ -1,352 +1,188 @@
 package protocols
 
 import (
+	"bcca_crawler/api"
 	"bcca_crawler/internal/config"
 	"bcca_crawler/internal/database"
-	"bcca_crawler/internal/json_utils"
-	"bcca_crawler/api"
+	"context"
 	"fmt"
 	"net/http"
-	"github.com/google/uuid"	
-
+	"github.com/google/uuid"
 )
 
-
-type TreatmentReq struct {
-	ID 						string `json:"id" validate:"omitempty,uuid"`	
-	MedicationID 			string `json:"medication_id" validate:"required,uuid"`
-	Dose 					string `json:"dose" validate:"required"`
-	Route 					string `json:"route" validate:"required,prescription_route"`
-	Frequency 				string `json:"frequency" validate:"required"`
-	Duration 				string `json:"duration" validate:"required"`
-	AdministrationGuide 	string `json:"administration_guide" validate:"omitempty,min=1,max=1000"`	
-}
-
-type CycleReq struct {
-	ID 						string `json:"id" validate:"omitempty,uuid"`
-	CycleID 				string `json:"cycle_id" validate:"required,uuid"`
-	Cycle 					string `json:"cycle" validate:"required"`
-	CycleDuration 			string `json:"cycle_duration" validate:"omitempty"`
-}
-
-
 func HandleGetTreatments(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	treatments := []api.Treatment{}
-	raw_tx, err := c.Db.GetTreatments(ctx)
-
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting treatments")
-		return
-	}
-	
-	for _, tx := range raw_tx {
-		treatments = append(treatments, api.MapTreatment(tx))		
-	}
-
-	json_utils.RespondWithJSON(w, http.StatusOK, treatments)
-}
-
-
-func HandleGetTreatmentByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ids, err := api.ParseAndValidateID(r)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	raw_treatment, err := c.Db.GetProtocolTreatmentByID(ctx, ids.ID)
-
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting treatment: %s", ids.ID.String()))
-		return
-	}	
-
-	Treatment := api.MapTreatmentByID(raw_treatment)
-	
-	json_utils.RespondWithJSON(w, http.StatusOK, Treatment)
+	api.HandleGet(c, w, r, getTx)
 }
 
 func HandleGetTreatmentsByCycleID(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	
-	ctx := r.Context()
+	api.HandleGet(c, w, r, getTxsByCycleID)
+}
 
-	ids, err := api.ParseAndValidateID(r)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}	
-	
-	raw_tx, err := c.Db.GetTreatmentsByCycle(ctx, ids.CycleID)
-
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting treatments for cycle: %s", ids.CycleID.String()))
-		return
-	}
-	
-	treatments := []api.Treatment{}
-	
-	for _, tx := range raw_tx {
-		treatments = append(treatments, api.MapTreatmentByCycle(tx))		
-	}
-
-	json_utils.RespondWithJSON(w, http.StatusOK, treatments)
+func HandleGetTreatmentByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
+	api.HandleGet(c, w, r, getTxByID)
 }
 
 func HandleDeleteTreatmentByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ids, err := api.ParseAndValidateID(r)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	err = c.Db.RemoveProtocolTreatment(ctx, ids.ID)
-
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting treatments: %s", ids.ID.String()))
-		return
-	}
-
-	json_utils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "protocol treatment deleted"})
+	api.HandleModify(c, w, r, deleteTxByID)
 }
 
 func HandleUpsertTreatment(c *config.Config, w http.ResponseWriter, r *http.Request) {
-
-	var req TreatmentReq	
-	err := api.UnmarshalAndValidatePayload(c,r, &req)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	ctx := r.Context()	
-
-	pid, err:= uuid.Parse(req.ID)
-	if err != nil {
-		pid = uuid.New()
-	}
-	
-	mid, err := uuid.Parse(req.MedicationID)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, "medication_id is not a valid uuid")
-		return
-	}
-	
-	raw_tx,err := c.Db.UpsertProtocolTreatment(ctx,database.UpsertProtocolTreatmentParams{
-		ID: pid,
-		MedicationID: mid,
-		Dose: req.Dose,
-		Route: req.Route,
-		Frequency: req.Frequency,
-		Duration: req.Duration,
-		AdministrationGuide: req.AdministrationGuide,
-		
-	})
-
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error upserting treatment: %s", req.ID))
-		return		
-	}
-
-	Treatment := struct {
-		ID                  string `json:"id"`
-		MedicationID        string `json:"medication_id"`
-		Dose                string `json:"dose"`
-		Route               string `json:"route"`
-		Frequency           string `json:"frequency"`
-		Duration            string `json:"duration"`
-		AdministrationGuide string `json:"administration_guide"`		
-	}{
-		ID:                  raw_tx.ID.String(),
-		MedicationID:        raw_tx.MedicationID.String(),
-		Dose:                raw_tx.Dose,
-		Route:               raw_tx.Route,
-		Frequency:           raw_tx.Frequency,
-		Duration:            raw_tx.Duration,
-		AdministrationGuide: raw_tx.AdministrationGuide,		
-	}
-
-	json_utils.RespondWithJSON(w, http.StatusOK, Treatment)	
+	api.HandleUpsert(c, w, r, upsertTreatment)
 }
 
 func HandleAddTreatmentToCycle(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	ids, err := api.ParseAndValidateID(r)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}	
-	
-	err = c.Db.AddTreatmentToCycle(ctx, database.AddTreatmentToCycleParams{
-		ProtocolTreatmentID: ids.ID,
-		ProtocolCyclesID: ids.CycleID,
-	})	
-
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding treatment to cycle: %s", ids.ID.String()))
-		return
-	}
-
-	json_utils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "treatment added to cycle"})
-
+	api.HandleModify(c, w, r, addTxToCycle)
 }
-
 func HandleRemoveTreatmentToCycle(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	ids, err := api.ParseAndValidateID(r)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}	
-
-	err = c.Db.RemoveTreatmentFromCycle(ctx, database.RemoveTreatmentFromCycleParams{
-		ProtocolTreatmentID: ids.ID,
-		ProtocolCyclesID: ids.CycleID,
-	})
-
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error removing treatment from cycle: %s", ids.ID.String()))
-		return
-	}
-
-	json_utils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "treatment removed from cycle"})
-
+	api.HandleModify(c, w, r, removeTxToCycle)
 }
 
 func HandleUpsertTreatmentCycle(c *config.Config, w http.ResponseWriter, r *http.Request) {
-
-	var req CycleReq	
-	err := api.UnmarshalAndValidatePayload(c,r, &req)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	ctx := r.Context()	
-
-	id, err:= uuid.Parse(req.ID)
-	if err != nil {
-		id = uuid.New()
-	}
-
-	protocol_id := r.URL.Query().Get("protocol_id")
-
-	
-	pid, err := uuid.Parse(protocol_id)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, "protocol_id is not a valid uuid")
-		return
-	}
-	
-	raw_cyc,err := c.Db.UpsertCycleToProtocol(ctx,database.UpsertCycleToProtocolParams{
-		ID: id,
-		ProtocolID: pid,
-		Cycle: req.Cycle,
-		CycleDuration: req.CycleDuration,		
-	})
-
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error upserting treatment cycle: %s", req.ID))
-		return		
-	}
-
-	Cycle := api.MapCycle(raw_cyc)
-
-	json_utils.RespondWithJSON(w, http.StatusOK, Cycle)	
+	api.HandleUpsert(c, w, r, upsertCycle)
 }
 
 func HandleGetCycles(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	cycles := []api.ProtocolCycle{}
-	raw_cyc, err := c.Db.GetCycles(ctx)
-
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting cycles")
-		return
-	}
-	
-	for _, cyc := range raw_cyc {
-		cycles = append(cycles, api.MapCycle(cyc))		
-	}
-
-	json_utils.RespondWithJSON(w, http.StatusOK, cycles)
-}
-
-func HandleGetCyclesByProtocolID(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	ids, err := api.ParseAndValidateID(r)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	
-	raw_cyc, err := c.Db.GetCyclesByProtocol(ctx, ids.ID)
-
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting cycles for protocol: %s", ids.ID.String()))
-		return
-	}
-	
-	cycles := []api.ProtocolCycle{}
-	
-	for _, cyc := range raw_cyc {
-		cycles = append(cycles, api.MapCycle(cyc))		
-	}
-
-	json_utils.RespondWithJSON(w, http.StatusOK, cycles)
-}
-
-
-func HandleGetCycleByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ids, err := api.ParseAndValidateID(r)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	raw_cyc, err := c.Db.GetCycleByID(ctx, ids.ID)
-
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting cycle: %s", ids.ID.String()))
-		return
-	}	
-
-	Cycle := api.MapCycle(raw_cyc)
-	
-	json_utils.RespondWithJSON(w, http.StatusOK, Cycle)
+	api.HandleGet(c, w, r, getCyclesByProtocolID)
 }
 
 func HandleDeleteCycleByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ids, err := api.ParseAndValidateID(r)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	err = c.Db.RemoveCycleByID(ctx, ids.ID)
-
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting cycle: %s", ids.ID.String()))
-		return
-	}
-
-	json_utils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "protocol cycle deleted"})
+	api.HandleModify(c, w, r, deleteCycleByID)
 }
+
+
+func getTx(c *config.Config, ctx context.Context, ids api.IDs) ([]api.Treatment, error) {
+	items, err := c.Db.GetTreatments(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	response := api.MapAll(items, api.MapTreatment)
+
+	return response, nil
+}
+
+func getTxsByCycleID(c *config.Config, ctx context.Context, ids api.IDs) ([]api.Treatment, error) {
+	items, err := c.Db.GetTreatmentsByCycle(ctx, ids.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	response := api.MapAll(items, api.MapTreatment)
+
+	return response, nil
+}
+
+func getTxByID(c *config.Config, ctx context.Context, ids api.IDs) (api.Treatment, error) {
+	item, err := c.Db.GetProtocolTreatmentByID(ctx, ids.ID)
+
+	if err != nil {
+		return api.Treatment{}, err
+	}
+
+	response := api.MapTreatment(item)
+
+	return response, nil
+}
+
+func deleteTxByID(c *config.Config, ctx context.Context, ids api.IDs) (string, error) {
+	err := c.Db.RemoveProtocolTreatment(ctx, ids.ID)
+
+	if err != nil {
+		return "", fmt.Errorf("error deleting tx: %s, with error: %v", ids.ID.String(), err)
+
+	}
+	return fmt.Sprintf("Tx %s deleted.", ids.ID.String()), nil
+}
+
+func upsertTreatment(c *config.Config, ctx context.Context, req TreatmentReq, ids api.IDs) error {
+	id := api.ParseOrNilUUID(req.ID)
+
+	mid, err := uuid.Parse(req.MedicationID)
+	if err != nil {
+		return fmt.Errorf("medication ID: %s is not a valid UUID", req.MedicationID)
+	}
+
+	_, err = c.Db.UpsertProtocolTreatment(ctx, database.UpsertProtocolTreatmentParams{
+		ID:                  id,
+		MedicationID:        mid,
+		Dose:                req.Dose,
+		Route:               req.ToRouteEnum(),
+		Frequency:           req.Frequency,
+		Duration:            req.Duration,
+		AdministrationGuide: req.AdministrationGuide,
+	})
+
+	if err != nil {
+		return fmt.Errorf("error upserting treatment: %s with error:%s", req.ID, err.Error())
+	}
+
+	return nil
+}
+
+func addTxToCycle(c *config.Config, ctx context.Context, ids api.IDs) (string, error) {
+	err := c.Db.AddTreatmentToCycle(ctx, database.AddTreatmentToCycleParams{
+		ProtocolTreatmentID: ids.ID,
+		ProtocolCyclesID:    ids.CycleID,
+	})
+	if err != nil {
+		return "", fmt.Errorf("error adding tx: %s to cycle %s, with error: %v", ids.ID.String(), ids.CycleID.String(), err)
+
+	}
+	return fmt.Sprintf("Treatment %s added to Cycle %s", ids.ID.String(), ids.CycleID.String()), nil
+}
+
+func removeTxToCycle(c *config.Config, ctx context.Context, ids api.IDs) (string, error) {
+	err := c.Db.RemoveTreatmentFromCycle(ctx, database.RemoveTreatmentFromCycleParams{
+		ProtocolTreatmentID: ids.ID,
+		ProtocolCyclesID:    ids.CycleID,
+	})
+	if err != nil {
+		return "", fmt.Errorf("error removing tx: %s to cycle %s, with error: %v", ids.ID.String(), ids.CycleID.String(), err)
+
+	}
+	return fmt.Sprintf("Treatment %s removed from Cycle %s", ids.ID.String(), ids.CycleID.String()), nil
+}
+
+
+
+func upsertCycle(c *config.Config, ctx context.Context, req CycleReq, ids api.IDs) error {
+	id := api.ParseOrNilUUID(req.ID)
+
+	_, err := c.Db.UpsertCycleToProtocol(ctx, database.UpsertCycleToProtocolParams{
+		ID:            id,
+		ProtocolID:    ids.ProtocolID,
+		Cycle:         req.Cycle,
+		CycleDuration: req.CycleDuration,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func getCyclesByProtocolID(c *config.Config, ctx context.Context, ids api.IDs) ([]api.ProtocolCycle, error) {
+	items, err := c.Db.GetProtocolCyclesWithTreatments(ctx, ids.ProtocolID)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := api.ToResponseData[[]api.ProtocolCycle](items)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func deleteCycleByID(c *config.Config, ctx context.Context, ids api.IDs) (string, error) {
+	err := c.Db.RemoveCycleByID(ctx, ids.ID)
+
+	if err != nil {
+		return "", fmt.Errorf("error deleting cycle: %s, with error: %v", ids.ID.String(), err)
+
+	}
+	return fmt.Sprintf("Cycle %s deleted.", ids.ID.String()), nil
+}
+
 

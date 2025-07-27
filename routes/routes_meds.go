@@ -86,4 +86,30 @@ func RegisterMedRoutes(prefix string, mux *mux.Router, s *config.Config) {
 		}
 	})
 
+	mux.HandleFunc(prefix + "/pxgroup/{id:"+uuidPattern+"}", func(w http.ResponseWriter, r *http.Request) {		
+		switch r.Method {
+		case http.MethodGet:
+			protocols.HandleGetPrescriptionsByCategory(s, w, r)		
+		case http.MethodDelete:
+			protocols.HandleDeleteProtocolMedCategory(s, w, r)
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Create a subrouter for labgroup routes
+    labgroupRouter := mux.PathPrefix(prefix+"/pxgroup/{px_category_id:"+uuidPattern+"}").Subrouter()	
+
+	labgroupRouter.HandleFunc("/prescriptions/{id:"+uuidPattern+"}", func(w http.ResponseWriter, r *http.Request) {
+		//query = cycle_id
+		switch r.Method {
+		case http.MethodPost:
+			protocols.HandleAddPrescriptionToProtocolByCategory(s, w, r)
+		case http.MethodDelete:
+			protocols.HandleRemovePrescriptionFromProtocolByCategory(s, w, r)
+		default:
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		}
+	})	
+
 }

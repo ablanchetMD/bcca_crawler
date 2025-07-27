@@ -52,10 +52,12 @@ SELECT
     pec.*, 
     COALESCE(
         (
-            SELECT json_agg(
-            json_build_object(
+            SELECT jsonb_agg(
+            jsonb_build_object(
                 'id', pecv.protocol_id, 
                 'code', p.code
+                -- 'created_at', p.created_at,
+                -- 'updated_at', p.updated_at
             )
         )
         FROM protocol_cautions_values pecv
@@ -63,7 +65,7 @@ SELECT
         WHERE pecv.caution_id = pec.id
         ),
         '[]'
-    ) AS protocol_ids
+    )::jsonb AS protocol_ids
 FROM 
     protocol_cautions pec;
 
@@ -72,10 +74,12 @@ SELECT
     pec.*, 
     COALESCE(
         (
-            SELECT json_agg(
-            json_build_object(
+            SELECT jsonb_agg(
+            jsonb_build_object(
                 'id', pecv.protocol_id, 
                 'code', p.code
+                -- 'created_at', p.created_at,
+                -- 'updated_at', p.updated_at
             )
         )
         FROM protocol_cautions_values pecv
@@ -83,7 +87,7 @@ SELECT
         WHERE pecv.caution_id = pec.id
         ),
         '[]'
-    ) AS protocol_ids
+    )::jsonb AS protocol_ids
 FROM 
     protocol_cautions pec
 WHERE
@@ -138,10 +142,12 @@ SELECT
     pec.*, 
     COALESCE(
         (
-            SELECT json_agg(
-            json_build_object(
+            SELECT jsonb_agg(
+            jsonb_build_object(
                 'id', pecv.protocol_id, 
                 'code', p.code
+                -- 'created_at', p.created_at,
+                -- 'updated_at', p.updated_at
             )
         )
         FROM protocol_precautions_values pecv
@@ -149,7 +155,7 @@ SELECT
         WHERE pecv.precaution_id = pec.id
         ),
         '[]'
-    ) AS protocol_ids
+    )::jsonb AS protocol_ids
 FROM 
     protocol_precautions pec;
 
@@ -159,10 +165,12 @@ SELECT
     pec.*, 
     COALESCE(
         (
-            SELECT json_agg(
-            json_build_object(
+            SELECT jsonb_agg(
+            jsonb_build_object(
                 'id', pecv.protocol_id, 
                 'code', p.code
+                -- 'created_at', p.created_at,
+                -- 'updated_at', p.updated_at
             )
         )
         FROM protocol_precautions_values pecv
@@ -170,7 +178,7 @@ SELECT
         WHERE pecv.precaution_id = pec.id
         ),
         '[]'
-    ) AS protocol_ids
+    )::jsonb AS protocol_ids
 FROM 
     protocol_precautions pec
 WHERE

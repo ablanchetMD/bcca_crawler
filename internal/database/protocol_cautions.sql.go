@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -106,10 +107,12 @@ SELECT
     pec.id, pec.created_at, pec.updated_at, pec.description, 
     COALESCE(
         (
-            SELECT json_agg(
-            json_build_object(
+            SELECT jsonb_agg(
+            jsonb_build_object(
                 'id', pecv.protocol_id, 
                 'code', p.code
+                -- 'created_at', p.created_at,
+                -- 'updated_at', p.updated_at
             )
         )
         FROM protocol_cautions_values pecv
@@ -117,7 +120,7 @@ SELECT
         WHERE pecv.caution_id = pec.id
         ),
         '[]'
-    ) AS protocol_ids
+    )::jsonb AS protocol_ids
 FROM 
     protocol_cautions pec
 WHERE
@@ -125,11 +128,11 @@ WHERE
 `
 
 type GetCautionByIDWithProtocolsRow struct {
-	ID          uuid.UUID   `json:"id"`
-	CreatedAt   time.Time   `json:"created_at"`
-	UpdatedAt   time.Time   `json:"updated_at"`
-	Description string      `json:"description"`
-	ProtocolIds interface{} `json:"protocol_ids"`
+	ID          uuid.UUID       `json:"id"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+	Description string          `json:"description"`
+	ProtocolIds json.RawMessage `json:"protocol_ids"`
 }
 
 func (q *Queries) GetCautionByIDWithProtocols(ctx context.Context, id uuid.UUID) (GetCautionByIDWithProtocolsRow, error) {
@@ -150,10 +153,12 @@ SELECT
     pec.id, pec.created_at, pec.updated_at, pec.description, 
     COALESCE(
         (
-            SELECT json_agg(
-            json_build_object(
+            SELECT jsonb_agg(
+            jsonb_build_object(
                 'id', pecv.protocol_id, 
                 'code', p.code
+                -- 'created_at', p.created_at,
+                -- 'updated_at', p.updated_at
             )
         )
         FROM protocol_cautions_values pecv
@@ -161,17 +166,17 @@ SELECT
         WHERE pecv.caution_id = pec.id
         ),
         '[]'
-    ) AS protocol_ids
+    )::jsonb AS protocol_ids
 FROM 
     protocol_cautions pec
 `
 
 type GetCautionWithProtocolsRow struct {
-	ID          uuid.UUID   `json:"id"`
-	CreatedAt   time.Time   `json:"created_at"`
-	UpdatedAt   time.Time   `json:"updated_at"`
-	Description string      `json:"description"`
-	ProtocolIds interface{} `json:"protocol_ids"`
+	ID          uuid.UUID       `json:"id"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+	Description string          `json:"description"`
+	ProtocolIds json.RawMessage `json:"protocol_ids"`
 }
 
 func (q *Queries) GetCautionWithProtocols(ctx context.Context) ([]GetCautionWithProtocolsRow, error) {
@@ -208,10 +213,12 @@ SELECT
     pec.id, pec.created_at, pec.updated_at, pec.title, pec.description, 
     COALESCE(
         (
-            SELECT json_agg(
-            json_build_object(
+            SELECT jsonb_agg(
+            jsonb_build_object(
                 'id', pecv.protocol_id, 
                 'code', p.code
+                -- 'created_at', p.created_at,
+                -- 'updated_at', p.updated_at
             )
         )
         FROM protocol_precautions_values pecv
@@ -219,7 +226,7 @@ SELECT
         WHERE pecv.precaution_id = pec.id
         ),
         '[]'
-    ) AS protocol_ids
+    )::jsonb AS protocol_ids
 FROM 
     protocol_precautions pec
 WHERE
@@ -227,12 +234,12 @@ WHERE
 `
 
 type GetPrecautionByIDWithProtocolsRow struct {
-	ID          uuid.UUID   `json:"id"`
-	CreatedAt   time.Time   `json:"created_at"`
-	UpdatedAt   time.Time   `json:"updated_at"`
-	Title       string      `json:"title"`
-	Description string      `json:"description"`
-	ProtocolIds interface{} `json:"protocol_ids"`
+	ID          uuid.UUID       `json:"id"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+	Title       string          `json:"title"`
+	Description string          `json:"description"`
+	ProtocolIds json.RawMessage `json:"protocol_ids"`
 }
 
 func (q *Queries) GetPrecautionByIDWithProtocols(ctx context.Context, id uuid.UUID) (GetPrecautionByIDWithProtocolsRow, error) {
@@ -254,10 +261,12 @@ SELECT
     pec.id, pec.created_at, pec.updated_at, pec.title, pec.description, 
     COALESCE(
         (
-            SELECT json_agg(
-            json_build_object(
+            SELECT jsonb_agg(
+            jsonb_build_object(
                 'id', pecv.protocol_id, 
                 'code', p.code
+                -- 'created_at', p.created_at,
+                -- 'updated_at', p.updated_at
             )
         )
         FROM protocol_precautions_values pecv
@@ -265,18 +274,18 @@ SELECT
         WHERE pecv.precaution_id = pec.id
         ),
         '[]'
-    ) AS protocol_ids
+    )::jsonb AS protocol_ids
 FROM 
     protocol_precautions pec
 `
 
 type GetPrecautionWithProtocolsRow struct {
-	ID          uuid.UUID   `json:"id"`
-	CreatedAt   time.Time   `json:"created_at"`
-	UpdatedAt   time.Time   `json:"updated_at"`
-	Title       string      `json:"title"`
-	Description string      `json:"description"`
-	ProtocolIds interface{} `json:"protocol_ids"`
+	ID          uuid.UUID       `json:"id"`
+	CreatedAt   time.Time       `json:"created_at"`
+	UpdatedAt   time.Time       `json:"updated_at"`
+	Title       string          `json:"title"`
+	Description string          `json:"description"`
+	ProtocolIds json.RawMessage `json:"protocol_ids"`
 }
 
 func (q *Queries) GetPrecautionWithProtocols(ctx context.Context) ([]GetPrecautionWithProtocolsRow, error) {

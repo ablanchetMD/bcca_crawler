@@ -8,6 +8,8 @@ import (
 )
 
 func RegisterTreatmentRoutes(prefix string, mux *mux.Router, s *config.Config) {
+	// Define UUID pattern for consistent use
+    uuidPattern := "[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}"
 	mux.HandleFunc(prefix +"/treatments", func(w http.ResponseWriter, r *http.Request) {
 
 		switch r.Method {
@@ -20,7 +22,7 @@ func RegisterTreatmentRoutes(prefix string, mux *mux.Router, s *config.Config) {
 		}
 	})
 
-	mux.HandleFunc(prefix +"/treatments/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(prefix +"/treatments/{id:"+uuidPattern+"}", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			protocols.HandleGetTreatmentByID(s, w, r)			
@@ -31,17 +33,21 @@ func RegisterTreatmentRoutes(prefix string, mux *mux.Router, s *config.Config) {
 		}
 	})
 
-	mux.HandleFunc(prefix + "/cycles/{cycle_id}/treatments", func(w http.ResponseWriter, r *http.Request) {
-		//query = cycle_id
+	mux.HandleFunc(prefix + "/cycles/{id:"+uuidPattern+"}", func(w http.ResponseWriter, r *http.Request) {		
 		switch r.Method {
 		case http.MethodGet:
-			protocols.HandleGetTreatmentsByCycleID(s, w, r)
+			protocols.HandleGetTreatmentsByCycleID(s, w, r)		
+		case http.MethodDelete:
+			protocols.HandleDeleteCycleByID(s, w, r)
 		default:
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		}
 	})
 
-	mux.HandleFunc(prefix + "/cycles/{cycle_id}/treatments/{id}", func(w http.ResponseWriter, r *http.Request) {
+	// Create a subrouter for protocol_id routes
+    cycleRouter := mux.PathPrefix(prefix+"/cycles/{cycle_id:"+uuidPattern+"}").Subrouter()	
+
+	cycleRouter.HandleFunc("/treatments/{id:"+uuidPattern+"}", func(w http.ResponseWriter, r *http.Request) {
 		//query = cycle_id
 		switch r.Method {
 		case http.MethodPost:
@@ -53,15 +59,5 @@ func RegisterTreatmentRoutes(prefix string, mux *mux.Router, s *config.Config) {
 		}
 	})	
 
-	mux.HandleFunc(prefix + "/cycles/{id}", func(w http.ResponseWriter, r *http.Request) {		
-		switch r.Method {
-		case http.MethodGet:
-			protocols.HandleGetCycleByID(s, w, r)
-		case http.MethodDelete:
-			protocols.HandleDeleteCycleByID(s, w, r)
-		default:
-			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		}
-	})
-
+	
 }

@@ -12,11 +12,11 @@ SELECT
     t.category AS category,
     t.description AS description,
     COALESCE(
-        json_agg(
-            json_build_object(
+        jsonb_agg(
+            jsonb_build_object(
                 'id', tg.id,
-                'created_at',
-                'updated_at', 
+                'created_at',tg.created_at,
+                'updated_at',tg.updated_at,
                 'grade', tg.grade,
                 'description', tg.description
             )
@@ -40,11 +40,11 @@ SELECT
     t.category AS category,
     t.description AS description,    
     COALESCE(
-        json_agg(
-            json_build_object(
+        jsonb_agg(
+            jsonb_build_object(
                 'id', tg.id,
-                'created_at',
-                'updated_at',
+                'created_at', tg.created_at,
+                'updated_at', tg.updated_at,
                 'grade', tg.grade,
                 'description', tg.description
             )
@@ -67,19 +67,20 @@ SELECT
     t.category,
     t.description,
     COALESCE(
-    JSON_AGG(
-        JSON_BUILD_OBJECT(
+    JSONb_AGG(
+        JSONb_BUILD_OBJECT(
             'id', tg.id,
             'created_at', tg.created_at,
             'updated_at', tg.updated_at,
             'grade', tg.grade,
             'description', tg.description,
-            'adjustment', ptm.adjustment
+            'adjustment', ptm.adjustment,
+            'adjustment_id', ptm.id
         ) 
         ORDER BY tg.grade
         ) FILTER (WHERE tg.id IS NOT NULL),
         '[]'
-    )::json as grades
+    )::jsonb as grades
 FROM toxicities t
 LEFT JOIN toxicity_grades tg ON tg.toxicity_id = t.id
 LEFT JOIN protocol_tox_modifications ptm 
@@ -102,14 +103,15 @@ SELECT
     t.category,
     t.description,
     COALESCE(
-    JSON_AGG(
-        JSON_BUILD_OBJECT(
+    JSONb_AGG(
+        JSONb_BUILD_OBJECT(
             'id', tg.id,
             'created_at', tg.created_at,
             'updated_at', tg.updated_at,
             'grade', tg.grade,
             'description', tg.description,
-            'adjustment', ptm.adjustment
+            'adjustment', ptm.adjustment,
+            'adjustment_id', ptm.id
         ) 
         ORDER BY tg.grade
         ) FILTER (WHERE tg.id IS NOT NULL),
@@ -159,9 +161,9 @@ WITH upsert_toxicity AS (
 ), upsert_grades AS (
   INSERT INTO toxicity_grades (id, grade, description, toxicity_id)
   SELECT 
-    unnest($5::uuid[]),
-    unnest($6::grade_enum[]),
-    unnest($7::text[]),
+    unnest(@grade_ids::uuid[]),
+    unnest(@grade_number::grade_enum[]),
+    unnest(@grade_description::text[]),
     (SELECT id FROM upsert_toxicity)
   ON CONFLICT (id) DO UPDATE
   SET grade = EXCLUDED.grade,
@@ -169,6 +171,37 @@ WITH upsert_toxicity AS (
       updated_at = NOW()
 )
 SELECT 1;
+
+-- name: UpsertToxicityModification :exec
+WITH input_data AS (
+    SELECT 
+        unnest(@id::uuid[]) AS id,
+        unnest(@grade_ids::uuid[]) AS grade_id,
+        unnest(@adjustment::text[]) AS adjustment
+)
+INSERT INTO protocol_tox_modifications (
+    id, 
+    toxicity_grade_id, 
+    protocol_id, 
+    adjustment
+)
+SELECT
+    id,
+    grade_id,
+    @protocol_id::uuid,
+    adjustment
+FROM input_data
+ON CONFLICT (id) DO UPDATE SET
+    toxicity_grade_id = EXCLUDED.toxicity_grade_id,
+    adjustment = EXCLUDED.adjustment,
+    updated_at = NOW();
+
+-- name: DeleteProtocolToxModificationsByProtocolAndToxicity :exec
+DELETE FROM protocol_tox_modifications ptm
+USING toxicity_grades tg
+WHERE ptm.toxicity_grade_id = tg.id
+  AND ptm.protocol_id = @protocol_id
+  AND tg.toxicity_id = @toxicity_id;
 
 -- name: RemoveToxicity :exec
 DELETE FROM toxicities
@@ -205,28 +238,6 @@ WHERE id = $1;
 INSERT INTO protocol_tox_modifications (adjustment, toxicity_grade_id, protocol_id)
 VALUES ($1, $2, $3)
 RETURNING *;
-
--- name: UpsertToxicityToProtocol :one
-INSERT INTO protocol_tox_modifications (id, toxicity_grade_id, adjustment, protocol_id)
-VALUES ($1, $2, $3, $4)
-ON CONFLICT (id) DO UPDATE
-SET
-    toxicity_grade_id = EXCLUDED.toxicity_grade_id,
-    adjustment = EXCLUDED.adjustment,
-    protocol_id = EXCLUDED.protocol_id,
-    updated_at = NOW()
-RETURNING *;
-
--- name: GetToxicityModificationByProtocol :many
-SELECT 
-    protocol_tox_modifications.*, 
-    toxicities.title AS toxicity_title, 
-    toxicity_grades.description AS toxicity_grade_description, 
-    toxicity_grades.grade AS toxicity_grade
-FROM protocol_tox_modifications
-JOIN toxicity_grades ON protocol_tox_modifications.toxicity_grade_id = toxicity_grades.id
-JOIN toxicities ON toxicity_grades.toxicity_id = toxicities.id
-WHERE protocol_tox_modifications.protocol_id = $1;
 
 -- name: UpdateToxicityModification :one
 UPDATE protocol_tox_modifications

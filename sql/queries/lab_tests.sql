@@ -21,9 +21,9 @@ WITH input_values(id, name, description, form_url, unit, lower_limit, upper_limi
     @description,
     @form_url,
     @unit,
-    @lower_limit,
-    @upper_limit,
-    @test_category::test_category_enum
+    @lower_limit::FLOAT,
+    @upper_limit::FLOAT,
+    @test_category
   )
 )
 INSERT INTO tests (id, name, description, form_url, unit, lower_limit, upper_limit, test_category)
@@ -39,6 +39,73 @@ SET name = EXCLUDED.name,
     updated_at = NOW()
 RETURNING *;
 
+-- name: UpsertProtoTestCategory :one
+WITH input_values(id, protocol_id, category, comments,position) AS (
+  VALUES (
+    CASE 
+      WHEN @id::uuid  = '00000000-0000-0000-0000-000000000000'
+      THEN gen_random_uuid() 
+      ELSE @id::uuid 
+    END,
+    @protocol_id::uuid,
+    @category::TEXT,
+    @comments::text,
+    COALESCE(@position::INT, 0)
+  )
+)
+INSERT INTO protocol_tests (id, protocol_id, category, comments,position)
+SELECT id, protocol_id, category, comments,position FROM input_values
+ON CONFLICT (id) DO UPDATE
+SET protocol_id = EXCLUDED.protocol_id,
+    category = EXCLUDED.category,
+    comments = EXCLUDED.comments,
+    position = EXCLUDED.position,   
+    updated_at = NOW()
+RETURNING *;
+
+-- name: AddTestToProtoTestCategory :exec
+INSERT INTO protocol_tests_value (protocol_tests_id, tests_id)
+VALUES ($1, $2);
+
+-- name: RemoveTestToProtoTestCategory :exec
+DELETE FROM protocol_tests_value
+WHERE protocol_tests_id = $1 AND tests_id = $2;
+
+-- name: GetProtocolTests :one
+SELECT COALESCE(jsonb_agg(protocol_tests_data ORDER BY protocol_tests_data.position), '[]'::jsonb) AS data
+FROM (
+  SELECT 
+    pt.id,
+    pt.created_at,
+    pt.updated_at,
+    pt.category,
+    pt.comments,
+    pt.position,
+    COALESCE(tests.tests, '[]'::jsonb) AS tests
+  FROM protocol_tests pt
+  LEFT JOIN LATERAL (
+    SELECT jsonb_agg(
+      jsonb_build_object(
+        'id', t.id,
+        'name', t.name,
+        'created_at', t.created_at,
+        'updated_at', t.updated_at,
+        'description', t.description,
+        'form_url', t.form_url,
+        'unit', t.unit,
+        'lower_limit', t.lower_limit,
+        'upper_limit', t.upper_limit,
+        'test_category', t.test_category
+      ) ORDER BY t.test_category, t.name
+    ) AS tests
+    FROM tests t
+    JOIN protocol_tests_value ptv
+      ON ptv.tests_id = t.id
+    WHERE ptv.protocol_tests_id = pt.id
+  ) tests ON TRUE
+  WHERE pt.protocol_id = $1
+) protocol_tests_data;
+
 -- name: DeleteTest :exec
 DELETE FROM tests WHERE id = $1;
 
@@ -51,79 +118,38 @@ SELECT * FROM tests WHERE id = $1;
 -- name: GetTestsByCategory :many
 SELECT * FROM tests WHERE test_category = $1;
 
+-- name: RemoveTestCategoryByID :exec
+DELETE FROM protocol_tests
+WHERE id = $1;
+
+-- name: GetTestCategoryByID :one
+SELECT jsonb_build_object(
+  'id', pt.id,
+  'created_at', pt.created_at,
+  'updated_at', pt.updated_at,
+  'category', pt.category,
+  'comments', pt.comments,
+  'position', pt.position,
+  'tests', COALESCE((
+    SELECT jsonb_agg(jsonb_build_object(
+      'id', t.id,
+      'name', t.name,
+      'created_at', t.created_at,
+      'updated_at', t.updated_at,
+      'description', t.description,
+      'form_url', t.form_url,
+      'unit', t.unit,
+      'lower_limit', t.lower_limit,
+      'upper_limit', t.upper_limit,
+      'test_category', t.test_category
+    ) ORDER BY t.test_category, t.name)
+    FROM tests t
+    JOIN protocol_tests_value tc ON tc.tests_id = t.id AND tc.protocol_tests_id = pt.id
+  ), '[]'::jsonb)
+) AS data
+FROM protocol_tests pt
+WHERE pt.id = $1;
+
 -- name: GetTestByName :one
 SELECT * FROM tests WHERE name = $1;
-
--- name: GetTestsByProtocolByCategoryAndUrgency :many
-SELECT t.*
-FROM tests t
-JOIN protocol_tests pt ON t.id = pt.test_id
-WHERE pt.protocol_id = $1 AND pt.category = $2 AND pt.urgency = $3;
-
--- name: GetTestsByProtocol :one
-SELECT jsonb_build_object(
-  'tests', jsonb_build_object(
-    'baseline', jsonb_build_object(
-      'urgent', COALESCE((
-        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
-          SELECT 
-            json_build_object(
-              'id', tst.id,
-              'name', tst.name,
-              'description', tst.description
-            ) AS test
-          FROM tests tst
-          JOIN protocol_tests pt ON pt.test_id = tst.id
-          WHERE pt.protocol_id = $1 AND pt.category = 'baseline' AND pt.urgency = 'urgent'
-        ) sub
-      ), '[]'::jsonb),
-      
-      'non_urgent', COALESCE((
-        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
-          SELECT json_build_object('id', tst.id, 'name', tst.name, 'description', tst.description) AS test
-          FROM tests tst
-          JOIN protocol_tests pt ON pt.test_id = tst.id
-          WHERE pt.protocol_id = $1 AND pt.category = 'baseline' AND pt.urgency = 'non_urgent'
-        ) t
-      ), '[]'::jsonb),
-
-      'if_necessary', COALESCE((
-        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
-          SELECT json_build_object('id', tst.id, 'name', tst.name, 'description', tst.description) AS test
-          FROM tests tst
-          JOIN protocol_tests pt ON pt.test_id = tst.id
-          WHERE pt.protocol_id = $1 AND pt.category = 'baseline' AND pt.urgency = 'if_necessary'
-        ) t
-      ), '[]'::jsonb)
-    ),
-
-    'followup', jsonb_build_object(
-      'urgent', COALESCE((
-        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
-          SELECT json_build_object('id', tst.id, 'name', tst.name, 'description', tst.description) AS test
-          FROM tests tst
-          JOIN protocol_tests pt ON pt.test_id = tst.id
-          WHERE pt.protocol_id = $1 AND pt.category = 'followup' AND pt.urgency = 'urgent'
-        ) t
-      ), '[]'::jsonb),
-
-      'if_necessary', COALESCE((
-        SELECT jsonb_agg(to_jsonb(t) -> 'test') FROM (
-          SELECT json_build_object('id', tst.id, 'name', tst.name, 'description', tst.description) AS test
-          FROM tests tst
-          JOIN protocol_tests pt ON pt.test_id = tst.id
-          WHERE pt.protocol_id = $1 AND pt.category = 'followup' AND pt.urgency = 'if_necessary'
-        ) t
-      ), '[]'::jsonb)
-    )
-  )
-) AS tests;
-
--- name: AddTestToProtocolByCategoryAndUrgency :one
-INSERT INTO protocol_tests (protocol_id, test_id, category, urgency)
-VALUES ($1, $2, $3, $4)
-RETURNING *;
-
--- name: RemoveTestFromProtocolByCategoryAndUrgency :exec
-DELETE FROM protocol_tests WHERE protocol_id = $1 AND test_id = $2 AND category = $3 AND urgency = $4;
 

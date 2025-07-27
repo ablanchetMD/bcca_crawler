@@ -3,68 +3,64 @@ package api
 import (
 	"bcca_crawler/internal/config"
 	"bcca_crawler/internal/database"
-	"bcca_crawler/internal/json_utils"	
-	"fmt"	
-	"net/http"	
-	"time"	
+	"bcca_crawler/internal/json_utils"
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/lib/pq"
+	"net/http"
+	"time"
 )
 
-
-
 type Protocol struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	TumorGroup      string `json:"tumor_group"`
-	Code    string `json:"code"`
-	Name    string `json:"name"`
-	Tags    []string `json:"tags"`
-	Notes   string `json:"notes"`
-	ProtocolUrl string `json:"protocol_url"`
-	PatientHandoutUrl string `json:"patient_handout_url"`
-	RevisedOn string `json:"revised_on"`
-	ActivatedOn string `json:"activated_on"`
+	ID                uuid.UUID `json:"id"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+	TumorGroup        string    `json:"tumor_group"`
+	Code              string    `json:"code"`
+	Name              string    `json:"name"`
+	Tags              []string  `json:"tags"`
+	Notes             string    `json:"notes"`
+	ProtocolUrl       string    `json:"protocol_url"`
+	PatientHandoutUrl string    `json:"patient_handout_url"`
+	RevisedOn         string    `json:"revised_on"`
+	ActivatedOn       string    `json:"activated_on"`
 }
 
 type ProtocolRequest struct {
-	ID 				string `json:"id" validate:"omitempty,uuid"`
-	TumorGroup      string `json:"tumor_group" validate:"required,tumorgroup"`
-	Code    		string `json:"code" validate:"required,min=1,max=10"`
-	Name    		string `json:"name" validate:"required,min=1,max=250"`
-	Tags    		[]string `json:"tags" validate:"omitempty,max=10,dive,min=1,max=50"`
-	Notes  			 string `json:"notes" validate:"omitempty,max=500"`
-	ProtocolUrl string `json:"protocol_url" validate:"omitempty,max=250"`
-	PatientHandoutUrl string `json:"patient_handout_url" validate:"omitempty,max=250"`
-	RevisedOn string `json:"revised_on" validate:"omitempty,max=25"`
-	ActivatedOn string `json:"activated_on" validate:"omitempty,max=25"`
-
+	ID                string   `json:"id" validate:"omitempty,uuid"`
+	TumorGroup        string   `json:"tumor_group" validate:"required,tumorgroup"`
+	Code              string   `json:"code" validate:"required,min=1,max=10"`
+	Name              string   `json:"name" validate:"required,min=1,max=250"`
+	Tags              []string `json:"tags" validate:"omitempty,max=10,dive,min=1,max=50"`
+	Notes             string   `json:"notes" validate:"omitempty,max=500"`
+	ProtocolUrl       string   `json:"protocol_url" validate:"omitempty,max=250"`
+	PatientHandoutUrl string   `json:"patient_handout_url" validate:"omitempty,max=250"`
+	RevisedOn         string   `json:"revised_on" validate:"omitempty,max=25"`
+	ActivatedOn       string   `json:"activated_on" validate:"omitempty,max=25"`
 }
 
 type Protocols struct {
 	Protocols []Protocol `json:"protocols"`
 }
 
-
 func mapProtocolStruct(src database.Protocol) Protocol {
 	return Protocol{
-		ID:        src.ID,
-		CreatedAt: src.CreatedAt,
-		UpdatedAt: src.UpdatedAt,
-		TumorGroup:      src.TumorGroup,
-		Code:    src.Code,
-		Name:    src.Name,
-		Tags:    src.Tags,
-		Notes:   src.Notes,
-		ProtocolUrl: src.ProtocolUrl,
+		ID:                src.ID,
+		CreatedAt:         src.CreatedAt,
+		UpdatedAt:         src.UpdatedAt,
+		TumorGroup:        src.TumorGroup,
+		Code:              src.Code,
+		Name:              src.Name,
+		Tags:              src.Tags,
+		Notes:             src.Notes,
+		ProtocolUrl:       src.ProtocolUrl,
 		PatientHandoutUrl: src.PatientHandoutUrl,
-		RevisedOn: src.RevisedOn,
-		ActivatedOn: src.ActivatedOn,
+		RevisedOn:         src.RevisedOn,
+		ActivatedOn:       src.ActivatedOn,
 	}
 }
 
-func HandleGetProtocols(c *config.Config,q QueryParams, w http.ResponseWriter, r *http.Request) {
+func HandleGetProtocols(c *config.Config, q QueryParams, w http.ResponseWriter, r *http.Request) {
 	var protocols []database.Protocol
 	var err error
 	params := database.GetProtocolsAscParams{
@@ -90,17 +86,17 @@ func HandleGetProtocols(c *config.Config,q QueryParams, w http.ResponseWriter, r
 	default:
 		protocols, err = c.Db.GetProtocolsAsc(r.Context(), params)
 	}
-				
+
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error fetching protocols")
 		return
 	}
-	
+
 	var response []Protocol
 	for _, protocol := range protocols {
 		response = append(response, mapProtocolStruct(protocol))
 	}
-	
+
 	json_utils.RespondWithJSON(w, http.StatusOK, response)
 }
 
@@ -111,8 +107,8 @@ func HandleDeleteProtocol(c *config.Config, w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	err = c.Db.DeleteProtocol(r.Context(),ids.ID)
-		
+	err = c.Db.DeleteProtocol(r.Context(), ids.ID)
+
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error deleting protocols")
 		return
@@ -121,15 +117,15 @@ func HandleDeleteProtocol(c *config.Config, w http.ResponseWriter, r *http.Reque
 }
 
 func HandleGetProtocolById(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	
+
 	ids, err := ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	protocol,err := c.Db.GetProtocolByID(r.Context(),ids.ID)
-		
+	protocol, err := c.Db.GetProtocolByID(r.Context(), ids.ID)
+
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting protocol: %s", ids.ID.String()))
 		return
@@ -140,31 +136,31 @@ func HandleGetProtocolById(c *config.Config, w http.ResponseWriter, r *http.Requ
 func HandleUpsertProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
 
 	var req ProtocolRequest
-	err := UnmarshalAndValidatePayload(c,r, &req)
+	err := UnmarshalAndValidatePayload(c, r, &req)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	ctx := r.Context()	
+	ctx := r.Context()
 
-	pid, err:= uuid.Parse(req.ID)
+	pid, err := uuid.Parse(req.ID)
 	if err != nil || req.ID == "" {
 		fmt.Println("Error parsing UUID: ", err)
 		pid = uuid.Nil
 	}
 
-	protocol,err := c.Db.UpsertProtocol(ctx,database.UpsertProtocolParams{
-		ID: pid,
-		TumorGroup: database.TumorGroupEnum(req.TumorGroup),
-		Code: req.Code,
-		Name: req.Name,
-		Tags: pq.StringArray(req.Tags),
-		Notes: req.Notes,
-		ProtocolUrl: req.ProtocolUrl,
+	protocol, err := c.Db.UpsertProtocol(ctx, database.UpsertProtocolParams{
+		ID:                pid,
+		TumorGroup:        database.TumorGroupEnum(req.TumorGroup),
+		Code:              req.Code,
+		Name:              req.Name,
+		Tags:              pq.StringArray(req.Tags),
+		Notes:             req.Notes,
+		ProtocolUrl:       req.ProtocolUrl,
 		PatientHandoutUrl: req.PatientHandoutUrl,
-		RevisedOn: req.RevisedOn,
-		ActivatedOn: req.ActivatedOn,
+		RevisedOn:         req.RevisedOn,
+		ActivatedOn:       req.ActivatedOn,
 	})
 
 	if err != nil {
@@ -176,66 +172,64 @@ func HandleUpsertProtocol(c *config.Config, w http.ResponseWriter, r *http.Reque
 }
 
 func HandleGetProtocolSummary(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	
+
 	ids, err := ParseAndValidateID(r)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	response,err := CMD_GetProtocolBy(c,r.Context(),"id",ids.ID.String())
+	response, err := CMD_GetProtocolBy(c, r.Context(), "id", string(ids.ProtocolID.String()))
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting protocol: %s", ids.ID.String()))
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting protocol: %s", ids.ProtocolID.String()))
 		return
 	}
-	
+
 	json_utils.RespondWithJSON(w, http.StatusOK, response)
 }
 
 func HandleGetProtocolSummaryCode(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	code := r.PathValue("code")
-    if len(code) == 0 {
+	if len(code) == 0 {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "No protocol code provided")
 		return
-    }	
+	}
 
-	response,err := CMD_GetProtocolBy(c,r.Context(),"code",code)
+	response, err := CMD_GetProtocolBy(c, r.Context(), "code", code)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting protocol: %s", code))
 		return
 	}
-	
+
 	json_utils.RespondWithJSON(w, http.StatusOK, response)
 }
 
-func HandleCreateProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {	
-	
+func HandleCreateProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
+
 	var req ProtocolRequest
-	err := UnmarshalAndValidatePayload(c,r, &req)
+	err := UnmarshalAndValidatePayload(c, r, &req)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	
-	protocol, err := c.Db.CreateProtocol(r.Context(), database.CreateProtocolParams{	
-		
+
+	protocol, err := c.Db.CreateProtocol(r.Context(), database.CreateProtocolParams{
+
 		TumorGroup: req.TumorGroup,
-		Code: req.Code,
-		Name: req.Name,
-		Tags: req.Tags,
-		Notes: req.Notes,		
+		Code:       req.Code,
+		Name:       req.Name,
+		Tags:       req.Tags,
+		Notes:      req.Notes,
 	})
-	if err != nil {		
+	if err != nil {
 		if pgErr, ok := err.(*pq.Error); ok && pgErr.Code == "23505" {
 			// Duplicate key value violation
 			json_utils.RespondWithError(w, http.StatusInternalServerError, "Record already exists")
-			return			
+			return
 		}
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error creating protocol")
 		return
-	}	
-	
+	}
+
 	json_utils.RespondWithJSON(w, http.StatusCreated, mapProtocolStruct(protocol))
 }
-
-

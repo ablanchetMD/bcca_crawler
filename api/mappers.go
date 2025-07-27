@@ -1,14 +1,14 @@
 package api
 
 func MapAll[T any, R any](items []T, fn func(T) R) []R {
-	result := make([]R,0,len(items))	
+	result := make([]R, 0, len(items))
 	for _, item := range items {
 		result = append(result, fn(item))
 	}
 	return result
 }
 
-func MapAllWithError[T any, R any](items []T, fn func(T) (R,error)) ([]R,error){
+func MapAllWithError[T any, R any](items []T, fn func(T) (R, error)) ([]R, error) {
 	result := make([]R, 0, len(items))
 	for _, item := range items {
 		mapped, err := fn(item)

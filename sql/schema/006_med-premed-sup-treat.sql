@@ -30,7 +30,7 @@ CREATE TABLE protocol_treatment (
   updated_at timestamptz NOT NULL DEFAULT NOW(),
   medication_id UUID NOT NULL REFERENCES medications(id) ON DELETE CASCADE,  
   dose TEXT NOT NULL,
-  route TEXT NOT NULL,
+  route prescription_route_enum NOT NULL DEFAULT 'unknown',
   frequency TEXT NOT NULL,
   duration TEXT NOT NULL,
   administration_guide TEXT NOT NULL DEFAULT '',  
@@ -41,7 +41,7 @@ CREATE TABLE medication_modifications (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at timestamptz NOT NULL DEFAULT NOW(),
   updated_at timestamptz NOT NULL DEFAULT NOW(),
-  category TEXT NOT NULL, -- Hepatic Impairment, Renal Impairment, etc.
+  category med_adj_category_enum NOT NULL DEFAULT 'unknown',
   subcategory TEXT NOT NULL,
   adjustment TEXT NOT NULL,
   medication_id UUID NOT NULL REFERENCES medications(id) ON DELETE CASCADE,

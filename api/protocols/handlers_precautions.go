@@ -1,38 +1,53 @@
 package protocols
 
 import (
+	"bcca_crawler/api"
 	"bcca_crawler/internal/config"
 	"bcca_crawler/internal/database"
 	"bcca_crawler/internal/json_utils"
-	"bcca_crawler/api"
 	"fmt"
+	"github.com/google/uuid"
 	"net/http"
-	"github.com/google/uuid"	
-
 )
-
 
 func HandleGetPrecautions(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	
+
 	items, err := c.Db.GetPrecautionWithProtocols(ctx)
 
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting precautions")
 		return
 	}
-	
-	returned_value, err := api.MapAllWithError(items,MapPrecautionWithProtocols)
+
+	returned_value, err := api.MapAllWithError(items, MapPrecautionWithProtocols)
 
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting precautions")
-		fmt.Println("Error:", err)		
+		fmt.Println("Error:", err)
 		return
-	}	
+	}
 
 	json_utils.RespondWithJSON(w, http.StatusOK, returned_value)
 }
 
+func HandleGetPrecautionsByProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	ids, err := api.ParseAndValidateID(r)
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	items, err := c.Db.GetProtocolPrecautionsByProtocol(ctx, ids.ProtocolID)
+	if err != nil {
+		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	
+	json_utils.RespondWithJSON(w, http.StatusOK, items)
+}
 
 func HandleGetPrecautionByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
 
@@ -51,14 +66,14 @@ func HandleGetPrecautionByID(c *config.Config, w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	returned_value,err := MapPrecautionWithProtocols(item)
+	returned_value, err := MapPrecautionWithProtocols(item)
 
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting precautions")
-		fmt.Println("Error:", err)		
+		fmt.Println("Error:", err)
 		return
-	}	
-	
+	}
+
 	json_utils.RespondWithJSON(w, http.StatusOK, returned_value)
 }
 
@@ -84,53 +99,53 @@ func HandleDeletePrecautionByID(c *config.Config, w http.ResponseWriter, r *http
 
 func HandleUpsertPrecaution(c *config.Config, w http.ResponseWriter, r *http.Request) {
 
-	var req PrecautionReq	
-	err := api.UnmarshalAndValidatePayload(c,r, &req)
+	var req PrecautionReq
+	err := api.UnmarshalAndValidatePayload(c, r, &req)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	ctx := r.Context()	
+	ctx := r.Context()
 
-	pid, err:= uuid.Parse(req.ID)
+	pid, err := uuid.Parse(req.ID)
 	if err != nil {
 		pid = uuid.New()
-	}		
-	
-	caution,err := c.Db.UpsertPrecaution(ctx,database.UpsertPrecautionParams{
-		ID: pid,
-		Title: req.Title,		
-		Description: req.Description,		
+	}
+
+	caution, err := c.Db.UpsertPrecaution(ctx, database.UpsertPrecautionParams{
+		ID:          pid,
+		Title:       req.Title,
+		Description: req.Description,
 	})
 
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error upserting precaution: %s", req.ID))
-		return		
+		return
 	}
 
 	if req.ProtocolID == "" {
 		json_utils.RespondWithJSON(w, http.StatusOK, api.MapPrecaution(caution))
 		return
-	}	
+	}
 
-	proto_id, err:= uuid.Parse(req.ProtocolID)
+	proto_id, err := uuid.Parse(req.ProtocolID)
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding precaution to protocol (invalid UUID): %s", req.ProtocolID))		
-	}else{
-		err = c.Db.AddProtocolPrecautionToProtocol(ctx,database.AddProtocolPrecautionToProtocolParams{
-			ProtocolID: proto_id,			
+		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding precaution to protocol (invalid UUID): %s", req.ProtocolID))
+	} else {
+		err = c.Db.AddProtocolPrecautionToProtocol(ctx, database.AddProtocolPrecautionToProtocolParams{
+			ProtocolID:   proto_id,
 			PrecautionID: caution.ID,
 		})
-	
+
 		if err != nil {
-			json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding precaution to protocol: %s", req.ProtocolID))			
-		}	
+			json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding precaution to protocol: %s", req.ProtocolID))
+		}
 
 	}
 
-	json_utils.RespondWithJSON(w, http.StatusOK, api.MapPrecaution(caution))	
+	json_utils.RespondWithJSON(w, http.StatusOK, api.MapPrecaution(caution))
 }
 
 func HandleAddPrecautionToProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
@@ -140,12 +155,12 @@ func HandleAddPrecautionToProtocol(c *config.Config, w http.ResponseWriter, r *h
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
-	}	
-	
+	}
+
 	err = c.Db.AddProtocolPrecautionToProtocol(ctx, database.AddProtocolPrecautionToProtocolParams{
 		PrecautionID: ids.ID,
-		ProtocolID: ids.ProtocolID,
-	})	
+		ProtocolID:   ids.ProtocolID,
+	})
 
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding precaution to protocol: %s", ids.ID.String()))
@@ -163,11 +178,11 @@ func HandleRemovePrecautionFromProtocol(c *config.Config, w http.ResponseWriter,
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
-	}	
-	
+	}
+
 	err = c.Db.RemoveProtocolPrecautionFromProtocol(ctx, database.RemoveProtocolPrecautionFromProtocolParams{
 		PrecautionID: ids.ID,
-		ProtocolID: ids.ProtocolID,
+		ProtocolID:   ids.ProtocolID,
 	})
 
 	if err != nil {
@@ -186,7 +201,7 @@ func HandleUpdatePrecautionsToProtocols(c *config.Config, w http.ResponseWriter,
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	
+
 	var req ChangeProtocolReq
 	err = api.UnmarshalAndValidatePayload(c, r, &req)
 	if err != nil {
@@ -204,9 +219,9 @@ func HandleUpdatePrecautionsToProtocols(c *config.Config, w http.ResponseWriter,
 		selectedUUIDs = append(selectedUUIDs, uid)
 	}
 
-	err = c.Db.UpdatePrecautionProtocols(ctx, database.UpdatePrecautionProtocolsParams{		
+	err = c.Db.UpdatePrecautionProtocols(ctx, database.UpdatePrecautionProtocolsParams{
 		PrecautionID: ids.ID,
-		ProtocolIds: selectedUUIDs,
+		ProtocolIds:  selectedUUIDs,
 	})
 
 	if err != nil {

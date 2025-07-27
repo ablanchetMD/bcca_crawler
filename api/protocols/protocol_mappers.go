@@ -1,8 +1,8 @@
 package protocols
 
 import (
-	"bcca_crawler/internal/database"
 	"bcca_crawler/api"
+	"bcca_crawler/internal/database"
 )
 
 //Cautions
@@ -18,22 +18,22 @@ func mapToCautionResp[T any](row T) CautionLike {
 	}
 }
 
-func MapCautionWithProtocols[T any](r T) (CautionResp,error) {
+func MapCautionWithProtocols[T any](r T) (CautionResp, error) {
 	src := mapToCautionResp(r)
-	linkedProtocols, err := api.ParseLinkedProtocols(src.ProtocolIds)
-		if err != nil {			
-			return CautionResp{},err
-		}
+	linkedProtocols, err := api.ParsePostGRESData[api.LinkedProtocols](src.ProtocolIds)
+	if err != nil {
+		return CautionResp{}, err
+	}
 
 	return_item := CautionResp{
-		ID:          src.ID,
-		CreatedAt:	src.CreatedAt,
-		UpdatedAt: 	src.UpdatedAt,
-		Description: src.Description,
+		ID:              src.ID,
+		CreatedAt:       src.CreatedAt,
+		UpdatedAt:       src.UpdatedAt,
+		Description:     src.Description,
 		LinkedProtocols: linkedProtocols,
 	}
 
-	return return_item,nil
+	return return_item, nil
 }
 
 //Eligibility
@@ -51,23 +51,23 @@ func mapToEligibilityResp[T any](row T) EligibilityLike {
 	}
 }
 
-func MapEligibilityWithProtocols[T any](r T) (EligibilityCriterionResp,error) {
+func MapEligibilityWithProtocols[T any](r T) (EligibilityCriterionResp, error) {
 	src := mapToEligibilityResp(r)
-	linkedProtocols, err := api.ParseLinkedProtocols(src.ProtocolIds)
-		if err != nil {			
-			return EligibilityCriterionResp{},err
-		}
+	linkedProtocols, err := api.ParsePostGRESData[api.LinkedProtocols](src.ProtocolIds)
+	if err != nil {
+		return EligibilityCriterionResp{}, err
+	}
 
 	return_item := EligibilityCriterionResp{
-		ID:          src.ID,
-		CreatedAt:	src.CreatedAt,
-		UpdatedAt: 	src.UpdatedAt,
-		Description: src.Description,
-		Type:		string(src.Type),
+		ID:              src.ID,
+		CreatedAt:       src.CreatedAt,
+		UpdatedAt:       src.UpdatedAt,
+		Description:     src.Description,
+		Type:            string(src.Type),
 		LinkedProtocols: linkedProtocols,
 	}
 
-	return return_item,nil
+	return return_item, nil
 }
 
 //Precaution
@@ -77,41 +77,41 @@ func mapToPrecautionResponse[T any](row T) PrecautionLike {
 	case database.GetPrecautionWithProtocolsRow:
 		return PrecautionLike(r)
 	case database.GetPrecautionByIDWithProtocolsRow:
-		return PrecautionLike(r)	
+		return PrecautionLike(r)
 	default:
 		panic("unsupported row type")
 	}
 }
 
-func MapPrecautionWithProtocols[T any](r T) (PrecautionResp,error) {
+func MapPrecautionWithProtocols[T any](r T) (PrecautionResp, error) {
 	src := mapToPrecautionResponse(r)
-	linkedProtocols, err := api.ParseLinkedProtocols(src.ProtocolIds)
-		if err != nil {			
-			return PrecautionResp{},err
-		}
+	linkedProtocols, err := api.ParsePostGRESData[api.LinkedProtocols](src.ProtocolIds)
+	if err != nil {
+		return PrecautionResp{}, err
+	}
 
 	return_item := PrecautionResp{
-		ID:          src.ID,
-		CreatedAt:	src.CreatedAt,
-		UpdatedAt: 	src.UpdatedAt,
-		Description: src.Description,
-		Title:		src.Title,
+		ID:              src.ID,
+		CreatedAt:       src.CreatedAt,
+		UpdatedAt:       src.UpdatedAt,
+		Description:     src.Description,
+		Title:           src.Title,
 		LinkedProtocols: linkedProtocols,
 	}
 
-	return return_item,nil
+	return return_item, nil
 }
 
 //Medications
 
 func MapMedication(src database.Medication) MedicationResp {
 	return MedicationResp{
-		ID:          src.ID,
-		Name:        src.Name,
-		CreatedAt:   src.CreatedAt,
-		UpdatedAt:   src.UpdatedAt,
-		Description: src.Description,
-		Category:    src.Category,
+		ID:             src.ID,
+		Name:           src.Name,
+		CreatedAt:      src.CreatedAt,
+		UpdatedAt:      src.UpdatedAt,
+		Description:    src.Description,
+		Category:       src.Category,
 		AlternateNames: src.AlternateNames,
 	}
 }
@@ -131,37 +131,63 @@ func mapToPrescriptionResp[T any](row T) PrescriptionLike {
 	}
 }
 
+func MapMedModification(src database.GetProtocolMedicationsWithModificationsRow) (MedicationWithModifications, error)  {
+	cats, err := api.ParsePostGRESData[Category](src.Categories)
+	if err != nil {
+		return MedicationWithModifications{}, err
+	}
+
+	return MedicationWithModifications{		
+		MedicationID: src.MedicationID,
+		MedicationName: src.MedicationName,
+		Categories:     cats,		
+	}, nil
+}
+
 func MapPrescription[T any](r T) PrescriptionResp {
 	src := mapToPrescriptionResp(r)
 	return PrescriptionResp{
-		ID:            	src.MedicationPrescriptionID,
-		MedicationID:  	src.MedicationID,
-		MedicationName: src.Name,
-		CreatedAt:   	src.CreatedAt,
-		UpdatedAt:   	src.UpdatedAt,
-		Dose:          	src.Dose,
-		Route:         	string(src.Route),
-		Frequency:     	src.Frequency,
-		Duration:      	src.Duration,
-		Instructions:  	src.Instructions,
-		Renewals:     	 src.Renewals,
+		ID:                    src.MedicationPrescriptionID,
+		MedicationID:          src.MedicationID,
+		MedicationName:        src.Name,
+		MedicationCategory:    src.Category,
+		MedicationAlternates:  src.AlternateNames,
+		MedicationDescription: src.Description,
+		CreatedAt:             src.CreatedAt,
+		UpdatedAt:             src.UpdatedAt,
+		Dose:                  src.Dose,
+		Route:                 string(src.Route),
+		Frequency:             src.Frequency,
+		Duration:              src.Duration,
+		Instructions:          src.Instructions,
+		Renewals:              src.Renewals,
 	}
 }
-
 
 //Labs
 
 func MapLab(src database.Test) LabResp {
 	return LabResp{
-		ID:          src.ID,
-		Name:       src.Name,
-		CreatedAt:   src.CreatedAt,
-		UpdatedAt:   src.UpdatedAt,
-		Description: src.Description,
-		FormUrl:     src.FormUrl,
-		Unit:        src.Unit,
-		LowerLimit:  src.LowerLimit,
-		UpperLimit:  src.UpperLimit,
+		ID:           src.ID,
+		Name:         src.Name,
+		CreatedAt:    src.CreatedAt,
+		UpdatedAt:    src.UpdatedAt,
+		Description:  src.Description,
+		FormUrl:      src.FormUrl,
+		Unit:         src.Unit,
+		LowerLimit:   src.LowerLimit,
+		UpperLimit:   src.UpperLimit,
 		TestCategory: src.TestCategory,
+	}
+}
+
+func MapTestGroup(src database.ProtocolTest) ProtocolTestGroup {
+	return ProtocolTestGroup{
+		ID:         src.ID,
+		CreatedAt:  src.CreatedAt,
+		UpdatedAt:  src.UpdatedAt,
+		Category:   src.Category,
+		Comments:   src.Comments,
+		Position:   src.Position,
 	}
 }

@@ -5,12 +5,17 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"fmt"
-	"os"
-	
+	"fmt"	
 	"golang.org/x/net/html"
 
 )
+
+type WebProtocol struct {
+	Code string
+	Description string
+	Links []map[string]string	
+}
+
 
 func getTextContent(n *html.Node) string {
 	var buf strings.Builder
@@ -25,6 +30,36 @@ func getTextContent(n *html.Node) string {
 	}
 	extract(n)
 	return strings.TrimSpace(buf.String())
+}
+
+func extractLinksFromUL(ulNode *html.Node) []map[string]string {
+	var links []map[string]string
+
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "a" {
+			href := ""
+			for _, attr := range n.Attr {
+				if attr.Key == "href" {
+					href = attr.Val
+					break
+				}
+			}
+			text := getTextContent(n)
+			if href != "" {
+				links = append(links, map[string]string{
+					"text": text,
+					"href": fmt.Sprintf("http://www.bccancer.bc.ca%v",href),
+				})
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c)
+		}
+	}
+
+	f(ulNode)
+	return links
 }
 
 func GetHTML(rawURL string) (string, error) {
@@ -51,9 +86,9 @@ func GetHTML(rawURL string) (string, error) {
 }
 
 
-func GetURLsFromHTML(htmlBody string) ([]map[string]string, error) {
+func GetURLsFromHTML(htmlBody string) ([]WebProtocol, error) {
 	doc, err := html.Parse(strings.NewReader(htmlBody))
-	return_list := []map[string]string{}
+	return_list := []WebProtocol{}
 	if err != nil {
 		return nil, err
 	}
@@ -66,19 +101,22 @@ func GetURLsFromHTML(htmlBody string) ([]map[string]string, error) {
 					pNode := n.NextSibling
 					if pNode.NextSibling != nil && pNode.NextSibling.Type == html.ElementNode && pNode.NextSibling.Data == "ul" {
 						ulNode := pNode.NextSibling
+										
 	
 						// Extract text content
 						h4Text := getTextContent(n)
-						pText := getTextContent(pNode)
-						ulText := getTextContent(ulNode)
+						pText := getTextContent(pNode)						
+						ulLinks := extractLinksFromUL(ulNode)
+
+						protocol := WebProtocol{
+							Code:        h4Text,
+							Description: pText,
+							Links:       ulLinks,
+						}
 	
 						// Save to result
-						return_list = append(return_list, map[string]string{
-							"h4": h4Text,
-							"p":  pText,
-							"ul": ulText,
-						})
-						fmt.Fprintf(os.Stdout, "%d: %v : %v \n", i, h4Text,pText)
+						return_list = append(return_list,protocol)				
+
 
 						i++
 					}

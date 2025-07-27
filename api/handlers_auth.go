@@ -2,11 +2,11 @@ package api
 
 import (
 	"bcca_crawler/internal/auth"
+	"bcca_crawler/internal/auth/roles"
 	"bcca_crawler/internal/caching"
 	"bcca_crawler/internal/config"
 	"bcca_crawler/internal/database"
 	"bcca_crawler/internal/json_utils"
-	"bcca_crawler/internal/auth/roles"
 	"context"
 	"database/sql"
 	"fmt"
@@ -56,7 +56,6 @@ type RevokeRequest struct {
 type Users struct {
 	Users []User `json:"users"`
 }
-
 
 func mapUserStruct(src database.User) User {
 	return User{
@@ -195,17 +194,16 @@ func HandleReset(c *config.Config, w http.ResponseWriter, r *http.Request) {
 
 //Refresh function uses cookies instead of headers, can we make it use both?
 
-func HandleRefresh(c *config.Config, w http.ResponseWriter, r *http.Request) {	
+func HandleRefresh(c *config.Config, w http.ResponseWriter, r *http.Request) {
 
-	refresh_value, err := auth.GetCookieToken(r,"refresh_token")
-	if err != nil {			
+	refresh_value, err := auth.GetCookieToken(r, "refresh_token")
+	if err != nil {
 		json_utils.RespondWithError(w, http.StatusUnauthorized, "Invalid token")
 		return
 	}
-	
 
 	usertoken, err := auth.ValidateRefreshToken(refresh_value, c)
-	
+
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusUnauthorized, "Invalid Refresh Token")
 		return
@@ -235,9 +233,9 @@ func HandleRevoke(c *config.Config, w http.ResponseWriter, r *http.Request) {
 	json_utils.RespondWithJSON(w, http.StatusNoContent, "")
 }
 
-func HandleGetUsers(c *config.Config, q QueryParams, w http.ResponseWriter, r *http.Request) {	
-	user,err := auth.GetUserFromContext(r)
-	if err != nil {		
+func HandleGetUsers(c *config.Config, q QueryParams, w http.ResponseWriter, r *http.Request) {
+	user, err := auth.GetUserFromContext(r)
+	if err != nil {
 		json_utils.RespondWithError(w, http.StatusForbidden, "Invalid token")
 		return
 	}
@@ -251,7 +249,7 @@ func HandleGetUsers(c *config.Config, q QueryParams, w http.ResponseWriter, r *h
 		Limit:  int32(q.Limit),
 		Offset: int32(q.Offset),
 	}
-	
+
 	//optional queries : sort, sort_by, page, limit, offset, filter, fields, include, exclude,
 	switch {
 	case q.FilterBy == "role" && len(q.Include) > 0:
@@ -282,7 +280,7 @@ func HandleLogin(c *config.Config, w http.ResponseWriter, r *http.Request) {
 		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	
+
 	user, err := c.Db.GetUserByEmail(r.Context(), requestData.Email)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusUnauthorized, "Password or email is invalid.")
@@ -311,12 +309,12 @@ func HandleLogin(c *config.Config, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user_tokens,err := auth.GetJWTFromRefreshToken(refresh_obj, c)
+	user_tokens, err := auth.GetJWTFromRefreshToken(refresh_obj, c)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error creating auth token")
 		return
 	}
-	user_role,err := roles.RoleFromString(user.Role)
+	user_role, err := roles.RoleFromString(user.Role)
 	if err != nil {
 		json_utils.RespondWithError(w, http.StatusInternalServerError, "Invalid Role")
 		return

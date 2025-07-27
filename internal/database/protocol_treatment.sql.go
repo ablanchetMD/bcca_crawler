@@ -46,12 +46,12 @@ RETURNING id, created_at, updated_at, medication_id, dose, route, frequency, dur
 `
 
 type AddProtocolTreatmentParams struct {
-	MedicationID        uuid.UUID `json:"medication_id"`
-	Dose                string    `json:"dose"`
-	Route               string    `json:"route"`
-	Frequency           string    `json:"frequency"`
-	Duration            string    `json:"duration"`
-	AdministrationGuide string    `json:"administration_guide"`
+	MedicationID        uuid.UUID             `json:"medication_id"`
+	Dose                string                `json:"dose"`
+	Route               PrescriptionRouteEnum `json:"route"`
+	Frequency           string                `json:"frequency"`
+	Duration            string                `json:"duration"`
+	AdministrationGuide string                `json:"administration_guide"`
 }
 
 func (q *Queries) AddProtocolTreatment(ctx context.Context, arg AddProtocolTreatmentParams) (ProtocolTreatment, error) {
@@ -118,95 +118,53 @@ func (q *Queries) GetCycleByData(ctx context.Context, arg GetCycleByDataParams) 
 	return i, err
 }
 
-const getCycleByID = `-- name: GetCycleByID :one
-SELECT id, created_at, updated_at, cycle, cycle_duration, protocol_id FROM protocol_cycles
-WHERE id = $1
+const getProtocolCyclesWithTreatments = `-- name: GetProtocolCyclesWithTreatments :one
+SELECT COALESCE(jsonb_agg(cycle_data ORDER BY cycle_order), '[]'::jsonb) AS data
+FROM (
+  SELECT 
+    pc.id,
+    pc.created_at,
+    pc.updated_at,
+    pc.cycle,
+    pc.cycle_duration,
+    COALESCE(NULLIF(regexp_replace(pc.cycle, '\D', '', 'g'), '')::int, 0) AS cycle_order,
+    COALESCE((
+      SELECT jsonb_agg(treatment_data ORDER BY treatment_order)
+      FROM (
+        SELECT 
+          jsonb_build_object(
+            'medication_id', m.id,
+            'medication_name', m.name,
+            'medication_description', m.description,
+            'medication_category', m.category,
+            'medication_alternates', m.alternate_names,
+            'id', pt.id,
+            'dose', pt.dose,
+            'created_at', pt.created_at,
+            'updated_at', pt.updated_at,
+            'route', pt.route,
+            'frequency', pt.frequency,
+            'duration', pt.duration,
+            'administration_guide', pt.administration_guide
+          ) AS treatment_data,
+          COALESCE(NULLIF(regexp_replace(pt.frequency, '\D', '', 'g'), '')::int, 0) AS treatment_order
+        FROM protocol_treatment pt
+        LEFT JOIN medications m ON pt.medication_id = m.id
+        LEFT JOIN treatment_cycles_values tc 
+          ON tc.protocol_treatment_id = pt.id AND tc.protocol_cycles_id = pc.id
+        WHERE tc.protocol_cycles_id = pc.id
+      ) t
+    ), '[]'::jsonb) AS treatments
+  FROM protocol_cycles pc
+  WHERE pc.protocol_id = $1
+) cycle_data
 `
 
-func (q *Queries) GetCycleByID(ctx context.Context, id uuid.UUID) (ProtocolCycle, error) {
-	row := q.db.QueryRowContext(ctx, getCycleByID, id)
-	var i ProtocolCycle
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.Cycle,
-		&i.CycleDuration,
-		&i.ProtocolID,
-	)
-	return i, err
-}
-
-const getCycles = `-- name: GetCycles :many
-SELECT id, created_at, updated_at, cycle, cycle_duration, protocol_id FROM protocol_cycles
-ORDER BY cycle ASC
-`
-
-func (q *Queries) GetCycles(ctx context.Context) ([]ProtocolCycle, error) {
-	rows, err := q.db.QueryContext(ctx, getCycles)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ProtocolCycle{}
-	for rows.Next() {
-		var i ProtocolCycle
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Cycle,
-			&i.CycleDuration,
-			&i.ProtocolID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getCyclesByProtocol = `-- name: GetCyclesByProtocol :many
-SELECT protocol_cycles.id, protocol_cycles.created_at, protocol_cycles.updated_at, protocol_cycles.cycle, protocol_cycles.cycle_duration, protocol_cycles.protocol_id
-FROM protocol_cycles
-WHERE protocol_cycles.protocol_id = $1
-ORDER BY protocol_cycles.cycle ASC
-`
-
-func (q *Queries) GetCyclesByProtocol(ctx context.Context, protocolID uuid.UUID) ([]ProtocolCycle, error) {
-	rows, err := q.db.QueryContext(ctx, getCyclesByProtocol, protocolID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ProtocolCycle{}
-	for rows.Next() {
-		var i ProtocolCycle
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Cycle,
-			&i.CycleDuration,
-			&i.ProtocolID,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) GetProtocolCyclesWithTreatments(ctx context.Context, protocolID uuid.UUID) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getProtocolCyclesWithTreatments, protocolID)
+	var data interface{}
+	err := row.Scan(&data)
+	return data, err
 }
 
 const getProtocolTreatmentByData = `-- name: GetProtocolTreatmentByData :one
@@ -215,11 +173,11 @@ WHERE medication_id = $1 AND dose = $2 AND route = $3 AND frequency = $4 AND dur
 `
 
 type GetProtocolTreatmentByDataParams struct {
-	MedicationID uuid.UUID `json:"medication_id"`
-	Dose         string    `json:"dose"`
-	Route        string    `json:"route"`
-	Frequency    string    `json:"frequency"`
-	Duration     string    `json:"duration"`
+	MedicationID uuid.UUID             `json:"medication_id"`
+	Dose         string                `json:"dose"`
+	Route        PrescriptionRouteEnum `json:"route"`
+	Frequency    string                `json:"frequency"`
+	Duration     string                `json:"duration"`
 }
 
 func (q *Queries) GetProtocolTreatmentByData(ctx context.Context, arg GetProtocolTreatmentByDataParams) (ProtocolTreatment, error) {
@@ -246,26 +204,26 @@ func (q *Queries) GetProtocolTreatmentByData(ctx context.Context, arg GetProtoco
 }
 
 const getProtocolTreatmentByID = `-- name: GetProtocolTreatmentByID :one
-SELECT m.id as medication_id, m.name as medication_name, m.description as medication_description, m.category as medication_category ,m.alternate_names as medication_alternates, pt.id as treatment_id, pt.dose, pt.created_at,pt.updated_at, pt.route, pt.frequency, pt.duration, pt.administration_guide
+SELECT m.id as medication_id, m.name as medication_name, m.description as medication_description, m.category as medication_category ,m.alternate_names as medication_alternates, pt.id as id, pt.dose, pt.created_at,pt.updated_at, pt.route, pt.frequency, pt.duration, pt.administration_guide
 FROM medications m
 JOIN protocol_treatment pt ON m.id = pt.medication_id
 WHERE pt.id = $1
 `
 
 type GetProtocolTreatmentByIDRow struct {
-	MedicationID          uuid.UUID `json:"medication_id"`
-	MedicationName        string    `json:"medication_name"`
-	MedicationDescription string    `json:"medication_description"`
-	MedicationCategory    string    `json:"medication_category"`
-	MedicationAlternates  []string  `json:"medication_alternates"`
-	TreatmentID           uuid.UUID `json:"treatment_id"`
-	Dose                  string    `json:"dose"`
-	CreatedAt             time.Time `json:"created_at"`
-	UpdatedAt             time.Time `json:"updated_at"`
-	Route                 string    `json:"route"`
-	Frequency             string    `json:"frequency"`
-	Duration              string    `json:"duration"`
-	AdministrationGuide   string    `json:"administration_guide"`
+	MedicationID          uuid.UUID             `json:"medication_id"`
+	MedicationName        string                `json:"medication_name"`
+	MedicationDescription string                `json:"medication_description"`
+	MedicationCategory    string                `json:"medication_category"`
+	MedicationAlternates  []string              `json:"medication_alternates"`
+	ID                    uuid.UUID             `json:"id"`
+	Dose                  string                `json:"dose"`
+	CreatedAt             time.Time             `json:"created_at"`
+	UpdatedAt             time.Time             `json:"updated_at"`
+	Route                 PrescriptionRouteEnum `json:"route"`
+	Frequency             string                `json:"frequency"`
+	Duration              string                `json:"duration"`
+	AdministrationGuide   string                `json:"administration_guide"`
 }
 
 func (q *Queries) GetProtocolTreatmentByID(ctx context.Context, id uuid.UUID) (GetProtocolTreatmentByIDRow, error) {
@@ -277,7 +235,7 @@ func (q *Queries) GetProtocolTreatmentByID(ctx context.Context, id uuid.UUID) (G
 		&i.MedicationDescription,
 		&i.MedicationCategory,
 		pq.Array(&i.MedicationAlternates),
-		&i.TreatmentID,
+		&i.ID,
 		&i.Dose,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -290,26 +248,26 @@ func (q *Queries) GetProtocolTreatmentByID(ctx context.Context, id uuid.UUID) (G
 }
 
 const getTreatments = `-- name: GetTreatments :many
-SELECT m.id as medication_id, m.name as medication_name, m.description as medication_description, m.category as medication_category ,m.alternate_names as medication_alternates, pt.id as treatment_id, pt.dose, pt.created_at,pt.updated_at, pt.route, pt.frequency, pt.duration, pt.administration_guide
+SELECT m.id as medication_id, m.name as medication_name, m.description as medication_description, m.category as medication_category ,m.alternate_names as medication_alternates, pt.id as id, pt.dose, pt.created_at,pt.updated_at, pt.route, pt.frequency, pt.duration, pt.administration_guide
 FROM medications m
 JOIN protocol_treatment pt ON m.id = pt.medication_id
 ORDER BY medication_name ASC
 `
 
 type GetTreatmentsRow struct {
-	MedicationID          uuid.UUID `json:"medication_id"`
-	MedicationName        string    `json:"medication_name"`
-	MedicationDescription string    `json:"medication_description"`
-	MedicationCategory    string    `json:"medication_category"`
-	MedicationAlternates  []string  `json:"medication_alternates"`
-	TreatmentID           uuid.UUID `json:"treatment_id"`
-	Dose                  string    `json:"dose"`
-	CreatedAt             time.Time `json:"created_at"`
-	UpdatedAt             time.Time `json:"updated_at"`
-	Route                 string    `json:"route"`
-	Frequency             string    `json:"frequency"`
-	Duration              string    `json:"duration"`
-	AdministrationGuide   string    `json:"administration_guide"`
+	MedicationID          uuid.UUID             `json:"medication_id"`
+	MedicationName        string                `json:"medication_name"`
+	MedicationDescription string                `json:"medication_description"`
+	MedicationCategory    string                `json:"medication_category"`
+	MedicationAlternates  []string              `json:"medication_alternates"`
+	ID                    uuid.UUID             `json:"id"`
+	Dose                  string                `json:"dose"`
+	CreatedAt             time.Time             `json:"created_at"`
+	UpdatedAt             time.Time             `json:"updated_at"`
+	Route                 PrescriptionRouteEnum `json:"route"`
+	Frequency             string                `json:"frequency"`
+	Duration              string                `json:"duration"`
+	AdministrationGuide   string                `json:"administration_guide"`
 }
 
 func (q *Queries) GetTreatments(ctx context.Context) ([]GetTreatmentsRow, error) {
@@ -327,7 +285,7 @@ func (q *Queries) GetTreatments(ctx context.Context) ([]GetTreatmentsRow, error)
 			&i.MedicationDescription,
 			&i.MedicationCategory,
 			pq.Array(&i.MedicationAlternates),
-			&i.TreatmentID,
+			&i.ID,
 			&i.Dose,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -350,7 +308,7 @@ func (q *Queries) GetTreatments(ctx context.Context) ([]GetTreatmentsRow, error)
 }
 
 const getTreatmentsByCycle = `-- name: GetTreatmentsByCycle :many
-SELECT m.id as medication_id, m.name as medication_name, m.description as medication_description, m.category as medication_category ,m.alternate_names as medication_alternates, pt.id as treatment_id, pt.dose, pt.created_at,pt.updated_at, pt.route, pt.frequency, pt.duration, pt.administration_guide
+SELECT m.id as medication_id, m.name as medication_name, m.description as medication_description, m.category as medication_category ,m.alternate_names as medication_alternates, pt.id as id, pt.dose, pt.created_at,pt.updated_at, pt.route, pt.frequency, pt.duration, pt.administration_guide
 FROM medications m
 JOIN protocol_treatment pt ON m.id = pt.medication_id
 JOIN treatment_cycles_values ON pt.id = treatment_cycles_values.protocol_treatment_id
@@ -359,19 +317,19 @@ ORDER BY medication_name ASC
 `
 
 type GetTreatmentsByCycleRow struct {
-	MedicationID          uuid.UUID `json:"medication_id"`
-	MedicationName        string    `json:"medication_name"`
-	MedicationDescription string    `json:"medication_description"`
-	MedicationCategory    string    `json:"medication_category"`
-	MedicationAlternates  []string  `json:"medication_alternates"`
-	TreatmentID           uuid.UUID `json:"treatment_id"`
-	Dose                  string    `json:"dose"`
-	CreatedAt             time.Time `json:"created_at"`
-	UpdatedAt             time.Time `json:"updated_at"`
-	Route                 string    `json:"route"`
-	Frequency             string    `json:"frequency"`
-	Duration              string    `json:"duration"`
-	AdministrationGuide   string    `json:"administration_guide"`
+	MedicationID          uuid.UUID             `json:"medication_id"`
+	MedicationName        string                `json:"medication_name"`
+	MedicationDescription string                `json:"medication_description"`
+	MedicationCategory    string                `json:"medication_category"`
+	MedicationAlternates  []string              `json:"medication_alternates"`
+	ID                    uuid.UUID             `json:"id"`
+	Dose                  string                `json:"dose"`
+	CreatedAt             time.Time             `json:"created_at"`
+	UpdatedAt             time.Time             `json:"updated_at"`
+	Route                 PrescriptionRouteEnum `json:"route"`
+	Frequency             string                `json:"frequency"`
+	Duration              string                `json:"duration"`
+	AdministrationGuide   string                `json:"administration_guide"`
 }
 
 func (q *Queries) GetTreatmentsByCycle(ctx context.Context, protocolCyclesID uuid.UUID) ([]GetTreatmentsByCycleRow, error) {
@@ -389,7 +347,7 @@ func (q *Queries) GetTreatmentsByCycle(ctx context.Context, protocolCyclesID uui
 			&i.MedicationDescription,
 			&i.MedicationCategory,
 			pq.Array(&i.MedicationAlternates),
-			&i.TreatmentID,
+			&i.ID,
 			&i.Dose,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -461,13 +419,13 @@ RETURNING id, created_at, updated_at, medication_id, dose, route, frequency, dur
 `
 
 type UpdateProtocolTreatmentParams struct {
-	ID                  uuid.UUID `json:"id"`
-	MedicationID        uuid.UUID `json:"medication_id"`
-	Dose                string    `json:"dose"`
-	Route               string    `json:"route"`
-	Frequency           string    `json:"frequency"`
-	Duration            string    `json:"duration"`
-	AdministrationGuide string    `json:"administration_guide"`
+	ID                  uuid.UUID             `json:"id"`
+	MedicationID        uuid.UUID             `json:"medication_id"`
+	Dose                string                `json:"dose"`
+	Route               PrescriptionRouteEnum `json:"route"`
+	Frequency           string                `json:"frequency"`
+	Duration            string                `json:"duration"`
+	AdministrationGuide string                `json:"administration_guide"`
 }
 
 func (q *Queries) UpdateProtocolTreatment(ctx context.Context, arg UpdateProtocolTreatmentParams) (ProtocolTreatment, error) {
@@ -496,14 +454,25 @@ func (q *Queries) UpdateProtocolTreatment(ctx context.Context, arg UpdateProtoco
 }
 
 const upsertCycleToProtocol = `-- name: UpsertCycleToProtocol :one
+WITH input_values(id, protocol_id, cycle, cycle_duration) AS (
+  VALUES (
+    CASE 
+      WHEN $1::uuid  = '00000000-0000-0000-0000-000000000000'
+      THEN gen_random_uuid() 
+      ELSE $1::uuid 
+    END,
+    $2::uuid,
+    $3::TEXT,
+    $4::text    
+  )
+)
 INSERT INTO protocol_cycles (id, protocol_id, cycle, cycle_duration)
-VALUES ($1, $2, $3, $4)
+SELECT id, protocol_id, cycle, cycle_duration FROM input_values
 ON CONFLICT (id) DO UPDATE
-SET
-    updated_at = NOW(),
-    protocol_id = EXCLUDED.protocol_id,
+SET protocol_id = EXCLUDED.protocol_id,
     cycle = EXCLUDED.cycle,
-    cycle_duration = EXCLUDED.cycle_duration
+    cycle_duration = EXCLUDED.cycle_duration,      
+    updated_at = NOW()
 RETURNING id, created_at, updated_at, cycle, cycle_duration, protocol_id
 `
 
@@ -534,28 +503,42 @@ func (q *Queries) UpsertCycleToProtocol(ctx context.Context, arg UpsertCycleToPr
 }
 
 const upsertProtocolTreatment = `-- name: UpsertProtocolTreatment :one
+WITH input_values(id, medication_id, dose, route, frequency, duration, administration_guide) AS (
+  VALUES (
+    CASE 
+      WHEN $1 = '00000000-0000-0000-0000-000000000000'::uuid 
+      THEN gen_random_uuid() 
+      ELSE $1::uuid 
+    END,
+    $2::uuid,
+    $3,
+    $4::prescription_route_enum,
+    $5,
+    $6,
+    $7
+  )
+)
 INSERT INTO protocol_treatment (id, medication_id, dose, route, frequency, duration, administration_guide)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+SELECT id, medication_id, dose, route, frequency, duration, administration_guide FROM input_values
 ON CONFLICT (id) DO UPDATE
-SET
-    updated_at = NOW(),
-    medication_id = EXCLUDED.medication_id,
+SET medication_id = EXCLUDED.medication_id,
     dose = EXCLUDED.dose,
     route = EXCLUDED.route,
     frequency = EXCLUDED.frequency,
     duration = EXCLUDED.duration,
-    administration_guide = EXCLUDED.administration_guide
+    administration_guide = EXCLUDED.administration_guide,    
+    updated_at = NOW()
 RETURNING id, created_at, updated_at, medication_id, dose, route, frequency, duration, administration_guide
 `
 
 type UpsertProtocolTreatmentParams struct {
-	ID                  uuid.UUID `json:"id"`
-	MedicationID        uuid.UUID `json:"medication_id"`
-	Dose                string    `json:"dose"`
-	Route               string    `json:"route"`
-	Frequency           string    `json:"frequency"`
-	Duration            string    `json:"duration"`
-	AdministrationGuide string    `json:"administration_guide"`
+	ID                  interface{}           `json:"id"`
+	MedicationID        uuid.UUID             `json:"medication_id"`
+	Dose                interface{}           `json:"dose"`
+	Route               PrescriptionRouteEnum `json:"route"`
+	Frequency           interface{}           `json:"frequency"`
+	Duration            interface{}           `json:"duration"`
+	AdministrationGuide interface{}           `json:"administration_guide"`
 }
 
 func (q *Queries) UpsertProtocolTreatment(ctx context.Context, arg UpsertProtocolTreatmentParams) (ProtocolTreatment, error) {

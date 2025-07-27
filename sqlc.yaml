@@ -9,4 +9,8 @@ sql:
         emit_db_tags: false
         emit_json_tags: true
         emit_empty_slices: true
-
+        overrides:
+          - db_type: "jsonb"
+            go_type: "encoding/json.RawMessage"
+          - column: "protocol_cycles.data"
+            go_type: "encoding/json.RawMessage"

@@ -13,49 +13,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type CategoryEnum string
-
-const (
-	CategoryEnumBaseline CategoryEnum = "baseline"
-	CategoryEnumFollowup CategoryEnum = "followup"
-	CategoryEnumUnknown  CategoryEnum = "unknown"
-)
-
-func (e *CategoryEnum) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = CategoryEnum(s)
-	case string:
-		*e = CategoryEnum(s)
-	default:
-		return fmt.Errorf("unsupported scan type for CategoryEnum: %T", src)
-	}
-	return nil
-}
-
-type NullCategoryEnum struct {
-	CategoryEnum CategoryEnum `json:"category_enum"`
-	Valid        bool         `json:"valid"` // Valid is true if CategoryEnum is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullCategoryEnum) Scan(value interface{}) error {
-	if value == nil {
-		ns.CategoryEnum, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.CategoryEnum.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullCategoryEnum) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.CategoryEnum), nil
-}
-
 type EligibilityEnum string
 
 const (
@@ -145,47 +102,47 @@ func (ns NullGradeEnum) Value() (driver.Value, error) {
 	return string(ns.GradeEnum), nil
 }
 
-type MedProtoCategoryEnum string
+type MedAdjCategoryEnum string
 
 const (
-	MedProtoCategoryEnumPremed  MedProtoCategoryEnum = "premed"
-	MedProtoCategoryEnumSupport MedProtoCategoryEnum = "support"
-	MedProtoCategoryEnumUnknown MedProtoCategoryEnum = "unknown"
+	MedAdjCategoryEnumHepaticImpairment MedAdjCategoryEnum = "hepatic_impairment"
+	MedAdjCategoryEnumRenalImpairment   MedAdjCategoryEnum = "renal_impairment"
+	MedAdjCategoryEnumUnknown           MedAdjCategoryEnum = "unknown"
 )
 
-func (e *MedProtoCategoryEnum) Scan(src interface{}) error {
+func (e *MedAdjCategoryEnum) Scan(src interface{}) error {
 	switch s := src.(type) {
 	case []byte:
-		*e = MedProtoCategoryEnum(s)
+		*e = MedAdjCategoryEnum(s)
 	case string:
-		*e = MedProtoCategoryEnum(s)
+		*e = MedAdjCategoryEnum(s)
 	default:
-		return fmt.Errorf("unsupported scan type for MedProtoCategoryEnum: %T", src)
+		return fmt.Errorf("unsupported scan type for MedAdjCategoryEnum: %T", src)
 	}
 	return nil
 }
 
-type NullMedProtoCategoryEnum struct {
-	MedProtoCategoryEnum MedProtoCategoryEnum `json:"med_proto_category_enum"`
-	Valid                bool                 `json:"valid"` // Valid is true if MedProtoCategoryEnum is not NULL
+type NullMedAdjCategoryEnum struct {
+	MedAdjCategoryEnum MedAdjCategoryEnum `json:"med_adj_category_enum"`
+	Valid              bool               `json:"valid"` // Valid is true if MedAdjCategoryEnum is not NULL
 }
 
 // Scan implements the Scanner interface.
-func (ns *NullMedProtoCategoryEnum) Scan(value interface{}) error {
+func (ns *NullMedAdjCategoryEnum) Scan(value interface{}) error {
 	if value == nil {
-		ns.MedProtoCategoryEnum, ns.Valid = "", false
+		ns.MedAdjCategoryEnum, ns.Valid = "", false
 		return nil
 	}
 	ns.Valid = true
-	return ns.MedProtoCategoryEnum.Scan(value)
+	return ns.MedAdjCategoryEnum.Scan(value)
 }
 
 // Value implements the driver Valuer interface.
-func (ns NullMedProtoCategoryEnum) Value() (driver.Value, error) {
+func (ns NullMedAdjCategoryEnum) Value() (driver.Value, error) {
 	if !ns.Valid {
 		return nil, nil
 	}
-	return string(ns.MedProtoCategoryEnum), nil
+	return string(ns.MedAdjCategoryEnum), nil
 }
 
 type PhysicianSiteEnum string
@@ -339,50 +296,6 @@ func (ns NullTumorGroupEnum) Value() (driver.Value, error) {
 	return string(ns.TumorGroupEnum), nil
 }
 
-type UrgencyEnum string
-
-const (
-	UrgencyEnumUrgent      UrgencyEnum = "urgent"
-	UrgencyEnumNonUrgent   UrgencyEnum = "non_urgent"
-	UrgencyEnumIfNecessary UrgencyEnum = "if_necessary"
-	UrgencyEnumUnknown     UrgencyEnum = "unknown"
-)
-
-func (e *UrgencyEnum) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = UrgencyEnum(s)
-	case string:
-		*e = UrgencyEnum(s)
-	default:
-		return fmt.Errorf("unsupported scan type for UrgencyEnum: %T", src)
-	}
-	return nil
-}
-
-type NullUrgencyEnum struct {
-	UrgencyEnum UrgencyEnum `json:"urgency_enum"`
-	Valid       bool        `json:"valid"` // Valid is true if UrgencyEnum is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullUrgencyEnum) Scan(value interface{}) error {
-	if value == nil {
-		ns.UrgencyEnum, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.UrgencyEnum.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullUrgencyEnum) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.UrgencyEnum), nil
-}
-
 type ArticleReference struct {
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
@@ -432,13 +345,13 @@ type Medication struct {
 }
 
 type MedicationModification struct {
-	ID           uuid.UUID `json:"id"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	Category     string    `json:"category"`
-	Subcategory  string    `json:"subcategory"`
-	Adjustment   string    `json:"adjustment"`
-	MedicationID uuid.UUID `json:"medication_id"`
+	ID           uuid.UUID          `json:"id"`
+	CreatedAt    time.Time          `json:"created_at"`
+	UpdatedAt    time.Time          `json:"updated_at"`
+	Category     MedAdjCategoryEnum `json:"category"`
+	Subcategory  string             `json:"subcategory"`
+	Adjustment   string             `json:"adjustment"`
+	MedicationID uuid.UUID          `json:"medication_id"`
 }
 
 type MedicationPrescription struct {
@@ -519,9 +432,17 @@ type ProtocolEligibilityCriterium struct {
 }
 
 type ProtocolMed struct {
-	ProtocolID     uuid.UUID            `json:"protocol_id"`
-	PrescriptionID uuid.UUID            `json:"prescription_id"`
-	Category       MedProtoCategoryEnum `json:"category"`
+	ID         uuid.UUID `json:"id"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+	Category   string    `json:"category"`
+	Comments   string    `json:"comments"`
+	ProtocolID uuid.UUID `json:"protocol_id"`
+}
+
+type ProtocolMedsValue struct {
+	ProtocolMedsID           uuid.UUID `json:"protocol_meds_id"`
+	MedicationPrescriptionID uuid.UUID `json:"medication_prescription_id"`
 }
 
 type ProtocolPpo struct {
@@ -552,10 +473,18 @@ type ProtocolReferencesValue struct {
 }
 
 type ProtocolTest struct {
-	ProtocolID uuid.UUID    `json:"protocol_id"`
-	TestID     uuid.UUID    `json:"test_id"`
-	Category   CategoryEnum `json:"category"`
-	Urgency    UrgencyEnum  `json:"urgency"`
+	ID         uuid.UUID `json:"id"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+	ProtocolID uuid.UUID `json:"protocol_id"`
+	Category   string    `json:"category"`
+	Comments   string    `json:"comments"`
+	Position   int32     `json:"position"`
+}
+
+type ProtocolTestsValue struct {
+	ProtocolTestsID uuid.UUID `json:"protocol_tests_id"`
+	TestsID         uuid.UUID `json:"tests_id"`
 }
 
 type ProtocolToxModification struct {
@@ -568,15 +497,15 @@ type ProtocolToxModification struct {
 }
 
 type ProtocolTreatment struct {
-	ID                  uuid.UUID `json:"id"`
-	CreatedAt           time.Time `json:"created_at"`
-	UpdatedAt           time.Time `json:"updated_at"`
-	MedicationID        uuid.UUID `json:"medication_id"`
-	Dose                string    `json:"dose"`
-	Route               string    `json:"route"`
-	Frequency           string    `json:"frequency"`
-	Duration            string    `json:"duration"`
-	AdministrationGuide string    `json:"administration_guide"`
+	ID                  uuid.UUID             `json:"id"`
+	CreatedAt           time.Time             `json:"created_at"`
+	UpdatedAt           time.Time             `json:"updated_at"`
+	MedicationID        uuid.UUID             `json:"medication_id"`
+	Dose                string                `json:"dose"`
+	Route               PrescriptionRouteEnum `json:"route"`
+	Frequency           string                `json:"frequency"`
+	Duration            string                `json:"duration"`
+	AdministrationGuide string                `json:"administration_guide"`
 }
 
 type RefreshToken struct {

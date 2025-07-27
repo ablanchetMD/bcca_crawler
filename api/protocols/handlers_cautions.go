@@ -1,218 +1,159 @@
 package protocols
 
 import (
+	"bcca_crawler/api"
 	"bcca_crawler/internal/config"
 	"bcca_crawler/internal/database"
-	"bcca_crawler/internal/json_utils"
-	"bcca_crawler/api"
+	"context"
 	"fmt"
 	"net/http"
-	"github.com/google/uuid"
-		
 
+	"github.com/google/uuid"
 )
 
-
-func HandleGetCautions(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()		
+func getCautions(c *config.Config, ctx context.Context, ids api.IDs) ([]CautionResp, error) {
 	items, err := c.Db.GetCautionWithProtocols(ctx)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting cautions")
-		fmt.Println("Error:", err)
-		return
+		return nil, err
 	}
 
-	returned_value, err := api.MapAllWithError(items,MapCautionWithProtocols)
+	response, err := api.MapAllWithError(items, MapCautionWithProtocols)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, "Error getting cautions")
-		fmt.Println("Error:", err)		
-		return
+		return nil, fmt.Errorf("error getting cautions: %s", err)
+	}
+
+	return response, nil
+}
+
+func getCautionsByProtocol(c *config.Config, ctx context.Context, ids api.IDs) ([]database.ProtocolCaution, error) {
+	items, err := c.Db.GetProtocolCautionsByProtocol(ctx, ids.ProtocolID)
+
+	if err != nil {
+		return nil, err
 	}	
 
-	json_utils.RespondWithJSON(w, http.StatusOK, returned_value)
+	return items, nil
 }
 
+func getCautionsByID(c *config.Config, ctx context.Context, ids api.IDs) (CautionResp, error) {
+	items, err := c.Db.GetCautionByIDWithProtocols(ctx, ids.ID)
 
-func HandleGetCautionsByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ids, err := api.ParseAndValidateID(r)
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		return
+		return CautionResp{}, err
 	}
 
-	item, err := c.Db.GetCautionByIDWithProtocols(ctx, ids.ID)
+	response, err := MapCautionWithProtocols(items)
 
 	if err != nil {
-		println(err.Error())
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting cautions: %s", ids.ID.String()))
-		return
-	}	
-	
-	returned_value, err := MapCautionWithProtocols(item)
-
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		return
+		return CautionResp{}, fmt.Errorf("error getting cautions: %s", err)
 	}
-	
-	json_utils.RespondWithJSON(w, http.StatusOK, returned_value)
+
+	return response, nil
 }
 
-func HandleDeleteCautionByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ids, err := api.ParseAndValidateID(r)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	err = c.Db.DeleteProtocolCaution(ctx, ids.ID)
+func deleteCaution(c *config.Config, ctx context.Context, ids api.IDs) (string, error) {
+	err := c.Db.DeleteProtocolCaution(ctx, ids.ID)
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting caution: %s", ids.ID.String()))
-		return
-	}
+		return "", fmt.Errorf("error deleting caution: %s, with error: %v", ids.ID.String(), err)
 
-	json_utils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "caution deleted"})
+	}
+	return fmt.Sprintf("Caution %s deleted.", ids.ID.String()), nil
 }
 
-func HandleUpsertCaution(c *config.Config, w http.ResponseWriter, r *http.Request) {	
-	var req CautionReq	
-	err := api.UnmarshalAndValidatePayload(c,r, &req)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+func upsertCaution(c *config.Config, ctx context.Context, req CautionReq, ids api.IDs) error {
 
-	ctx := r.Context()	
-
-	pid, err:= uuid.Parse(req.ID)
-	if err != nil || req.ID == "" {
-		pid = uuid.Nil
-	}		
-	
-	caution,err := c.Db.UpsertCaution(ctx,database.UpsertCautionParams{
-		ID: pid,		
-		Description: req.Description,		
+	_, err := c.Db.UpsertCaution(ctx, database.UpsertCautionParams{
+		ID:          req.ID,
+		Description: req.Description,
 	})
 
-	if err != nil {		
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error upserting caution: %s", req.ID))
-		return		
-	}
-	
-	if req.ProtocolID == "" {
-		json_utils.RespondWithJSON(w, http.StatusOK, api.MapCaution(caution))
-		return
-	}
-
-	proto_id, err:= uuid.Parse(req.ProtocolID)
-	
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding caution to protocol (invalid UUID): %s", req.ProtocolID))		
-	}else{
-		err = c.Db.AddProtocolCautionToProtocol(ctx,database.AddProtocolCautionToProtocolParams{
-			ProtocolID: proto_id,			
-			CautionID: caution.ID,
-		})
-	
-		if err != nil {
-			json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding caution to protocol: %s", req.ProtocolID))			
-		}	
-
+		return fmt.Errorf("error upserting caution: %s with error:%s", req.ID, err.Error())
 	}
 
-	json_utils.RespondWithJSON(w, http.StatusOK, api.MapCaution(caution))	
+	return nil
 }
 
-func HandleAddCautionToProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	ids, err := api.ParseAndValidateID(r)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}	
-	
-	err = c.Db.AddProtocolCautionToProtocol(ctx, database.AddProtocolCautionToProtocolParams{
-		CautionID: ids.ID,
-		ProtocolID: ids.ProtocolID,
-	})	
-
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error adding caution to protocol: %s", ids.ID.String()))
-		return
-	}
-
-	json_utils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "caution added to protocol"})
-
-}
-
-func HandleRemoveCautionFromProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	ids, err := api.ParseAndValidateID(r)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}	
-	
-	err = c.Db.RemoveProtocolCautionFromProtocol(ctx, database.RemoveProtocolCautionFromProtocolParams{
-		CautionID: ids.ID,
+func addCautionToProtocol(c *config.Config, ctx context.Context, ids api.IDs) (string, error) {
+	err := c.Db.AddProtocolCautionToProtocol(ctx, database.AddProtocolCautionToProtocolParams{
+		CautionID:  ids.ID,
 		ProtocolID: ids.ProtocolID,
 	})
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error removing eligibility criteria from protocol: %s", ids.ID.String()))
-		return
-	}
+		return "", fmt.Errorf("error adding caution: %s to protocol %s, with error: %v", ids.ID.String(), ids.ProtocolID.String(), err)
 
-	json_utils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "caution removed from protocol"})
+	}
+	return fmt.Sprintf("Caution %s added to protocol %s", ids.ID.String(), ids.ProtocolID.String()), nil
 
 }
 
-func HandleUpdateCautionsToProtocols(c *config.Config, w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	ids, err := api.ParseAndValidateID(r)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	
-	var req ChangeProtocolReq
-	err = api.UnmarshalAndValidatePayload(c, r, &req)
-	if err != nil {
-		json_utils.RespondWithError(w, http.StatusBadRequest, err.Error())
-		return
-	}
+func removeCautionToProtocol(c *config.Config, ctx context.Context, ids api.IDs) (string, error) {
+	err := c.Db.RemoveProtocolCautionFromProtocol(ctx, database.RemoveProtocolCautionFromProtocolParams{
+		CautionID:  ids.ID,
+		ProtocolID: ids.ProtocolID,
+	})
 
+	if err != nil {
+		return "", fmt.Errorf("error removing caution: %s to protocol %s, with error: %v", ids.ID.String(), ids.ProtocolID.String(), err)
+
+	}
+	return fmt.Sprintf("Caution %s removed from protocol %s", ids.ID.String(), ids.ProtocolID.String()), nil
+}
+
+func updateCautionToProtocol(c *config.Config, ctx context.Context, req ChangeProtocolReq, ids api.IDs) error {
 	var selectedUUIDs []uuid.UUID
 	for _, id := range req.SelectedProtocolIDs {
 		uid, err := uuid.Parse(id)
 		if err != nil {
-			json_utils.RespondWithError(w, http.StatusBadRequest, fmt.Sprintf("Invalid UUID: %s", id))
-			return
+			return fmt.Errorf("invalid UUID:%s", id)
 		}
 		selectedUUIDs = append(selectedUUIDs, uid)
 	}
 
-	err = c.Db.UpdateCautionProtocols(ctx, database.UpdateCautionProtocolsParams{		
-		CautionID: ids.ID,
+	err := c.Db.UpdateCautionProtocols(ctx, database.UpdateCautionProtocolsParams{
+		CautionID:   ids.ID,
 		ProtocolIds: selectedUUIDs,
 	})
 
 	if err != nil {
-		json_utils.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error updating cautions for protocol: %s", ids.ProtocolID))
-		return
+		return fmt.Errorf("error updating cautions (%s) to protocols with error:%s", ids.ID.String(), err.Error())
 	}
 
-	json_utils.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "cautions updated for protocol"})
+	return nil
+}
+
+func HandleGetCautions(c *config.Config, w http.ResponseWriter, r *http.Request) {
+	api.HandleGet(c, w, r, getCautions)
+}
+
+func HandleGetCautionsByProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
+	api.HandleGet(c, w, r, getCautionsByProtocol)
+}
+
+func HandleGetCautionsByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
+	api.HandleGet(c, w, r, getCautionsByID)
+}
+
+func HandleDeleteCautionByID(c *config.Config, w http.ResponseWriter, r *http.Request) {
+	api.HandleModify(c, w, r, deleteCaution)
+}
+
+func HandleUpsertCaution(c *config.Config, w http.ResponseWriter, r *http.Request) {
+	api.HandleUpsert(c, w, r, upsertCaution)
+}
+
+func HandleAddCautionToProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
+	api.HandleModify(c, w, r, addCautionToProtocol)
+}
+
+func HandleRemoveCautionFromProtocol(c *config.Config, w http.ResponseWriter, r *http.Request) {
+	api.HandleModify(c, w, r, removeCautionToProtocol)
+}
+
+func HandleUpdateCautionsToProtocols(c *config.Config, w http.ResponseWriter, r *http.Request) {
+	api.HandleUpsert(c, w, r, updateCautionToProtocol)
 }

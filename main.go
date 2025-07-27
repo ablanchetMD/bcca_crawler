@@ -56,6 +56,8 @@ func main() {
 	commands.register("get", handlerAnalyzePDF)
 	commands.register("check", handlerCheckDatabase)
 	commands.register("pubmed", handlerSearchPubmed)
+	commands.register("reset", handlerResetDatabase)
+	commands.register("scrawl",handlerSingleCrawl)
 
 	//http://www.bccancer.bc.ca/health-professionals/clinical-resources/chemotherapy-protocols/lymphoma-myeloma
 

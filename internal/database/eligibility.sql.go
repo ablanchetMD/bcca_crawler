@@ -48,6 +48,8 @@ SELECT
             json_build_object(
                 'id', pecv.protocol_id, 
                 'code', p.code
+                -- 'created_at', p.created_at,
+                -- 'updated_at', p.updated_at
             )
         )
         FROM protocol_eligibility_criteria_values pecv
@@ -162,6 +164,8 @@ SELECT
             json_build_object(
                 'id', pecv.protocol_id, 
                 'code', p.code
+                -- 'created_at', p.created_at,
+                -- 'updated_at', p.updated_at
             )
         )
         FROM protocol_eligibility_criteria_values pecv
@@ -208,6 +212,8 @@ SELECT
             json_build_object(
                 'id', pecv.protocol_id, 
                 'code', p.code
+                -- 'created_at', p.created_at,
+                -- 'updated_at', p.updated_at
             )
         )
         FROM protocol_eligibility_criteria_values pecv
